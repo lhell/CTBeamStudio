@@ -1,29 +1,4 @@
-# Format-Empfehlung
 
-**Eine einzige Markdown-Datei `docs/PLAN.md`, versioniert im Repo.** Kein zweites YAML/JSON daneben — doppelte Quellen driften auseinander, und du pflegst dann zwei Wahrheiten.
-
-| Format | Für dich | Für KI | Urteil |
-|---|---|---|---|
-| Markdown mit Task-IDs | sehr gut | sehr gut | **Empfehlung** |
-| YAML/JSON-Plan | mühsam | gut | nur wenn Tooling ihn liest |
-| GitHub Issues | gut | schlecht (Kontext nicht im Repo) | ergänzend, nicht als Quelle |
-| Freitext-Notizen | gut | schlecht (keine Referenzen) | nein |
-| Markdown + YAML-Spiegel | mittel | gut | Driftrisiko, nein |
-
-Was Markdown KI-lesbar macht — diese sechs Regeln sind der eigentliche Unterschied:
-
-1. **Stabile IDs** (`T-11`) statt „die DICOM-Aufgabe" — eindeutig referenzierbar über Sessions hinweg.
-2. **Fixe Schlüssel pro Task**: `Ziel`, `Dateien`, `Abhängig von`, `Akzeptanz`. Gleiche Struktur überall, parsebar ohne Raten.
-3. **Konkrete Repo-Pfade**, keine Umschreibungen.
-4. **Akzeptanzkriterien als prüfbare Aussagen**, nicht als Wunsch („Loader ist robust" → unbrauchbar).
-5. **Decision Log** am Ende: verhindert, dass bereits getroffene Entscheidungen neu diskutiert werden.
-6. **Offene Fragen explizit markiert** — sonst füllt eine KI die Lücke mit Annahmen.
-
-Status-Marker: `[ ]` offen, `[~]` läuft, `[x]` fertig, `[!]` blockiert.
-
----
-
-Nachfolgend der Inhalt für `docs/PLAN.md`:
 
 # CT-Viewer — Implementierungsplan
 

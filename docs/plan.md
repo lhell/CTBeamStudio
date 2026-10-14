@@ -159,6 +159,24 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 - **Abhängig von:** T-04, T-40
 - **Akzeptanz:** Option A (Phantom) und Option B (eigene AAPM-Daten) getrennt; Screenshot zeigt Phantom; Satz zur Nicht-Weitergabe der Challenge-Daten enthalten.
 
+### `[ ]` T-43 — Requirements
+- **Ziel:** Projekt-Dependencies definieren.
+- **Dateien:** `requirements.txt`, `requirements-dev.txt`
+- **Abhängig von:** –
+- **Akzeptanz:** 
+  - `requirements.txt`: pydicom, numpy, streamlit, pyvista (oder plotly für 3D)
+  - `requirements-dev.txt`: pytest, flake8, black, isort
+  - Dockerfile verwendet `requirements.txt`
+
+### `[ ]` T-44 — Deployment
+- **Ziel:** App veröffentlichen.
+- **Optionen:** GHCR, Streamlit Cloud, HuggingFace Spaces
+- **Dateien:** `.github/workflows/deploy.yml` (optional)
+- **Abhängig von:** T-40, T-41, T-42
+- **Akzeptanz:** 
+  - Docker-Image wird nach GHCR gepusht (bei Push auf main)
+  - ODER: Link zu deployed Streamlit Cloud App im README
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -168,7 +186,8 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 | 3 | Fr, 16.10. | T-11, T-12 |
 | 4 | Mo, 19.10. | T-14, T-20 |
 | 5 | Di, 20.10. | T-21, T-22, T-23, T-30 – T-33 |
-| 6 | Mi, 21.10. | T-40, T-41, T-42 |
+| 6 | Mi, 21.10. | T-40, T-41, T-42, T-43 |
+| 7 | Do, 22.10. | T-44 (optional) |
 
 ## Decision Log
 

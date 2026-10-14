@@ -3,7 +3,7 @@
 # CT-Viewer — Implementierungsplan
 
 **Projekt:** `Res_Indep_CTO` / `src/visualization/`
-**Stand:** 2026-10-13
+**Stand:** 2026-10-14
 **Start:** Mi, 2026-10-14
 
 ## Leitprinzipien
@@ -17,25 +17,25 @@
 
 ## Phase 0 — Lizenz & Hygiene (Tag 1–2)
 
-### `[ ]` T-01 — Lizenzdateien
+### `[x]` T-01 — Lizenzdateien
 - **Ziel:** Projekt ist rechtlich veröffentlichbar.
 - **Dateien:** `LICENSE` (MIT), `NOTICE`, `../SECURITY.md`
 - **Abhängig von:** –
 - **Akzeptanz:** Alle drei Dateien im Root; `NOTICE` nennt Fremdlizenzen von `pydicom`, `numpy`, `streamlit`, `pylibjpeg`.
 
-### `[ ]` T-02 — Git-Historie prüfen
+### `[x]` T-02 — Git-Historie prüfen
 - **Ziel:** Keine Patientendaten oder Secrets in der Historie.
 - **Dateien:** –
 - **Abhängig von:** –
-- **Akzeptanz:** `git log --all --diff-filter=A --name-only` enthält keine `.dcm`, `.npy`, `.ckpt`, `.env`. Bei Fund: History-Rewrite **vor** dem ersten Push.
+- **Akzeptanz:** `git log --all --diff-filter=A --name-only` enthält keine `.dcm`, `.ima`, `.npy`, `.ckpt`, `.env`. Bei Fund: History-Rewrite **vor** dem ersten Push.
 
-### `[ ]` T-03 — Daten-Guards
+### `[x]` T-03 — Daten-Guards
 - **Ziel:** Daten können nicht versehentlich veröffentlicht werden.
 - **Dateien:** `../.gitignore`, `.dockerignore`, `Dockerfile`, `.github/workflows/ci.yml`
 - **Abhängig von:** T-02
 - **Akzeptanz:** CI-Job schlägt fehl, wenn eine Testdatei `test.dcm` getrackt wird (lokal einmal verifizieren, dann zurücknehmen).
 
-### `[ ]` T-04 — Datendokumentation
+### `[x]` T-04 — Datendokumentation
 - **Ziel:** Zugang und Zitierpflicht dokumentiert.
 - **Dateien:** `docs/data.md`, `CITATION.cff`, `configs/datasets/aapm_ldct2016.yaml`
 - **Abhängig von:** –
@@ -110,12 +110,17 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 - **Abhängig von:** T-10
 - **Akzeptanz:** Start ohne `CT_VIEWER_DATA_ROOT` lädt synthetisches Phantom in plausiblen HU (Luft −1000, Wasser 0, Knocheneinschlüsse ~+800) mit anisotropem Spacing; Banner weist auf Demo-Modus hin.
 
-### `[ ]` T-23 — Full/Low-Dose-Vergleich *(optional)*
-- **Dateien:** `src/visualization/app.py`
-- **Abhängig von:** T-21
-- **Akzeptanz:** Bei zwei Serien gleicher Geometrie Side-by-Side mit gekoppeltem Slider und identischem Window. Entfällt bei Zeitdruck.
+### `[ ]` T-23 — 3D-Visualisierung mit Quelle/Detektor
+- **Ziel:** Volumen in 3D anzeigen mit Röntgenquelle und Detektor im DICOM-Koordinatensystem.
+- **Dateien:** `src/visualization/volume3d.py`
+- **Abhängig von:** T-10, T-11
+- **Akzeptanz:** 
+  - 3D-Volumen-Visualisierung (PyVista oder Plotly)
+  - Röntgenquelle (Isocenter) und Detektorflügel positioniert gemäß DICOM Patient Coordinate System
+  - Rotation/Zoom der 3D-Ansicht
+  - Optional: Strahlengang eingezeichnet
 
-## Phase 3 — Tests (Tag 5)
+## Phase 3 — Tests (Tag 5–6)
 
 ### `[ ]` T-30 — Synthetische Fixtures
 - **Dateien:** `tests/visualization/conftest.py`
@@ -158,12 +163,12 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 
 | Tag | Datum | Tasks |
 |---|---|---|
-| 1 | Mi, 14.10. | T-01, T-02, T-03 |
-| 2 | Do, 15.10. | T-04, T-10, T-13 |
+| 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
+| 2 | Do, 15.10. | T-10, T-13 |
 | 3 | Fr, 16.10. | T-11, T-12 |
-| 4 | Sa, 17.10. | T-14, T-20 |
-| 5 | So, 18.10. | T-21, T-22, T-30 – T-33 |
-| 6 | Mo, 19.10. | T-40, T-41, T-42, T-23 falls Zeit |
+| 4 | Mo, 19.10. | T-14, T-20 |
+| 5 | Di, 20.10. | T-21, T-22, T-23, T-30 – T-33 |
+| 6 | Mi, 21.10. | T-40, T-41, T-42 |
 
 ## Decision Log
 

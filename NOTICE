@@ -1,0 +1,29 @@
+CT-Viewer Notice
+===============
+
+This project includes the following third-party components:
+
+- pydicom: https://github.com/pydicom/pydicom
+  License: BSD 3-Clause "New" or "Revised" License
+
+- numpy: https://numpy.org
+  License: BSD 3-Clause "New" or "Revised" License
+
+- streamlit: https://streamlit.io
+  License: Apache License 2.0
+
+- pylibjpeg: https://github.com/pydicom/pylibjpeg
+  License: BSD 3-Clause "New" or "Revised" License
+
+The CT-Viewer project itself is licensed under the MIT License.
+See the LICENSE file for details.
+
+AAPM LDCT Challenge 2016 Data
+=============================
+This software is designed to work with data from the AAPM Low-Dose CT
+Challenge 2016. The challenge data is NOT distributed with this software.
+Users must register separately at the challenge website to obtain access.
+
+Please cite the original challenge data if you use it in your research:
+- The AAPM TG-201 supplementary data on low-dose CT
+- Reference: https://www.aapm.org/grandchallenge/lowdosect/

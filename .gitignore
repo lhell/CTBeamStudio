@@ -1,5 +1,6 @@
 # CT Data - NEVER commit
 *.dcm
+*.ima
 *.dicom
 *.npy
 *.npz

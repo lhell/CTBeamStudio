@@ -1,0 +1,45 @@
+# CT Data - NEVER commit
+*.dcm
+*.dicom
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.ckpt
+*.pth
+*.pt
+*.onnx
+
+# Data directories
+data/
+datasets/
+CT_DATA/
+patient_data/
+
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/secrets.toml

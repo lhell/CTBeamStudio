@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Data (must not be in image)
+*.dcm
+*.ima
+*.npy
+data/
+datasets/
+
+# Python
+__pycache__
+*.pyc
+.venv
+venv
+
+# IDE
+.vscode
+.idea
+
+# Secrets
+.env
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db

@@ -19,7 +19,7 @@
 
 ### `[ ]` T-01 — Lizenzdateien
 - **Ziel:** Projekt ist rechtlich veröffentlichbar.
-- **Dateien:** `LICENSE` (MIT), `NOTICE`, `SECURITY.md`
+- **Dateien:** `LICENSE` (MIT), `NOTICE`, `../SECURITY.md`
 - **Abhängig von:** –
 - **Akzeptanz:** Alle drei Dateien im Root; `NOTICE` nennt Fremdlizenzen von `pydicom`, `numpy`, `streamlit`, `pylibjpeg`.
 
@@ -31,7 +31,7 @@
 
 ### `[ ]` T-03 — Daten-Guards
 - **Ziel:** Daten können nicht versehentlich veröffentlicht werden.
-- **Dateien:** `.gitignore`, `.dockerignore`, `Dockerfile`, `.github/workflows/ci.yml`
+- **Dateien:** `../.gitignore`, `.dockerignore`, `Dockerfile`, `.github/workflows/ci.yml`
 - **Abhängig von:** T-02
 - **Akzeptanz:** CI-Job schlägt fehl, wenn eine Testdatei `test.dcm` getrackt wird (lokal einmal verifizieren, dann zurücknehmen).
 
@@ -140,7 +140,7 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 ## Phase 4 — Deploy (Tag 6)
 
 ### `[ ]` T-40 — Dockerfile
-- **Dateien:** `Dockerfile`, `.dockerignore`
+- **Dateien:** `../Dockerfile`, `.dockerignore`
 - **Abhängig von:** T-03, T-22
 - **Akzeptanz:** Multi-Stage, kein Torch/CUDA, Non-Root-User, Image < 400 MiB, startet ohne Mount im Demo-Modus, Build-Guard aus T-03 aktiv.
 
@@ -197,4 +197,4 @@ Nicht blockierend, zu klären bis Tag 4:
 
 ---
 
-Soll ich als nächstes T-10 bis T-12 ausimplementieren (`volume.py`, `dicom.py`, `npy.py`), oder zuerst Phase 0 — also `LICENSE`, `NOTICE`, `SECURITY.md`, `docs/data.md` und die Guards?
+Soll ich als nächstes T-10 bis T-12 ausimplementieren (`volume.py`, `dicom.py`, `npy.py`), oder zuerst Phase 0 — also `LICENSE`, `NOTICE`, `../SECURITY.md`, `docs/data.md` und die Guards?

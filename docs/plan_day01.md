@@ -22,7 +22,7 @@ Projekt ist rechtlich veröffentlichbar.
 ### Dateien
 - `LICENSE` (MIT License)
 - `NOTICE`
-- `SECURITY.md`
+- `../SECURITY.md`
 
 ### Akzeptanzkriterien
 - Alle drei Dateien im Root-Verzeichnis
@@ -173,9 +173,9 @@ git push --force --tags
 Daten können nicht versehentlich veröffentlicht werden.
 
 ### Dateien
-- `.gitignore`
-- `.dockerignore`
-- `Dockerfile`
+- `../.gitignore`
+- `../.dockerignore`
+- `../Dockerfile`
 - `.github/workflows/ci.yml`
 
 ### Akzeptanzkriterien
@@ -186,7 +186,8 @@ CI-Job schlägt fehl, wenn eine Testdatei `test.dcm` getrackt wird.
 
 ### Umsetzung
 
-#### 1. `.gitignore` erweitern
+#### 1. `../.gitignore` erweitern
+
 ```gitignore
 # CT Data - NEVER commit
 *.dcm
@@ -228,7 +229,7 @@ venv/
 
 # IDE
 .vscode/
-.idea/
+../.idea/
 *.swp
 *.swo
 

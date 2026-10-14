@@ -1,0 +1,24 @@
+cff-version: "1.2.0"
+title: "CT-Viewer"
+message: "If you use this software, please cite it as below."
+authors:
+  - name: "CT-Viewer Project"
+    email: "contact@example.com"
+version: "1.0.0"
+date-released: "2026-10-14"
+license: "MIT"
+
+preferred-citation:
+  type: article
+  title: "CT-Viewer: A visualization tool for CT orientation"
+  authors:
+    - name: "CT-Viewer Project"
+  journal: "SoftwareX"
+  year: 2026
+
+references:
+  - type: book
+    title: "Low-dose CT: The phantom database testing a proton therapy treatment planning system"
+    journal: "AAPM Task Group 201 Report"
+    year: 2016
+    url: "https://www.aapm.org/grandchallenge/lowdosect/"

@@ -49,8 +49,8 @@ Repository = "https://github.com/your-org/CTOrientationViewer"
 Issues = "https://github.com/your-org/CTOrientationViewer/issues"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["visualization*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

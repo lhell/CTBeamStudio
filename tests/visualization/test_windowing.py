@@ -2,7 +2,12 @@
 
 import numpy as np
 import pytest
-from src.visualization.windowing import apply_window, apply_window_with_preset, WINDOW_PRESETS
+
+from src.visualization.windowing import (
+    WINDOW_PRESETS,
+    apply_window,
+    apply_window_with_preset,
+)
 
 
 def test_apply_window_basic():
@@ -14,9 +19,9 @@ def test_apply_window_basic():
     result = apply_window(array, center=0, width=2000)
 
     assert result.dtype == np.uint8
-    assert result[0, 0, 0] == 0   # -1000 -> 0
-    assert result[0, 0, 1] == 128 # 0 -> 128
-    assert result[0, 0, 2] == 255 # 1000 -> 255
+    assert result[0, 0, 0] == 0  # -1000 -> 0
+    assert result[0, 0, 1] == 128  # 0 -> 128
+    assert result[0, 0, 2] == 255  # 1000 -> 255
 
 
 def test_apply_window_presets():

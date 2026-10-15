@@ -4,7 +4,6 @@ from typing import Union
 
 import numpy as np
 
-
 # Window presets: (center, width)
 WINDOW_PRESETS: dict[str, tuple[float, float]] = {
     "lung": (-600, 1500),
@@ -48,8 +47,7 @@ def apply_window(array: np.ndarray, center: float, width: float) -> np.ndarray:
 
 
 def apply_window_with_preset(
-    array: np.ndarray,
-    window: Union[str, tuple[float, float]]
+    array: np.ndarray, window: Union[str, tuple[float, float]]
 ) -> np.ndarray:
     """Apply windowing with preset name or (center, width) tuple.
 

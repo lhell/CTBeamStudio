@@ -27,6 +27,7 @@ class Volume:
         Volume is unit-agnostic (HU, attenuation, or other).
         Loaders are responsible for correct unit conversion and validation.
     """
+
     array: np.ndarray
     spacing: tuple[float, ...]
     origin: tuple[float, ...]

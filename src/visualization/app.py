@@ -1,8 +1,8 @@
 """Streamlit app for CT Orientation Viewer."""
 
+import logging
 import sys
 import time
-import logging
 from pathlib import Path
 
 # Configure logging
@@ -18,9 +18,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import streamlit as st
 
-from visualization.loaders.dicom import scan_series, load_dicom_series
-from visualization.windowing import apply_window, WINDOW_PRESETS
+from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.volume import Volume
+from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
 def main():

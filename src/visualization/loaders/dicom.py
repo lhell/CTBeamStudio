@@ -25,13 +25,13 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-
-from visualization.volume import Volume
 from typing import Optional
 
 import numpy as np
 import pydicom
 from pydicom.dataset import Dataset
+
+from visualization.volume import Volume
 
 
 @dataclass

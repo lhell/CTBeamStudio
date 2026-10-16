@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -9,7 +10,7 @@ import pytest
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from visualization.phantom import create_shepp_logan_phantom, create_shepp_logan_3d
+from visualization.phantom import create_shepp_logan_3d, create_shepp_logan_phantom
 
 
 class TestSheppLoganPhantom:

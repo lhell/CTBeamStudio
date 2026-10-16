@@ -5,9 +5,8 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-import pytest
-
 import pydicom
+import pytest
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
 
@@ -59,7 +58,7 @@ def _create_ct_dicom(
         cols: Number of columns.
     """
     import pydicom
-    from pydicom.uid import generate_uid, ImplicitVRLittleEndian
+    from pydicom.uid import ImplicitVRLittleEndian, generate_uid
 
     ds = Dataset()
 

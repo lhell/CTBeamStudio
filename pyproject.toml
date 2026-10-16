@@ -57,7 +57,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-pythonpath = ["src"]
+# pythonpath removed - handled by conftest.py
 
 [tool.black]
 line-length = 88

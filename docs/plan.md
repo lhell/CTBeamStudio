@@ -43,13 +43,13 @@
 
 ## Phase 1 — Kern (Tag 2–4)
 
-### `[ ]` T-10 — `Volume`-Dataclass
+### `[x]` T-10 — `Volume`-Dataclass
 - **Ziel:** Gemeinsames Austauschformat aller Loader.
 - **Dateien:** `src/visualization/volume.py`
 - **Abhängig von:** –
 - **Akzeptanz:** Felder `array` (`np.int16`/`float32`, HU, Achsen `(z, y, x)`), `spacing` (mm, `(z, y, x)`), `origin`, `meta: dict`. `__post_init__` validiert Shape- und Spacing-Länge und wirft `ValueError` bei Spacing ≤ 0.
 
-### `[ ]` T-11 — DICOM-Loader
+### `[x]` T-11 — DICOM-Loader
 - **Ziel:** DICOM-Serie → `Volume` in HU.
 - **Dateien:** `src/visualization/loaders/dicom.py`
 - **Abhängig von:** T-10
@@ -81,7 +81,7 @@ def assert_hu(array: np.ndarray, source: str) -> None:
         )
 ```
 
-### `[ ]` T-13 — Windowing
+### `[x]` T-13 — Windowing
 - **Ziel:** HU → 8-bit Grauwerte.
 - **Dateien:** `src/visualization/windowing.py`
 - **Abhängig von:** T-10
@@ -95,7 +95,7 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 
 ## Phase 2 — App (Tag 4–5)
 
-### `[ ]` T-20 — Streamlit-App
+### `[x]` T-20 — Streamlit-App
 - **Dateien:** `src/visualization/app.py`, `configs/viewer.yaml`
 - **Abhängig von:** T-11, T-13, T-14
 - **Akzeptanz:** Ebenenauswahl, Slice-Slider, Window-Presets + manuelle Center/Width-Eingabe; HU-Wert unter dem Cursor oder zumindest Min/Max der aktuellen Schicht sichtbar.
@@ -105,7 +105,7 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 - **Abhängig von:** T-11, T-20
 - **Akzeptanz:** Sidebar listet gefundene Serien mit Patient, Beschreibung, Dosisklasse, Slice-Anzahl; Serien unter 20 Slices sind als „Localizer?" markiert.
 
-### `[ ]` T-22 — Demo-Phantom
+### `[x]` T-22 — Demo-Phantom
 - **Dateien:** `src/visualization/phantom.py`
 - **Abhängig von:** T-10
 - **Akzeptanz:** Start ohne `CT_VIEWER_DATA_ROOT` lädt synthetisches Phantom in plausiblen HU (Luft −1000, Wasser 0, Knocheneinschlüsse ~+800) mit anisotropem Spacing; Banner weist auf Demo-Modus hin.
@@ -182,10 +182,10 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 | Tag | Datum | Tasks |
 |---|---|---|
 | 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
-| 2 | Do, 15.10. | T-10, T-13 |
-| 3 | Fr, 16.10. | T-11, T-12 |
-| 4 | Mo, 19.10. | T-14, T-20 |
-| 5 | Di, 20.10. | T-21, T-22, T-23, T-30 – T-33 |
+| 2 | Do, 15.10. | T-10 ✅, T-13 ✅ |
+| 3 | Fr, 16.10. | T-11 ✅, T-12, T-20 ✅, T-22 ✅ |
+| 4 | Mo, 19.10. | T-14, T-21, T-23 |
+| 5 | Di, 20.10. | T-30 – T-33 |
 | 6 | Mi, 21.10. | T-40, T-41, T-42, T-43 |
 | 7 | Do, 22.10. | T-44 (optional) |
 

@@ -10,7 +10,7 @@ import pytest
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
 
-from src.visualization.loaders.dicom import (
+from visualization.loaders.dicom import (
     SeriesInfo,
     classify_dose,
     load_dicom_series,

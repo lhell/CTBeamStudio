@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.visualization.volume import Volume
+from visualization.volume import Volume
 
 
 def test_volume_creation():

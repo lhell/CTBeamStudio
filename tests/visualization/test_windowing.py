@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.visualization.windowing import (
+from visualization.windowing import (
     WINDOW_PRESETS,
     apply_window,
     apply_window_with_preset,

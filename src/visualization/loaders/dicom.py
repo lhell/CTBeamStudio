@@ -20,9 +20,13 @@ Example:
     ...     volume = load_dicom_series([...list of file paths...])
 """
 
+from __future__ import annotations
+
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+
+from visualization.volume import Volume
 from typing import Optional
 
 import numpy as np
@@ -209,7 +213,7 @@ def scan_series(root: Path) -> list[SeriesInfo]:
     return series_list
 
 
-def load_dicom_series(files: list[Path]) -> "Volume":
+def load_dicom_series(files: list[Path]) -> Volume:
     """Load a DICOM series and return as Volume.
 
     Sorts slices by their position along the scan axis, validates
@@ -226,8 +230,6 @@ def load_dicom_series(files: list[Path]) -> "Volume":
         ValueError: If slice spacing varies by more than 1%.
         UserWarning: If gantry tilt is detected (warning only, does not abort).
     """
-    from visualization.volume import Volume
-
     if not files:
         raise ValueError("No files provided")
 

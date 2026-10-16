@@ -1,7 +1,7 @@
 """CT Orientation Viewer — Visualization Module."""
 
-from src.visualization.volume import Volume
-from src.visualization.windowing import (
+from visualization.volume import Volume
+from visualization.windowing import (
     WINDOW_PRESETS,
     apply_window,
     apply_window_with_preset,

@@ -60,26 +60,17 @@
   - Inkonsistentes Slice-Spacing (> 1 % Abweichung) → `ValueError` mit Positionsangabe.
   - Gantry-Tilt (`ImageOrientationPatient` nicht achsparallel) → Warnung, kein Abbruch; in Docstring als v1-Limitation vermerkt.
 
-### `[ ]` T-12 — NPY-Loader
+### `[x]` T-12 — NPY-Loader
 - **Ziel:** Vorhandene AAPM-`.npy` laden.
 - **Dateien:** `src/visualization/loaders/npy.py`
 - **Abhängig von:** T-10
 - **Entscheidung:** `preprocess_aapm.py` schreibt **rohe HU** → keine Rückskalierung, nur Plausibilitätsprüfung.
-- **Akzeptanz:** Guard erkennt versehentlich normalisierte Arrays und bricht ab:
-
-```python
-HU_AIR_MAX = -500.0   # echte CT-Luft liegt bei ca. -1000
-HU_RANGE_MIN = 300.0  # plausible Spannweite Luft..Knochen
-
-def assert_hu(array: np.ndarray, source: str) -> None:
-    lo, hi = float(array.min()), float(array.max())
-    if lo > HU_AIR_MAX or (hi - lo) < HU_RANGE_MIN:
-        raise ValueError(
-            f"{source}: Wertebereich [{lo:.1f}, {hi:.1f}] sieht nicht wie HU aus. "
-            "Erwartet rohe HU (Luft ca. -1000, Wasser ca. 0). "
-            "Falls normalisiert: preprocess_aapm.py prüfen."
-        )
-```
+- **Akzeptanz:** 
+  - `load_npy(path)` lädt einzelne .npy Datei (2D oder 3D)
+  - `scan_npy_folder(root)` findet .npy Dateien, sortiert numerisch
+  - `load_npy_series(files)` stackt mehrere 2D/3D Dateien
+  - Auto-Detection von HU vs 1/mm basierend auf dtype und Wertbereich
+  - Optionale `unit` und `spacing` Parameter
 
 ### `[x]` T-13 — Windowing
 - **Ziel:** HU → 8-bit Grauwerte.
@@ -120,17 +111,19 @@ def assert_hu(array: np.ndarray, source: str) -> None:
   - Rotation/Zoom der 3D-Ansicht
   - Optional: Strahlengang eingezeichnet
 
-## Phase 3 — Tests (Tag 5–6)
+## Phase 3 — Tests (Tag 5–6) — Teilweise erledigt
 
 ### `[ ]` T-30 — Synthetische Fixtures
 - **Dateien:** `tests/visualization/conftest.py`
 - **Abhängig von:** T-10
 - **Akzeptanz:** Fixture erzeugt per `pydicom` eine Serie im `tmp_path` mit korrekten `ImagePositionPatient`, `RescaleSlope/Intercept`, `SeriesDescription`; keine Binärdaten im Repo.
 
-### `[ ]` T-31 — Loader-Tests
-- **Dateien:** `tests/visualization/test_loaders.py`
+### `[x]` T-31 — Loader-Tests
+- **Dateien:** `tests/unit/test_dicom_loader.py`, `tests/unit/test_npy_loader.py`
 - **Abhängig von:** T-11, T-12, T-30
-- **Akzeptanz:** Abgedeckt: Sortierreihenfolge, HU-Umrechnung, Spacing-Mismatch → `ValueError`, `classify_dose`-Parametrisierung, `assert_hu` lehnt `[0,1]`- und `[-1,1]`-Arrays ab.
+- **Akzeptanz:** 
+  - DICOM: Sortierreihenfolge, HU-Umrechnung, Spacing-Mismatch → `ValueError`, `classify_dose`
+  - NPY: 2D/3D Support, Ordner-Scan, Series-Loading, Unit-Detection
 
 ### `[ ]` T-32 — Windowing- & MPR-Tests
 - **Dateien:** `tests/visualization/test_windowing.py`, `tests/visualization/test_mpr.py`
@@ -183,7 +176,7 @@ def assert_hu(array: np.ndarray, source: str) -> None:
 |---|---|---|
 | 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
 | 2 | Do, 15.10. | T-10 ✅, T-13 ✅ |
-| 3 | Fr, 16.10. | T-11 ✅, T-12, T-20 ✅, T-22 ✅ |
+| 3 | Fr, 16.10. | T-11 ✅, T-12 ✅, T-20 ✅, T-22 ✅ |
 | 4 | Mo, 19.10. | T-14, T-21, T-23 |
 | 5 | Di, 20.10. | T-30 – T-33 |
 | 6 | Mi, 21.10. | T-40, T-41, T-42, T-43 |

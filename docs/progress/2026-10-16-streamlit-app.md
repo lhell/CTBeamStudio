@@ -5,15 +5,19 @@ Streamlit UI für CT Orientation Viewer entwickelt und getestet mit AAPM-Daten.
 
 ## Completed Tasks
 
-### 1. Streamlit App (src/visualization/app.py)
-- **Folder Selection**: Text input für DICOM-Pfad
-- **Scan Directory**: Button mit animiertem Fortschrittsbalken
+### 1. Streamlit App (src/visualization/app.py) - TEILWEISE ✅
+- **Folder Selection**: Text input für DICOM-Pfad ✅
+- **Scan Directory**: Button mit animiertem Fortschrittsbalken ✅
 - **Load Options**: 
-  - "All slices" - lädt alle Dateien
-  - "Custom number" - lädt benutzerdefinierte Anzahl (default: 100)
-- **File Count**: Zeigt Anzahl der Dateien im Verzeichnis
-- **Loaded Files**: Scrollbare Liste aller geladenen Dateien in der Sidebar
-- **Progress Bar**: Zeigt X/Y während des Ladens
+  - "All slices" - lädt alle Dateien ✅
+  - "Custom number" - lädt benutzerdefinierte Anzahl (default: 100) ✅
+- **File Count**: Zeigt Anzahl der Dateien im Verzeichnis ✅
+- **Loaded Files**: Scrollbare Liste aller geladenen Dateien in der Sidebar ✅
+- **Progress Bar**: Zeigt X/Y während des Ladens ⚠️ (nicht vollständig funktional)
+
+### Known Issues / Offene Punkte
+- Progress-Anzeige während Scan funktioniert, aber UI-Updates sind begrenzt
+- X/Y Anzeige unter Loading-Balken wird nicht korrekt angezeigt (Streamlit-Limitation)
 
 ### 2. UI Improvements
 - Zwei Optionen am Anfang (All slices / Custom number)

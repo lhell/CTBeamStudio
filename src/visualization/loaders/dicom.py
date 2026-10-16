@@ -226,7 +226,7 @@ def load_dicom_series(files: list[Path]) -> "Volume":
         ValueError: If slice spacing varies by more than 1%.
         UserWarning: If gantry tilt is detected (warning only, does not abort).
     """
-    from src.visualization.volume import Volume
+    from visualization.volume import Volume
 
     if not files:
         raise ValueError("No files provided")

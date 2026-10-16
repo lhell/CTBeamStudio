@@ -1,11 +1,12 @@
 """NPY loader for CT volume data."""
 
-import numpy as np
 from pathlib import Path
 from typing import Optional
 
-from visualization.volume import Volume
+import numpy as np
+
 from visualization.loaders.dicom import _detect_unit
+from visualization.volume import Volume
 
 
 def scan_npy_folder(root: Path) -> list[Path]:

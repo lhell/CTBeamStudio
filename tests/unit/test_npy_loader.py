@@ -41,12 +41,13 @@ class TestLoadNpy:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "volume.npy"
 
-            # 2D array
-            array = np.random.randint(0, 100, (64, 64), dtype=np.float32)
+            # 2D array (now should work - 2D is supported!)
+            array = np.random.rand(64, 64).astype(np.float32)
             np.save(path, array)
 
-            with pytest.raises(ValueError, match="Expected 3D array"):
-                load_npy(path)
+            # 2D arrays are now loaded as single slice
+            volume = load_npy(path)
+            assert volume.array.shape == (1, 64, 64)
 
     def test_load_npy_1d_raises(self):
         """ValueError when array is 1D."""
@@ -56,7 +57,7 @@ class TestLoadNpy:
             array = np.array([1, 2, 3, 4], dtype=np.float32)
             np.save(path, array)
 
-            with pytest.raises(ValueError, match="Expected 3D array"):
+            with pytest.raises(ValueError, match="Expected 2D or 3D array"):
                 load_npy(path)
 
     def test_custom_spacing(self):
@@ -212,7 +213,7 @@ class TestNpy2DSupport:
             path = Path(tmpdir) / "slice.npy"
 
             # 2D array (y, x)
-            array = np.random.randint(0, 100, (64, 64), dtype=np.float32)
+            array = np.random.rand(64, 64).astype(np.float32)
             np.save(path, array)
 
             volume = load_npy(path)

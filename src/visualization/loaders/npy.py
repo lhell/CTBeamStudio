@@ -167,6 +167,15 @@ def load_npy(
     # Apply rescale
     array = array * rescale_slope + rescale_intercept
 
+    # Preserve original dtype if possible (identity rescale or HU)
+    original_dtype = np.load(path).dtype
+    if array.dtype != original_dtype and original_dtype in (np.int16, np.uint16):
+        # Preserve for identity (slope=1, intercept=0) OR HU (standard CT conversion)
+        if (rescale_slope == 1.0 and rescale_intercept == 0) or (
+            unit == "HU" and rescale_slope == 1.0 and rescale_intercept == -1024
+        ):
+            array = array.astype(original_dtype)
+
     # Create metadata
     meta = {
         "unit": unit,

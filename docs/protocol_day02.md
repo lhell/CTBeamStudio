@@ -1,4 +1,4 @@
-# Day 02 Protocol — CTOrientationViewer
+# Day 02 Protocol — CTOrientationViewer ✅ (Abgeschlossen)
 **Datum:** Do, 15.10.2026  
 **Phase:** Phase 1 — Kern (Tag 2)
 
@@ -75,6 +75,8 @@
 
 1. **T-11** — DICOM-Loader
 2. **T-12** — NPY-Loader
+3. **T-20** — Streamlit-App
+4. **T-22** — Demo-Phantom
 
 ---
 

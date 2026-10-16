@@ -11,10 +11,10 @@ Note:
 Example:
     >>> from pathlib import Path
     >>> from src.visualization.loaders import scan_series, load_dicom_series
-    >>> 
+    >>>
     >>> # Scan directory for series
     >>> series_list = scan_series(Path("path/to/dicom/dir"))
-    >>> 
+    >>>
     >>> # Load first series
     >>> if series_list:
     ...     volume = load_dicom_series([...list of file paths...])

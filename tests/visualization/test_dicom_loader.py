@@ -27,7 +27,12 @@ def _create_ct_dicom(
     slice_location: float = 0.0,
     image_position_patient: tuple[float, float, float] = (0.0, 0.0, 0.0),
     image_orientation_patient: tuple[float, float, float, float, float, float] = (
-        1.0, 0.0, 0.0, 0.0, 1.0, 0.0
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
     ),
     pixel_spacing: tuple[float, float] = (0.7, 0.7),
     rescale_slope: float = 1.0,
@@ -61,7 +66,9 @@ def _create_ct_dicom(
     # File meta for proper DICOM write
     ds.file_meta = pydicom.Dataset()
     ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
-    ds.file_meta.MediaStorageSOPClassUID = "1.2.840.10008.5.1.4.1.1.2"  # CT Image Storage
+    ds.file_meta.MediaStorageSOPClassUID = (
+        "1.2.840.10008.5.1.4.1.1.2"  # CT Image Storage
+    )
     ds.file_meta.MediaStorageSOPInstanceUID = generate_uid()
     ds.file_meta.ImplementationClassUID = generate_uid()
 
@@ -119,7 +126,7 @@ def _create_ct_dicom(
     center_y, center_x = rows // 2, cols // 2
     radius = min(rows, cols) // 4
     y, x = np.ogrid[:rows, :cols]
-    mask = (x - center_x) ** 2 + (y - center_y) ** 2 <= radius ** 2
+    mask = (x - center_x) ** 2 + (y - center_y) ** 2 <= radius**2
     pixel_array[mask] = 1000  # ~water-equivalent
 
     ds.PixelData = pixel_array.tobytes()
@@ -359,9 +366,7 @@ class TestLoadDicomSeries:
 
                 # Should have warning
                 assert len(w) >= 1
-                gantry_warnings = [
-                    x for x in w if "Gantry tilt" in str(x.message)
-                ]
+                gantry_warnings = [x for x in w if "Gantry tilt" in str(x.message)]
                 assert len(gantry_warnings) >= 1
 
                 # Should still return valid volume

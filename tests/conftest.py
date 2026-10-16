@@ -15,6 +15,7 @@ if src_path not in sys.path:
 
 # Debug
 import visualization.windowing
-print(f"[conftest] OK - visualization.windowing found at {visualization.windowing.__file__}")
 
-
+print(
+    f"[conftest] OK - visualization.windowing found at {visualization.windowing.__file__}"
+)

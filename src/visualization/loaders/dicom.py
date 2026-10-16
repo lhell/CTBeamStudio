@@ -213,7 +213,36 @@ def scan_series(root: Path) -> list[SeriesInfo]:
     return series_list
 
 
-def load_dicom_series(files: list[Path]) -> Volume:
+def _detect_unit(arrays: np.ndarray) -> tuple[str, float, float, str]:
+    """Detect if data is HU or attenuation.
+
+    Returns:
+        tuple: (unit, slope, intercept, confidence)
+            - unit: "HU" or "1/mm"
+            - slope: rescale slope
+            - intercept: rescale intercept
+            - confidence: "high" or "low"
+    """
+    min_val = float(arrays.min())
+    max_val = float(arrays.max())
+
+    # HU: int16/int32 with large positive values
+    if arrays.dtype in (np.int16, np.int32) and max_val > 100:
+        return ("HU", 1.0, -1024, "high")
+
+    # Attenuation: float, all positive, max < 10
+    if arrays.dtype == np.float32 and min_val >= 0 and max_val < 10:
+        return ("1/mm", 1.0, 0, "high")
+
+    # Attenuation: float, all positive, max < 1
+    if arrays.dtype == np.float32 and min_val >= 0 and max_val < 1:
+        return ("1/mm", 1.0, 0, "high")
+
+    # Default: assume HU with standard CT values
+    return ("HU", 1.0, -1024, "low")
+
+
+def load_dicom_series(files: list[Path], unit: str = None) -> Volume:
     """Load a DICOM series and return as Volume.
 
     Sorts slices by their position along the scan axis, validates
@@ -307,14 +336,30 @@ def load_dicom_series(files: list[Path]) -> Volume:
     # Stack pixel arrays into volume (z, y, x)
     array = np.stack(pixel_arrays, axis=0)
 
-    # Convert to HU: hu = pixel_value * RescaleSlope + RescaleIntercept
-    rescale_slope = getattr(first_ds, "RescaleSlope", 1)
-    rescale_intercept = getattr(first_ds, "RescaleIntercept", -1024)
+    # Detect or use forced unit
+    if unit is None:
+        detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(array)
+        print(f"[load_dicom_series] Detected unit: {detected_unit} (confidence: {confidence})")
+        print(f"  Using: slope={detected_slope}, intercept={detected_intercept}")
+        print(f"  Data range: [{array.min()}, {array.max()}], dtype: {array.dtype}")
+        unit = detected_unit
+        rescale_slope = detected_slope
+        rescale_intercept = detected_intercept
+    else:
+        # Validate and use forced unit
+        if unit not in ("HU", "1/mm", "1/cm"):
+            raise ValueError(f"Invalid unit: {unit}. Must be 'HU', '1/mm', or '1/cm'.")
+        # Use DICOM tags if available, otherwise defaults
+        rescale_slope = getattr(first_ds, "RescaleSlope", 1)
+        if unit == "HU":
+            rescale_intercept = getattr(first_ds, "RescaleIntercept", -1024)
+        else:
+            rescale_intercept = getattr(first_ds, "RescaleIntercept", 0)
 
     array = array * rescale_slope + rescale_intercept
 
     # Ensure correct dtype
-    if array.dtype != np.int16:
+    if unit == "HU" and array.dtype != np.int16:
         array = array.astype(np.int16)
 
     # Get origin from first slice position
@@ -326,7 +371,7 @@ def load_dicom_series(files: list[Path]) -> Volume:
 
     # Create metadata
     meta = {
-        "unit": "HU",
+        "unit": unit,
         "series_instance_uid": getattr(first_ds, "SeriesInstanceUID", ""),
         "patient_id": getattr(first_ds, "PatientID", ""),
     }

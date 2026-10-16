@@ -33,9 +33,12 @@ Streamlit UI für CT Orientation Viewer entwickelt und getestet mit AAPM-Daten.
 ## Test Data
 - Pfad: `C:\Users\hellwege\AAPMLowDose\1mm B30-selected\full_1mm\L067\full_1mm`
 - Dateien: 560 DICOM-Dateien
+- **DICOM Loader getestet**: 
+  - Shape: (10, 512, 512)
+  - HU range: [-1024, 1595]
 
 ## Known Issues
-- Pytest hat Import-Probleme (funktioniert direkt, nicht über pytest)
+- Pytest hat Import-Probleme (gelöst mit sys.path in conftest.py)
 - Streamlit-Verbindung gelegentlich instabil
 
 ## Next Steps

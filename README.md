@@ -5,7 +5,7 @@ A web-based visualization tool for CT orientation and 3D volume rendering, desig
 ## Features
 
 - **DICOM Loading** — Read CT scans from DICOM files (`.dcm`, `.ima`)
-- **3D Volume Visualization** — Interactive 3D view with source and detector positioning
+- **3D Volume Visualization** — Interactive 3D view with source and detector positioning (parallelproj: Z-axis rotation)
 - **Multi-Planar Reconstruction (MPR)** — Axial, coronal, and sagittal slices
 - **Windowing** — Presets for lung, abdomen, bone, and brain imaging
 - **HU Values** — Native Hounsfield Unit handling
@@ -13,7 +13,7 @@ A web-based visualization tool for CT orientation and 3D volume rendering, desig
 
 ## Supported Data
 
-- **AAPM Low-Dose CT Challenge 2016** — [Register here](https://www.aapm.org/grandchallenge/lowdosect/)
+- **AAPM Low-Dose CT Challenge 2016** — [Download data here](https://aapm.app.box.com/s/eaw4jddb53keg1bptavvvd1sf4x3pe9h/folder/144226105715) (requires registration)
 - **Generic DICOM** — Any CT dataset with valid HU values
 - **NumPy** — `.npy` files with shape `(z, y, x)` and `int16` dtype
 

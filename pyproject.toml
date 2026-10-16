@@ -53,7 +53,7 @@ where = ["src"]
 include = ["visualization*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/test_phantom.py", "tests/visualization"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -13,7 +13,7 @@ A web-based visualization tool for CT orientation and 3D volume rendering, desig
 
 ## Supported Data
 
-- **AAPM Low-Dose CT Challenge 2016** — [Download data here](https://aapm.app.box.com/s/eaw4jddb53keg1bptavvvd1sf4x3pe9h/folder/144226105715) (requires registration)
+- **AAPM Low-Dose CT Challenge 2016** — [Download data here](https://aapm.app.box.com/s/eaw4jddb53keg1bptavvvd1sf4x3pe9h/folder/144226105715) 
 - **Generic DICOM** — Any CT dataset with valid HU values
 - **NumPy** — `.npy` files with shape `(z, y, x)` and `int16` dtype
 

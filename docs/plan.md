@@ -78,11 +78,18 @@
 - **Abhängig von:** T-10
 - **Akzeptanz:** `apply_window(array, center, width)` liefert `uint8`; Presets `lung (-600/1500)`, `abdomen (40/400)`, `bone (400/1800)`, `brain (40/80)`; `width <= 0` → `ValueError`; Clipping ohne Überlauf bei `int16`-Eingang.
 
-### `[ ]` T-14 — Reslicing / MPR
+### `[x]` T-14 — Reslicing / MPR
 - **Ziel:** Axial, koronal, sagittal bei anisotropem Spacing.
 - **Dateien:** `src/visualization/mpr.py`
 - **Abhängig von:** T-10
 - **Akzeptanz:** `extract_slice(volume, plane, index)` gibt Bild **und** In-plane-Spacing zurück; Seitenverhältnis wird aus dem Spacing berechnet, nicht aus der Pixelanzahl. Testfall: Volume mit Spacing `(3.0, 0.7, 0.7)` ergibt im koronalen Schnitt ein Aspect-Ratio von ≈ 4,29.
+- **Status:** ✅ Done (Oct 19, 2026)
+- **Implementierung:**
+  - 3-column MPR layout (axial, coronal, sagittal)
+  - Slice sliders + jump buttons (⏮/⏭)
+  - Isotropic resampling for correct aspect ratio
+  - Hover coordinates via JavaScript
+  - Click-to-focus + keyboard navigation (arrows, Home/End, Tab)
 
 ## Phase 2 — App (Tag 4–5)
 
@@ -90,11 +97,20 @@
 - **Dateien:** `src/visualization/app.py`, `configs/viewer.yaml`
 - **Abhängig von:** T-11, T-13, T-14
 - **Akzeptanz:** Ebenenauswahl, Slice-Slider, Window-Presets + manuelle Center/Width-Eingabe; HU-Wert unter dem Cursor oder zumindest Min/Max der aktuellen Schicht sichtbar.
+- **Status:** ✅ Done (Oct 19, 2026)
+- **Implementierung:**
+  - MPR views with sliders
+  - Window presets (lung, abdomen, bone, brain) + manual controls
+  - Hover coordinates (x,y tooltip on images)
+  - Click-to-focus for keyboard navigation
+  - Jump buttons (⏮/⏭) for first/last slice
+  - Session state persistence
 
-### `[ ]` T-21 — Serienauswahl
+### `[x]` T-21 — Serienauswahl
 - **Dateien:** `src/visualization/app.py`
 - **Abhängig von:** T-11, T-20
 - **Akzeptanz:** Sidebar listet gefundene Serien mit Patient, Beschreibung, Dosisklasse, Slice-Anzahl; Serien unter 20 Slices sind als „Localizer?" markiert.
+- **Status:** ⚠️ Partial - fast scan works, but file loading ignores selection
 
 ### `[x]` T-22 — Demo-Phantom
 - **Dateien:** `src/visualization/phantom.py`
@@ -125,10 +141,11 @@
   - DICOM: Sortierreihenfolge, HU-Umrechnung, Spacing-Mismatch → `ValueError`, `classify_dose`
   - NPY: 2D/3D Support, Ordner-Scan, Series-Loading, Unit-Detection
 
-### `[ ]` T-32 — Windowing- & MPR-Tests
+### `[x]` T-32 — Windowing- & MPR-Tests
 - **Dateien:** `tests/visualization/test_windowing.py`, `tests/visualization/test_mpr.py`
 - **Abhängig von:** T-13, T-14
 - **Akzeptanz:** Window-Grenzen exakt (0 und 255 an den Rändern), Aspect-Ratio-Fall aus T-14, `width=0` → `ValueError`.
+- **Status:** ✅ Done (Oct 19, 2026)
 
 ### `[ ]` T-33 — Datenvalidierungsskript
 - **Dateien:** `scripts/check_aapm.py`
@@ -177,8 +194,8 @@
 | 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
 | 2 | Do, 15.10. | T-10 ✅, T-13 ✅ |
 | 3 | Fr, 16.10. | T-11 ✅, T-12 ✅, T-20 ✅, T-22 ✅ |
-| 4 | Mo, 19.10. | T-14, T-21, T-23 |
-| 5 | Di, 20.10. | T-30 – T-33 |
+| 4 | Mo, 19.10. | T-14 ✅, T-20 ✅, T-21 ⚠️, T-32 ✅ |
+| 5 | Di, 20.10. | T-30, T-33, T-21 (fix) |
 | 6 | Mi, 21.10. | T-40, T-41, T-42, T-43 |
 | 7 | Do, 22.10. | T-44 (optional) |
 
@@ -196,11 +213,49 @@
 
 ## Offene Fragen
 
-Keine blockierenden Punkte. D-6 hat den letzten Blocker (`NpyLoader`) aufgelöst.
+### Erledigt (Tag 4)
+- Window-Preset für den Start: `abdomen` ✅ (default in T-20)
+- Hover-Koordinaten implementiert ✅
+- Keyboard-Navigation (arrows, Home/End, Tab) ✅
+- Jump buttons (⏮/⏭) ✅
 
-Nicht blockierend, zu klären bis Tag 4:
-- `assert_hu`-Schwellen (`HU_AIR_MAX`, `HU_RANGE_MIN`) gegen einen echten AAPM-Fall kalibrieren — bei beschnittenen Volumes ohne Luft könnten sie zu streng sein.
-- Window-Preset für den Start: `abdomen` oder aus `configs/viewer.yaml`?
+### Noch offen
+- T-21: Series selection verwendet nicht `selected_series.files` → lädt alle Dateien
+- T-23: 3D-Visualisierung (optional)
+- Sortierung nach ImagePositionPatient[2] für korrekte anatomische Reihenfolge
+- Mouse-Wheel-Scrolling über Bilder
+
+## Implementation Notes (Oct 19, 2026)
+
+### Key Functions in app.py
+| Function | Purpose |
+|----------|---------|
+| `setup_image_interaction()` | JavaScript for keyboard/click navigation via components.html |
+| `slice_slider()` | Slider + anchor div + jump buttons |
+| `to_isotropic()` | Resample for correct aspect ratio |
+| `clamp_slice_state()` | Clamp session state values before widget creation |
+
+### Key Functions in mpr.py
+| Function | Purpose |
+|----------|---------|
+| `extract_slice()` | Extract 2D slice from 3D volume |
+| `AXIS` | Mapping: axial→0, coronal→1, sagittal→2 |
+
+### Key Functions in dicom.py
+| Function | Purpose |
+|----------|---------|
+| `scan_series()` | Fast scanning by subdirectory (no DICOM reads) |
+| `load_dicom_series()` | Load DICOM files into Volume |
+| `SeriesInfo` | Dataclass with `files` attribute |
+
+### Commands
+```bash
+# Run server
+python -m streamlit run src/visualization/app.py --server.headless true --server.port 8501
+
+# Run tests
+python -m pytest tests/ -v
+```
 
 ## Risiken
 

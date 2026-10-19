@@ -254,7 +254,7 @@ def main():
             )
             if show_coords:
                 axial_coords = streamlit_image_coordinates(
-                    axial_windowed, key="axial_coords", use_container_width=True
+                    axial_windowed, key="axial_coords", use_column_width=True
                 )
                 if axial_coords:
                     x, y = axial_coords["x"], axial_coords["y"]
@@ -278,7 +278,7 @@ def main():
             )
             if show_coords:
                 coronal_coords = streamlit_image_coordinates(
-                    coronal_resampled, key="coronal_coords", use_container_width=True
+                    coronal_resampled, key="coronal_coords", use_column_width=True
                 )
                 if coronal_coords:
                     x, y = coronal_coords["x"], coronal_coords["y"]
@@ -304,7 +304,7 @@ def main():
             )
             if show_coords:
                 sagittal_coords = streamlit_image_coordinates(
-                    sagittal_resampled, key="sagittal_coords", use_container_width=True
+                    sagittal_resampled, key="sagittal_coords", use_column_width=True
                 )
                 if sagittal_coords:
                     x, y = sagittal_coords["x"], sagittal_coords["y"]

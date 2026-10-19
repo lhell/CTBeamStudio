@@ -139,3 +139,89 @@ class TestVolumeInfoDisplay:
         # Sagittal: spacing[0], spacing[1] - use valid index 5
         _, spacing = extract_slice(test_volume, "sagittal", 5)
         assert spacing == (2.5, 0.5)
+
+
+class TestIsotropicResampling:
+    """Test isotropic resampling for correct aspect ratio."""
+
+    @pytest.fixture
+    def anisotropic_image(self):
+        """Create anisotropic image (different row/col spacing)."""
+        # Simulate coronal/sagittal: 100 rows (3mm each), 512 cols (0.7mm each)
+        return np.random.randint(0, 256, (100, 512), dtype=np.uint8)
+
+    def test_isotropic_same_spacing(self, anisotropic_image):
+        """When row/col spacing equal, return original."""
+        from visualization.app import to_isotropic
+
+        result = to_isotropic(anisotropic_image, (0.7, 0.7))
+        assert result.shape == anisotropic_image.shape
+
+    def test_isotropic_vertical_stretch(self, anisotropic_image):
+        """When rows thicker than cols, stretch vertically."""
+        from visualization.app import to_isotropic
+
+        # 3mm row spacing, 0.7mm col spacing -> stretch rows by ~4.3x
+        result = to_isotropic(anisotropic_image, (3.0, 0.7))
+        # Expected: 100 * (3.0/0.7) = ~428 rows
+        assert result.shape[0] > anisotropic_image.shape[0]
+        assert result.shape[1] == anisotropic_image.shape[1]
+
+    def test_isotropic_horizontal_stretch(self, anisotropic_image):
+        """When cols thicker than rows, shrink horizontally (inverse of vertical)."""
+        from visualization.app import to_isotropic
+
+        # 0.7mm row spacing, 3mm col spacing -> scale rows by 0.7/3.0 = 0.23
+        result = to_isotropic(anisotropic_image, (0.7, 3.0))
+        # Expected: 100 * (0.7/3.0) = ~23 rows
+        assert result.shape[0] < anisotropic_image.shape[0]
+        assert result.shape[1] == anisotropic_image.shape[1]
+
+
+class TestSliceIndexClamping:
+    """Test clamp_slice_state logic."""
+
+    def test_clamp_above_max(self):
+        """Test clamping value above max."""
+        import streamlit as st
+
+        # Simulate session state with stale value
+        st.session_state["test_slice"] = 500
+
+        from visualization.app import clamp_slice_state
+
+        clamp_slice_state("test_slice", 100)  # max is 100
+        assert st.session_state["test_slice"] == 100
+
+    def test_clamp_below_zero(self):
+        """Test clamping negative value."""
+        import streamlit as st
+
+        st.session_state["test_slice"] = -5
+
+        from visualization.app import clamp_slice_state
+
+        clamp_slice_state("test_slice", 100)
+        assert st.session_state["test_slice"] == 0
+
+    def test_clamp_within_bounds(self):
+        """Test value within bounds stays unchanged."""
+        import streamlit as st
+
+        st.session_state["test_slice"] = 50
+
+        from visualization.app import clamp_slice_state
+
+        clamp_slice_state("test_slice", 100)
+        assert st.session_state["test_slice"] == 50
+
+    def test_default_when_missing(self):
+        """Test default value when key not in session state."""
+        import streamlit as st
+
+        st.session_state.pop("test_slice", None)
+
+        from visualization.app import clamp_slice_state
+
+        clamp_slice_state("test_slice", 100)
+        assert st.session_state["test_slice"] == 50  # 100 // 2

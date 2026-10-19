@@ -59,6 +59,60 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
     return zoom(img, (scale_factor, 1.0), order=1)
 
 
+def setup_image_interaction():
+    """Add JavaScript to show x,y coordinates on image hover."""
+    js = """
+    <script>
+    function setupImageInteraction() {
+        const imgs = window.parent.document.querySelectorAll('.stImage img');
+        imgs.forEach(img => {
+            if (img.dataset.interactionSetup === 'true') return;
+            img.dataset.interactionSetup = 'true';
+            
+            // Create tooltip
+            const tooltip = window.parent.document.createElement('div');
+            tooltip.style.cssText = `
+                position: absolute;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                display: none;
+                z-index: 1000;
+            `;
+            img.parentElement.style.position = 'relative';
+            img.parentElement.appendChild(tooltip);
+            
+            img.style.cursor = 'pointer';
+            
+            img.addEventListener('mousemove', (e) => {
+                const rect = img.getBoundingClientRect();
+                const x = Math.round((e.clientX - rect.left) * img.naturalWidth / rect.width);
+                const y = Math.round((e.clientY - rect.top) * img.naturalHeight / rect.height);
+                tooltip.textContent = `x: ${x}, y: ${y}`;
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+                tooltip.style.top = (e.clientY - rect.top - 25) + 'px';
+            });
+            
+            img.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
+        });
+    }
+    
+    setupImageInteraction();
+    const observer = new MutationObserver(() => setupImageInteraction());
+    observer.observe(window.parent.document.body, {childList: true, subtree: true});
+    </script>
+    """
+    return js
+    scale_factor = row_sp / col_sp
+    return zoom(img, (scale_factor, 1.0), order=1)
+
+
 def main():
     st.set_page_config(
         page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"

@@ -93,9 +93,7 @@ def main():
                 st.session_state["series_list"] = scan_series(Path(data_path))
 
         series_list = st.session_state.get("series_list") or []
-        if not series_list:
-            st.sidebar.info("No series scanned yet — click 'Scan Directory'.")
-        else:
+        if series_list:
             series_options = [
                 f"{s.series_description or 'Unknown'} - {s.n_slices} slices ({s.dose_class})"
                 for s in series_list

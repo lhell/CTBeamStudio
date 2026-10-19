@@ -342,3 +342,8 @@ ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remo
 2026-10-19 22:33:00,972 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 22:33:01,860 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 22:33:03,460 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:49:47,084 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:49:50,036 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:49:51,532 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:49:52,497 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:49:53,861 - INFO - Loaded 100 slices, shape=(100, 512, 512)

@@ -255,7 +255,7 @@ def main():
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
             axial_coords = streamlit_image_coordinates(
-                axial_windowed, key="axial_click", clamp=True, use_container_width=True
+                axial_windowed, key="axial_click", use_container_width=True
             )
             # Crosshair: clicking axial updates coronal and sagittal
             if axial_coords:
@@ -286,7 +286,6 @@ def main():
             coronal_coords = streamlit_image_coordinates(
                 coronal_resampled,
                 key="coronal_click",
-                clamp=True,
                 use_container_width=True,
             )
             # Crosshair: clicking coronal updates axial and sagittal
@@ -316,7 +315,6 @@ def main():
             sagittal_coords = streamlit_image_coordinates(
                 sagittal_resampled,
                 key="sagittal_click",
-                clamp=True,
                 use_container_width=True,
             )
             # Crosshair: clicking sagittal updates axial and coronal

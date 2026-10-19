@@ -23,7 +23,7 @@ import visualization.mpr as _mpr
 logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
 import streamlit as st
-from pathlib import Path
+import streamlit.components.v1 as components
 
 import numpy as np
 from scipy.ndimage import zoom
@@ -59,34 +59,25 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
     return zoom(img, (scale_factor, 1.0), order=1)
 
 
-def setup_image_interaction():
-    """Add JavaScript to show x,y coordinates on image hover."""
+def setup_image_interaction() -> None:
+    """Show x,y pixel coordinates on image hover."""
     js = """
     <script>
     function setupImageInteraction() {
-        const imgs = window.parent.document.querySelectorAll('.stImage img');
-        imgs.forEach(img => {
+        const doc = window.parent.document;
+        doc.querySelectorAll('[data-testid="stImage"] img').forEach(img => {
             if (img.dataset.interactionSetup === 'true') return;
             img.dataset.interactionSetup = 'true';
-            
-            // Create tooltip
-            const tooltip = window.parent.document.createElement('div');
+
+            const tooltip = doc.createElement('div');
             tooltip.style.cssText = `
-                position: absolute;
-                background: rgba(0,0,0,0.7);
-                color: white;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                pointer-events: none;
-                display: none;
-                z-index: 1000;
-            `;
+                position:absolute; background:rgba(0,0,0,.7); color:#fff;
+                padding:4px 8px; border-radius:4px; font-size:12px;
+                pointer-events:none; display:none; z-index:1000;`;
             img.parentElement.style.position = 'relative';
             img.parentElement.appendChild(tooltip);
-            
-            img.style.cursor = 'pointer';
-            
+            img.style.cursor = 'crosshair';
+
             img.addEventListener('mousemove', (e) => {
                 const rect = img.getBoundingClientRect();
                 const x = Math.round((e.clientX - rect.left) * img.naturalWidth / rect.width);
@@ -94,23 +85,17 @@ def setup_image_interaction():
                 tooltip.textContent = `x: ${x}, y: ${y}`;
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                tooltip.style.top = (e.clientY - rect.top - 25) + 'px';
+                tooltip.style.top  = (e.clientY - rect.top  - 25) + 'px';
             });
-            
-            img.addEventListener('mouseleave', () => {
-                tooltip.style.display = 'none';
-            });
+            img.addEventListener('mouseleave', () => tooltip.style.display = 'none');
         });
     }
-    
     setupImageInteraction();
-    const observer = new MutationObserver(() => setupImageInteraction());
-    observer.observe(window.parent.document.body, {childList: true, subtree: true});
+    new MutationObserver(setupImageInteraction)
+        .observe(window.parent.document.body, {childList: true, subtree: true});
     </script>
     """
-    return js
-    scale_factor = row_sp / col_sp
-    return zoom(img, (scale_factor, 1.0), order=1)
+    components.html(js, height=0)
 
 
 def main():
@@ -270,60 +255,6 @@ def main():
         clamp_slice_state("axial_slice", axial_max)
         clamp_slice_state("coronal_slice", coronal_max)
         clamp_slice_state("sagittal_slice", sagittal_max)
-
-        # Helper to show coordinates on image hover and click to focus slider
-        def setup_image_interaction():
-            js = """
-            <script>
-            function setupImageInteraction() {
-                const imgs = window.parent.document.querySelectorAll('.stImage img');
-                imgs.forEach(img => {
-                    if (img.dataset.interactionSetup === 'true') return;
-                    img.dataset.interactionSetup = 'true';
-                    
-                    // Find parent column to get the slider key
-                    const col = img.closest('[data-testid="stVerticalColumn"]');
-                    
-                    // Create tooltip
-                    const tooltip = window.parent.document.createElement('div');
-                    tooltip.style.cssText = `
-                        position: absolute;
-                        background: rgba(0,0,0,0.7);
-                        color: white;
-                        padding: 4px 8px;
-                        border-radius: 4px;
-                        font-size: 12px;
-                        pointer-events: none;
-                        display: none;
-                        z-index: 1000;
-                    `;
-                    img.parentElement.style.position = 'relative';
-                    img.parentElement.appendChild(tooltip);
-                    
-                    img.style.cursor = 'pointer';
-                    
-                    img.addEventListener('mousemove', (e) => {
-                        const rect = img.getBoundingClientRect();
-                        const x = Math.round((e.clientX - rect.left) * img.naturalWidth / rect.width);
-                        const y = Math.round((e.clientY - rect.top) * img.naturalHeight / rect.height);
-                        tooltip.textContent = `x: ${x}, y: ${y}`;
-                        tooltip.style.display = 'block';
-                        tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                        tooltip.style.top = (e.clientY - rect.top - 25) + 'px';
-                    });
-                    
-                    img.addEventListener('mouseleave', () => {
-                        tooltip.style.display = 'none';
-                    });
-                });
-            }
-            
-            setupImageInteraction();
-            const observer = new MutationObserver(() => setupImageInteraction());
-            observer.observe(window.parent.document.body, {childList: true, subtree: true});
-            </script>
-            """
-            st.markdown(js, unsafe_allow_html=True)
 
         # Axial view
         with axial_col:

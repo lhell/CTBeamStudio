@@ -182,3 +182,7 @@ Traceback (most recent call last):
     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
 ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen
 2026-10-19 14:56:19,703 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:56:22,707 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:56:27,782 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:56:28,741 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:56:29,765 - INFO - Loaded 100 slices, shape=(100, 512, 512)

@@ -26,6 +26,7 @@ logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
@@ -58,106 +59,6 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
     # Scale to make voxels square
     scale_factor = row_sp / col_sp
     return zoom(img, (scale_factor, 1.0), order=1)
-
-
-def setup_image_interaction() -> None:
-    """Click image -> focus its slider; arrows/Home/End/Tab navigate slices."""
-    js = """
-    <script>
-    (function () {
-      const win = window.parent, doc = win.document;
-      const S = (win.__mpr = win.__mpr || { plane: null });
-      const ORDER = ['axial', 'coronal', 'sagittal'];
-      const COL = '[data-testid="stColumn"], [data-testid="column"]';
-
-      // tear down listeners/observer owned by the PREVIOUS iframe instance
-      if (win.__mprCleanup) { try { win.__mprCleanup(); } catch (e) {} }
-
-      function planes() {
-        const m = {};
-        doc.querySelectorAll('.mpr-anchor[data-plane]').forEach(a => {
-          const c = a.closest(COL);
-          if (c) m[a.dataset.plane] = c;
-        });
-        return m;
-      }
-      const thumbOf = (col) => col && col.querySelector('div[role="slider"]');
-      function planeOf(el) {
-        const p = planes();
-        return ORDER.find(k => p[k] && p[k].contains(el)) || null;
-      }
-
-      function paint() {
-        const p = planes();
-        Object.entries(p).forEach(([name, col]) => {
-          const img = col.querySelector('[data-testid="stImage"] img');
-          if (img) img.style.outline = (name === S.plane) ? '2px solid #ff4b4b' : 'none';
-        });
-      }
-
-      function focusPlane(name) {
-        const t = thumbOf(planes()[name]);
-        if (!t) return false;
-        S.plane = name;
-        t.focus({ preventScroll: true });
-        paint();
-        return doc.activeElement === t;
-      }
-
-      const onDown = (e) => {
-        const img = e.target.closest && e.target.closest('[data-testid="stImage"] img');
-        if (!img) return;
-        const name = planeOf(img);
-        if (!name) return;
-        e.preventDefault();          // keep Streamlit from blurring the thumb
-        focusPlane(name);
-      };
-
-      const onKey = (e) => {
-        const name = planeOf(doc.activeElement) || (doc.activeElement === doc.body ? S.plane : null);
-        if (!name) return;
-        if (e.key === 'Home' || e.key === 'End') {
-          const btns = planes()[name].querySelectorAll('[data-testid="stButton"] button');
-          const b = e.key === 'Home' ? btns[0] : btns[1];
-          if (b) { e.preventDefault(); S.plane = name; b.click(); }
-        } else if (e.key === 'Tab') {
-          e.preventDefault();
-          const step = e.shiftKey ? ORDER.length - 1 : 1;
-          focusPlane(ORDER[(ORDER.indexOf(name) + step) % ORDER.length]);
-        }
-        // arrows: handled natively by the slider thumb
-      };
-
-      doc.addEventListener('mousedown', onDown, true);
-      doc.addEventListener('keydown', onKey, true);
-
-      let t;
-      const obs = new MutationObserver(() => {
-        paint();
-        clearTimeout(t);
-        t = setTimeout(() => {
-          if (!S.plane) return;
-          const ae = doc.activeElement;
-          const parked = !ae || ae === doc.body || ae.tagName === 'HTML'
-                      || ae.closest('[data-testid="stButton"]');   // after Home/End click
-          if (parked) focusPlane(S.plane);
-        }, 60);
-      });
-      obs.observe(doc.body, { childList: true, subtree: true });
-
-      win.__mprCleanup = () => {
-        doc.removeEventListener('mousedown', onDown, true);
-        doc.removeEventListener('keydown', onKey, true);
-        obs.disconnect();
-        clearTimeout(t);
-      };
-
-      paint();
-      if (S.plane) requestAnimationFrame(() => focusPlane(S.plane));   // survive rerun
-    })();
-    </script>
-    """
-    components.html(js, height=0)
 
 
 def main():
@@ -278,7 +179,7 @@ def main():
         st.markdown("---")
         st.subheader("Windowing")
 
-        col_preset, col_center, col_width, col_coords = st.columns(4)
+        col_preset, col_center, col_width = st.columns(3)
 
         with col_preset:
             window_preset = st.selectbox(
@@ -303,17 +204,12 @@ def main():
                 value=WINDOW_PRESETS[window_preset][1],
             )
 
-        with col_coords:
-            show_coords = st.checkbox(
-                "Show coords", value=False, disabled=True, help="Coords shown on hover"
-            )
-
         # MPR Display - 3 columns
         st.markdown("---")
         st.subheader("MPR Views")
 
-        # Enable hover coordinates (always on now)
-        setup_image_interaction()
+        # Click instruction
+        st.caption("💡 Click on an image to navigate the other planes (crosshair)")
 
         axial_col, coronal_col, sagittal_col = st.columns(3)
 
@@ -358,7 +254,21 @@ def main():
             st.caption(
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
-            st.image(axial_windowed, clamp=True, use_container_width=True)
+            axial_coords = streamlit_image_coordinates(
+                axial_windowed, key="axial_click", clamp=True, use_container_width=True
+            )
+            # Crosshair: clicking axial updates coronal and sagittal
+            if axial_coords:
+                y, x = axial_coords["x"], axial_coords["y"]
+                # Convert to slice indices (approximate)
+                new_coronal = int(x * coronal_max / axial_windowed.shape[1])
+                new_sagittal = int(y * sagittal_max / axial_windowed.shape[0])
+                st.session_state["coronal_slice"] = max(
+                    0, min(new_coronal, coronal_max)
+                )
+                st.session_state["sagittal_slice"] = max(
+                    0, min(new_sagittal, sagittal_max)
+                )
 
         # Coronal view
         with coronal_col:
@@ -373,7 +283,22 @@ def main():
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
             )
-            st.image(coronal_resampled, clamp=True, use_container_width=True)
+            coronal_coords = streamlit_image_coordinates(
+                coronal_resampled,
+                key="coronal_click",
+                clamp=True,
+                use_container_width=True,
+            )
+            # Crosshair: clicking coronal updates axial and sagittal
+            if coronal_coords:
+                y, x = coronal_coords["x"], coronal_coords["y"]
+                # axial uses row (y), sagittal uses col (x)
+                new_axial = int(y * axial_max / coronal_resampled.shape[0])
+                new_sagittal = int(x * sagittal_max / coronal_resampled.shape[1])
+                st.session_state["axial_slice"] = max(0, min(new_axial, axial_max))
+                st.session_state["sagittal_slice"] = max(
+                    0, min(new_sagittal, sagittal_max)
+                )
 
         # Sagittal view
         with sagittal_col:
@@ -388,7 +313,22 @@ def main():
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
             )
-            st.image(sagittal_resampled, clamp=True, use_container_width=True)
+            sagittal_coords = streamlit_image_coordinates(
+                sagittal_resampled,
+                key="sagittal_click",
+                clamp=True,
+                use_container_width=True,
+            )
+            # Crosshair: clicking sagittal updates axial and coronal
+            if sagittal_coords:
+                y, x = sagittal_coords["x"], sagittal_coords["y"]
+                # axial uses row (y), coronal uses col (x)
+                new_axial = int(y * axial_max / sagittal_resampled.shape[0])
+                new_coronal = int(x * coronal_max / sagittal_resampled.shape[1])
+                st.session_state["axial_slice"] = max(0, min(new_axial, axial_max))
+                st.session_state["coronal_slice"] = max(
+                    0, min(new_coronal, coronal_max)
+                )
 
     else:
         # Welcome screen / Demo mode

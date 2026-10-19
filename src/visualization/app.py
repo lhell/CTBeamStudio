@@ -107,6 +107,10 @@ def main():
                 volume = load_dicom_series(files, progress=report)
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
+                # Reset slice indices for new volume
+                st.session_state["axial_slice"] = volume.array.shape[0] // 2
+                st.session_state["coronal_slice"] = volume.array.shape[1] // 2
+                st.session_state["sagittal_slice"] = volume.array.shape[2] // 2
                 st.toast(f"Loaded {len(files)} slices!")
 
                 with st.sidebar.expander(f"Loaded Files ({len(files)})"):
@@ -167,7 +171,7 @@ def main():
                 "Slice",
                 min_value=0,
                 max_value=axial_max,
-                value=axial_max // 2,
+                value=st.session_state.get("axial_slice", axial_max // 2),
                 key="axial_slice",
             )
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
@@ -184,7 +188,7 @@ def main():
                 "Slice",
                 min_value=0,
                 max_value=coronal_max,
-                value=coronal_max // 2,
+                value=st.session_state.get("coronal_slice", coronal_max // 2),
                 key="coronal_slice",
             )
             coronal_slice, coronal_spacing = extract_slice(
@@ -203,7 +207,7 @@ def main():
                 "Slice",
                 min_value=0,
                 max_value=sagittal_max,
-                value=sagittal_max // 2,
+                value=st.session_state.get("sagittal_slice", sagittal_max // 2),
                 key="sagittal_slice",
             )
             sagittal_slice, sagittal_spacing = extract_slice(

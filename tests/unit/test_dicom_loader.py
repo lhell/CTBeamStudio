@@ -174,9 +174,21 @@ class TestScanSeries:
             (root / "series1").mkdir()
             (root / "series2").mkdir()
 
-            _create_ct_dicom(root / "series1" / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
-            _create_ct_dicom(root / "series1" / "slice2.dcm", series_instance_uid="1.1", slice_location=1.0)
-            _create_ct_dicom(root / "series2" / "slice1.dcm", series_instance_uid="1.2", slice_location=0.0)
+            _create_ct_dicom(
+                root / "series1" / "slice1.dcm",
+                series_instance_uid="1.1",
+                slice_location=0.0,
+            )
+            _create_ct_dicom(
+                root / "series1" / "slice2.dcm",
+                series_instance_uid="1.1",
+                slice_location=1.0,
+            )
+            _create_ct_dicom(
+                root / "series2" / "slice1.dcm",
+                series_instance_uid="1.2",
+                slice_location=0.0,
+            )
 
             series_list = scan_series(root)
 
@@ -202,8 +214,12 @@ class TestScanSeries:
             root = Path(tmpdir)
 
             # Create files directly in root
-            _create_ct_dicom(root / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
-            _create_ct_dicom(root / "slice2.dcm", series_instance_uid="1.1", slice_location=1.0)
+            _create_ct_dicom(
+                root / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0
+            )
+            _create_ct_dicom(
+                root / "slice2.dcm", series_instance_uid="1.1", slice_location=1.0
+            )
 
             series_list = scan_series(root)
 
@@ -217,7 +233,11 @@ class TestScanSeries:
             root = Path(tmpdir)
 
             (root / "series1").mkdir()
-            _create_ct_dicom(root / "series1" / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
+            _create_ct_dicom(
+                root / "series1" / "slice1.dcm",
+                series_instance_uid="1.1",
+                slice_location=0.0,
+            )
 
             series_list = scan_series(root)
 

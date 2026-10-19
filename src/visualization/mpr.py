@@ -45,9 +45,7 @@ def extract_slice(
     axis = AXIS[plane]
     size = volume.array.shape[axis]
     if not 0 <= index < size:
-        raise IndexError(
-            f"index {index} out of bounds for {plane} axis (size {size})"
-        )
+        raise IndexError(f"index {index} out of bounds for {plane} axis (size {size})")
 
     # Extract slice and determine in-plane spacing based on plane orientation
     if plane == "axial":

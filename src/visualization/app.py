@@ -20,12 +20,12 @@ sys.path.insert(0, str(src_path.resolve()))  # Add src/ to path
 
 # Debug: log where modules are loaded from
 import visualization.mpr as _mpr
+
 logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
+import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
-
-import numpy as np
 from scipy.ndimage import zoom
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
@@ -225,9 +225,17 @@ def main():
             if st.sidebar.button("Load Series"):
                 # Use files from selected_series if available, otherwise scan folder
                 if selected_series.files:
-                    files = selected_series.files[:n_slices] if n_slices else selected_series.files
+                    files = (
+                        selected_series.files[:n_slices]
+                        if n_slices
+                        else selected_series.files
+                    )
                 else:
-                    files = list(Path(data_path).iterdir())[:n_slices] if n_slices else list(Path(data_path).iterdir())
+                    files = (
+                        list(Path(data_path).iterdir())[:n_slices]
+                        if n_slices
+                        else list(Path(data_path).iterdir())
+                    )
 
                 progress_bar = st.progress(0, text="Loading DICOM series...")
 
@@ -295,7 +303,9 @@ def main():
             )
 
         with col_coords:
-            show_coords = st.checkbox("Show coords", value=False, disabled=True, help="Coords shown on hover")
+            show_coords = st.checkbox(
+                "Show coords", value=False, disabled=True, help="Coords shown on hover"
+            )
 
         # MPR Display - 3 columns
         st.markdown("---")
@@ -324,10 +334,18 @@ def main():
             )
             idx = st.slider("Slice", 0, max_idx, key=key, label_visibility="collapsed")
             b_min, b_max = st.columns(2)
-            b_min.button("⏮", key=f"{key}_min", use_container_width=True,
-                         on_click=lambda: st.session_state.update({key: 0}))
-            b_max.button("⏭", key=f"{key}_max", use_container_width=True,
-                         on_click=lambda: st.session_state.update({key: max_idx}))
+            b_min.button(
+                "⏮",
+                key=f"{key}_min",
+                use_container_width=True,
+                on_click=lambda: st.session_state.update({key: 0}),
+            )
+            b_max.button(
+                "⏭",
+                key=f"{key}_max",
+                use_container_width=True,
+                on_click=lambda: st.session_state.update({key: max_idx}),
+            )
             return idx
 
         # Axial view

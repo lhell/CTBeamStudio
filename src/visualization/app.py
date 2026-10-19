@@ -249,6 +249,9 @@ def main():
             axial_idx = st.slider("Slice", 0, axial_max, key="axial_slice")
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
+            st.caption(
+                f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
+            )
             if show_coords:
                 axial_coords = streamlit_image_coordinates(
                     axial_windowed, key="axial_coords", use_container_width=True
@@ -259,9 +262,6 @@ def main():
             else:
                 st.image(axial_windowed, clamp=True, use_container_width=True)
             focus_on_click("axial_slice")
-            st.caption(
-                f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
-            )
 
         # Coronal view
         with coronal_col:
@@ -273,6 +273,9 @@ def main():
             coronal_windowed = apply_window(coronal_slice, center, width)
             # Resample to isotropic for correct aspect ratio
             coronal_resampled = to_isotropic(coronal_windowed, coronal_spacing)
+            st.caption(
+                f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
+            )
             if show_coords:
                 coronal_coords = streamlit_image_coordinates(
                     coronal_resampled, key="coronal_coords", use_container_width=True
@@ -285,9 +288,6 @@ def main():
             else:
                 st.image(coronal_resampled, clamp=True, use_container_width=True)
             focus_on_click("coronal_slice")
-            st.caption(
-                f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
-            )
 
         # Sagittal view
         with sagittal_col:
@@ -299,6 +299,9 @@ def main():
             sagittal_windowed = apply_window(sagittal_slice, center, width)
             # Resample to isotropic for correct aspect ratio
             sagittal_resampled = to_isotropic(sagittal_windowed, sagittal_spacing)
+            st.caption(
+                f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
+            )
             if show_coords:
                 sagittal_coords = streamlit_image_coordinates(
                     sagittal_resampled, key="sagittal_coords", use_container_width=True
@@ -311,9 +314,6 @@ def main():
             else:
                 st.image(sagittal_resampled, clamp=True, use_container_width=True)
             focus_on_click("sagittal_slice")
-            st.caption(
-                f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
-            )
 
     else:
         # Welcome screen / Demo mode

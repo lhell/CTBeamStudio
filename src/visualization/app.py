@@ -63,93 +63,97 @@ def setup_image_interaction() -> None:
     """Click image -> focus its slider; arrows/Home/End/Tab navigate slices."""
     js = """
     <script>
-    const win = window.parent, doc = win.parent ? window.parent.document : document;
-    win.__mpr = win.__mpr || { plane: null };
-    const S = win.__mpr;
-    const ORDER = ['axial', 'coronal', 'sagittal'];
+    (function () {
+      const win = window.parent, doc = win.document;
+      const S = (win.__mpr = win.__mpr || { plane: null });
+      const ORDER = ['axial', 'coronal', 'sagittal'];
+      const COL = '[data-testid="stColumn"], [data-testid="column"]';
 
-    const colOf = (el) => el.closest('[data-testid="stColumn"]')
-                       || el.closest('[data-testid="column"]');
+      // tear down listeners/observer owned by the PREVIOUS iframe instance
+      if (win.__mprCleanup) { try { win.__mprCleanup(); } catch (e) {} }
 
-    function planes() {
-        const map = {};
+      function planes() {
+        const m = {};
         doc.querySelectorAll('.mpr-anchor[data-plane]').forEach(a => {
-            const c = colOf(a);
-            if (c) map[a.dataset.plane] = c;
+          const c = a.closest(COL);
+          if (c) m[a.dataset.plane] = c;
         });
-        return map;
-    }
-    const thumbIn = (col) => col ? col.querySelector('div[role="slider"]') : null;
+        return m;
+      }
+      const thumbOf = (col) => col && col.querySelector('div[role="slider"]');
+      function planeOf(el) {
+        const p = planes();
+        return ORDER.find(k => p[k] && p[k].contains(el)) || null;
+      }
 
-    function paint() {
+      function paint() {
         const p = planes();
         Object.entries(p).forEach(([name, col]) => {
-            const img = col.querySelector('[data-testid="stImage"] img');
-            if (img) img.style.outline = (name === S.plane) ? '2px solid #ff4b4b' : 'none';
+          const img = col.querySelector('[data-testid="stImage"] img');
+          if (img) img.style.outline = (name === S.plane) ? '2px solid #ff4b4b' : 'none';
         });
-    }
+      }
 
-    function focusPlane(name) {
-        const t = thumbIn(planes()[name]);
-        if (!t) return;
+      function focusPlane(name) {
+        const t = thumbOf(planes()[name]);
+        if (!t) return false;
         S.plane = name;
         t.focus({ preventScroll: true });
         paint();
-    }
+        return doc.activeElement === t;
+      }
 
-    function attach() {
-        Object.entries(planes()).forEach(([name, col]) => {
-            const img = col.querySelector('[data-testid="stImage"] img');
-            if (!img || img.dataset.mprBound) return;
-            img.dataset.mprBound = '1';
-            img.style.cursor = 'pointer';
-            img.addEventListener('mousedown', e => { e.preventDefault(); focusPlane(name); });
-        });
+      const onDown = (e) => {
+        const img = e.target.closest && e.target.closest('[data-testid="stImage"] img');
+        if (!img) return;
+        const name = planeOf(img);
+        if (!name) return;
+        e.preventDefault();          // keep Streamlit from blurring the thumb
+        focusPlane(name);
+      };
+
+      const onKey = (e) => {
+        const name = planeOf(doc.activeElement) || (doc.activeElement === doc.body ? S.plane : null);
+        if (!name) return;
+        if (e.key === 'Home' || e.key === 'End') {
+          const btns = planes()[name].querySelectorAll('[data-testid="stButton"] button');
+          const b = e.key === 'Home' ? btns[0] : btns[1];
+          if (b) { e.preventDefault(); S.plane = name; b.click(); }
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          const step = e.shiftKey ? ORDER.length - 1 : 1;
+          focusPlane(ORDER[(ORDER.indexOf(name) + step) % ORDER.length]);
+        }
+        // arrows: handled natively by the slider thumb
+      };
+
+      doc.addEventListener('mousedown', onDown, true);
+      doc.addEventListener('keydown', onKey, true);
+
+      let t;
+      const obs = new MutationObserver(() => {
         paint();
-    }
+        clearTimeout(t);
+        t = setTimeout(() => {
+          if (!S.plane) return;
+          const ae = doc.activeElement;
+          const parked = !ae || ae === doc.body || ae.tagName === 'HTML'
+                      || ae.closest('[data-testid="stButton"]');   // after Home/End click
+          if (parked) focusPlane(S.plane);
+        }, 60);
+      });
+      obs.observe(doc.body, { childList: true, subtree: true });
 
-    function activePlane() {
-        const ae = doc.activeElement;
-        if (!ae || !ae.closest) return null;
-        const col = colOf(ae);
-        if (!col) return null;
-        const p = planes();
-        return ORDER.find(k => p[k] === col) || null;
-    }
+      win.__mprCleanup = () => {
+        doc.removeEventListener('mousedown', onDown, true);
+        doc.removeEventListener('keydown', onKey, true);
+        obs.disconnect();
+        clearTimeout(t);
+      };
 
-    if (!win.__mprKeys) {
-        win.__mprKeys = true;
-        doc.addEventListener('keydown', e => {
-            const name = activePlane();
-            if (!name) return;
-            if (e.key === 'Home' || e.key === 'End') {
-                const btns = planes()[name].querySelectorAll('[data-testid="stButton"] button');
-                const b = e.key === 'Home' ? btns[0] : btns[1];
-                if (b) { e.preventDefault(); S.plane = name; b.click(); }
-            } else if (e.key === 'Tab') {
-                e.preventDefault();
-                const step = e.shiftKey ? ORDER.length - 1 : 1;
-                focusPlane(ORDER[(ORDER.indexOf(name) + step) % ORDER.length]);
-            }
-            // Arrow keys: handled natively by the slider
-        }, true);
-    }
-
-    attach();
-    if (!win.__mprObs) {
-        let t;
-        win.__mprObs = new MutationObserver(() => {
-            attach();
-            clearTimeout(t);
-            t = setTimeout(() => {
-                if (!S.plane) return;
-                const ae = doc.activeElement;
-                if (ae && ae !== doc.body && ae.tagName !== 'HTML') return;  // don't steal focus
-                focusPlane(S.plane);
-            }, 60);
-        });
-        win.__mprObs.observe(doc.body, { childList: true, subtree: true });
-    }
+      paint();
+      if (S.plane) requestAnimationFrame(() => focusPlane(S.plane));   // survive rerun
+    })();
     </script>
     """
     components.html(js, height=0)

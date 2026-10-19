@@ -82,10 +82,15 @@ def main():
                     f"Number of slices (max {file_count})",
                     min_value=1,
                     max_value=file_count,
-                    value=100,
+                    value=st.session_state.get("n_slices", 100),
+                    key="n_slices_input",
                 )
+                # Store in session state to persist
+                st.session_state["n_slices"] = n_slices
 
             if st.sidebar.button("Load Series"):
+                # Get n_slices from session state (persists across reruns)
+                n_slices = st.session_state.get("n_slices")
                 files = (
                     list(Path(data_path).iterdir())[:n_slices]
                     if n_slices

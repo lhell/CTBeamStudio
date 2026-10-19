@@ -13,9 +13,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Add project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Use resolve() to get absolute path, then go up to project root
+app_path = Path(__file__).resolve()
+src_path = app_path.parent  # src/visualization
+project_root = src_path.parent  # project root (contains src/)
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Debug: log where modules are loaded from
+import visualization.mpr as _mpr
+logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
 import streamlit as st
+from pathlib import Path
+
+import numpy as np
+from scipy.ndimage import zoom
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
@@ -29,6 +42,24 @@ def clamp_slice_state(key: str, max_idx: int) -> None:
         st.session_state[key] = int(max(0, min(st.session_state[key], max_idx)))
     else:
         st.session_state[key] = max_idx // 2
+
+
+def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
+    """Resample image to isotropic voxels based on spacing.
+
+    Args:
+        img: 2D numpy array (the slice)
+        spacing: (row_spacing, col_spacing) in mm
+
+    Returns:
+        Resampled image with square pixels
+    """
+    row_sp, col_sp = spacing
+    if abs(row_sp - col_sp) < 1e-6:
+        return img  # Already isotropic
+    # Scale to make voxels square
+    scale_factor = row_sp / col_sp
+    return zoom(img, (scale_factor, 1.0), order=1)
 
 
 def main():
@@ -48,6 +79,13 @@ def main():
     )
 
     path_ok = bool(data_path and Path(data_path).exists())
+
+    # Clear stale state when path changes
+    if st.session_state.get("last_path") != data_path:
+        st.session_state["last_path"] = data_path
+        for k in ("series_list", "volume", "series", "loaded_files"):
+            st.session_state.pop(k, None)
+
     if not path_ok:
         st.sidebar.warning("Enter a valid folder path")
     else:
@@ -90,15 +128,12 @@ def main():
                     f"Number of slices (max {file_count})",
                     min_value=1,
                     max_value=file_count,
-                    value=st.session_state.get("n_slices", 100),
+                    value=100,
                     key="n_slices_input",
                 )
-                # Store in session state to persist
-                st.session_state["n_slices"] = n_slices
 
             if st.sidebar.button("Load Series"):
-                # Get n_slices from session state (persists across reruns)
-                n_slices = st.session_state.get("n_slices")
+                # Use n_slices from the widget, not session state (which persists incorrectly)
                 files = (
                     list(Path(data_path).iterdir())[:n_slices]
                     if n_slices
@@ -113,16 +148,26 @@ def main():
                     )
 
                 volume = load_dicom_series(files, progress=report)
+                progress_bar.empty()  # Clear progress bar
+
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
+                st.session_state["loaded_files"] = files
                 # Clear old slice indices so clamp_slice_state will center them
                 for k in ("axial_slice", "coronal_slice", "sagittal_slice"):
                     st.session_state.pop(k, None)
+
+                logger.info(
+                    "Loaded %d slices, shape=%s", len(files), volume.array.shape
+                )
                 st.toast(f"Loaded {len(files)} slices!")
 
-                with st.sidebar.expander(f"Loaded Files ({len(files)})"):
-                    for f in files:
-                        st.text(f.name)
+    # Show loaded files expander (persists across reruns)
+    loaded = st.session_state.get("loaded_files")
+    if loaded:
+        with st.sidebar.expander(f"Loaded Files ({len(loaded)})"):
+            for f in loaded:
+                st.text(f.name)
 
     # Main area
     if "volume" in st.session_state:
@@ -195,7 +240,9 @@ def main():
                 volume, "coronal", coronal_idx
             )
             coronal_windowed = apply_window(coronal_slice, center, width)
-            st.image(coronal_windowed, clamp=True, use_container_width=True)
+            # Resample to isotropic for correct aspect ratio
+            coronal_resampled = to_isotropic(coronal_windowed, coronal_spacing)
+            st.image(coronal_resampled, clamp=True, use_container_width=True)
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: {coronal_spacing}"
             )
@@ -208,7 +255,9 @@ def main():
                 volume, "sagittal", sagittal_idx
             )
             sagittal_windowed = apply_window(sagittal_slice, center, width)
-            st.image(sagittal_windowed, clamp=True, use_container_width=True)
+            # Resample to isotropic for correct aspect ratio
+            sagittal_resampled = to_isotropic(sagittal_windowed, sagittal_spacing)
+            st.image(sagittal_resampled, clamp=True, use_container_width=True)
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: {sagittal_spacing}"
             )

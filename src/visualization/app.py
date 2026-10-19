@@ -32,7 +32,6 @@ from scipy.ndimage import zoom
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
-from visualization.volume import Volume
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
 

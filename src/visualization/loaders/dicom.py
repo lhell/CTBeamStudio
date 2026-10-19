@@ -44,6 +44,7 @@ class SeriesInfo:
         series_description: Description of the series (SeriesDescription).
         n_slices: Number of slices in the series.
         dose_class: Classification of dose ("full", "quarter", "half", "unknown").
+        files: Optional list of file paths (for fast loading).
     """
 
     series_instance_uid: str
@@ -51,6 +52,7 @@ class SeriesInfo:
     series_description: str
     n_slices: int
     dose_class: str
+    files: list[Path] | None = None
 
 
 def classify_dose(series_description: str) -> str:
@@ -149,66 +151,48 @@ def _read_dicom_slice(file_path: Path) -> tuple[Dataset, np.ndarray, np.ndarray]
 def scan_series(root: Path) -> list[SeriesInfo]:
     """Scan a directory for DICOM series.
 
-    Groups DICOM files by SeriesInstanceUID and returns information
-    about each series found.
+    Groups DICOM files by subdirectory (fast) or returns single series.
 
     Args:
         root: Path to directory containing DICOM files.
 
     Returns:
         List of SeriesInfo objects, one per series found.
-
-    Raises:
-        ValueError: If directory is empty or contains no valid DICOM files.
     """
-    # Find all DICOM files in directory
+    # Find all DICOM files - non-recursive, just top level
     dicom_files = []
     for ext in ("*.dcm", "*.ima"):
-        dicom_files.extend(root.glob(f"**/{ext}"))
+        dicom_files.extend(root.glob(ext))
+        dicom_files.extend(root.glob(f"*/{ext}"))  # one level deep
 
-    # Remove duplicates (same file might be found via multiple patterns)
+    # Remove duplicates
     dicom_files = list(set(dicom_files))
 
     if not dicom_files:
         raise ValueError(f"No DICOM files found in {root}")
 
-    # Group by SeriesInstanceUID
-    series_dict: dict[str, list[Path]] = {}
+    # If files are in subdirectories, group by subdirectory
+    subdirs: dict[str, list[Path]] = {}
+    for f in dicom_files:
+        subdir = f.parent.name if f.parent != root else "root"
+        if subdir not in subdirs:
+            subdirs[subdir] = []
+        subdirs[subdir].append(f)
 
-    for file_path in dicom_files:
-        try:
-            ds = pydicom.dcmread(file_path)
-            if hasattr(ds, "SeriesInstanceUID"):
-                uid = ds.SeriesInstanceUID
-                if uid not in series_dict:
-                    series_dict[uid] = []
-                series_dict[uid].append(file_path)
-        except Exception:
-            # Skip invalid DICOM files
-            continue
-
-    if not series_dict:
-        raise ValueError(f"No valid DICOM series found in {root}")
-
-    # Build SeriesInfo for each series
+    # Build SeriesInfo - without reading DICOM files
     series_list = []
-    for uid, files in series_dict.items():
-        # Read first file to get metadata
-        ds = pydicom.dcmread(files[0])
-
-        patient_id = getattr(ds, "PatientID", "UNKNOWN")
-        series_description = getattr(ds, "SeriesDescription", "")
-
-        dose_class = classify_dose(series_description)
-
-        series_info = SeriesInfo(
-            series_instance_uid=uid,
-            patient_id=patient_id,
-            series_description=series_description,
+    for subdir, files in subdirs.items():
+        # Use subdir name as series description, or "All Files" for root
+        desc = subdir if subdir != "root" else "DICOM Series"
+        info = SeriesInfo(
+            patient_id="Unknown",
+            series_description=desc,
+            series_instance_uid=f"local:{subdir}",
             n_slices=len(files),
-            dose_class=dose_class,
+            dose_class="unknown",
+            files=sorted(files),
         )
-        series_list.append(series_info)
+        series_list.append(info)
 
     return series_list
 

@@ -201,8 +201,8 @@ def main():
             selected_series = series_list[selected_idx]
             st.sidebar.markdown("---")
 
-            # SINGLE load-options block
-            file_count = len(list(Path(data_path).iterdir()))
+            # Use n_slices from selected series
+            file_count = selected_series.n_slices
             slice_option = st.sidebar.radio(
                 "Slices to load:",
                 ["All slices", "Custom number"],
@@ -219,12 +219,11 @@ def main():
                 )
 
             if st.sidebar.button("Load Series"):
-                # Use n_slices from the widget, not session state (which persists incorrectly)
-                files = (
-                    list(Path(data_path).iterdir())[:n_slices]
-                    if n_slices
-                    else list(Path(data_path).iterdir())
-                )
+                # Use files from selected_series if available, otherwise scan folder
+                if selected_series.files:
+                    files = selected_series.files[:n_slices] if n_slices else selected_series.files
+                else:
+                    files = list(Path(data_path).iterdir())[:n_slices] if n_slices else list(Path(data_path).iterdir())
 
                 progress_bar = st.progress(0, text="Loading DICOM series...")
 

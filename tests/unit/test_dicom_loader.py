@@ -165,44 +165,28 @@ class TestClassifyDose:
 class TestScanSeries:
     """Tests for scan_series function."""
 
-    def test_scan_series_groups_by_uid(self):
-        """Groups files by SeriesInstanceUID."""
+    def test_scan_series_groups_by_subdir(self):
+        """Groups files by subdirectory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
 
-            # Create two series
-            _create_ct_dicom(
-                root / "slice1_s1.dcm",
-                series_instance_uid="1.2.3.4.5.1",
-                series_description="Series 1",
-                slice_location=0.0,
-            )
-            _create_ct_dicom(
-                root / "slice2_s1.dcm",
-                series_instance_uid="1.2.3.4.5.1",
-                series_description="Series 1",
-                slice_location=1.0,
-            )
-            _create_ct_dicom(
-                root / "slice1_s2.dcm",
-                series_instance_uid="1.2.3.4.5.2",
-                series_description="Series 2",
-                slice_location=0.0,
-            )
+            # Create files in subdirectories
+            (root / "series1").mkdir()
+            (root / "series2").mkdir()
+
+            _create_ct_dicom(root / "series1" / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
+            _create_ct_dicom(root / "series1" / "slice2.dcm", series_instance_uid="1.1", slice_location=1.0)
+            _create_ct_dicom(root / "series2" / "slice1.dcm", series_instance_uid="1.2", slice_location=0.0)
 
             series_list = scan_series(root)
 
-            # Should have 2 series
+            # Should have 2 series (one per subdir)
             assert len(series_list) == 2
 
-            # Find series by UID
-            s1 = next(s for s in series_list if s.series_instance_uid == "1.2.3.4.5.1")
-            s2 = next(s for s in series_list if s.series_instance_uid == "1.2.3.4.5.2")
-
-            assert s1.n_slices == 2
-            assert s2.n_slices == 1
-            assert s1.dose_class == "unknown"
-            assert s1.series_description == "Series 1"
+            # Check counts
+            counts = {s.series_description: s.n_slices for s in series_list}
+            assert counts["series1"] == 2
+            assert counts["series2"] == 1
 
     def test_scan_series_empty_directory_raises(self):
         """Error on empty directory."""
@@ -212,46 +196,33 @@ class TestScanSeries:
             with pytest.raises(ValueError, match="No DICOM files found"):
                 scan_series(root)
 
-    def test_scan_series_no_valid_series_raises(self):
-        """Error when no valid series found."""
+    def test_scan_series_root_files(self):
+        """Files in root dir are grouped together."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
 
-            # Create a file that's not a valid DICOM (not even recognized as DICOM)
-            (root / "not_dicom.txt").write_text("not a dicom")
-
-            # When no valid DICOM files are found at all
-            with pytest.raises(ValueError, match="No DICOM files found"):
-                scan_series(root)
-
-    def test_scan_series_dose_classification(self):
-        """Dose classification from series description."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-
-            _create_ct_dicom(
-                root / "full.dcm",
-                series_instance_uid="1.1",
-                series_description="Full Dose Scan",
-            )
-            _create_ct_dicom(
-                root / "quarter.dcm",
-                series_instance_uid="1.2",
-                series_description="Quarter Dose",
-            )
-            _create_ct_dicom(
-                root / "half.dcm",
-                series_instance_uid="1.3",
-                series_description="Half Dose",
-            )
+            # Create files directly in root
+            _create_ct_dicom(root / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
+            _create_ct_dicom(root / "slice2.dcm", series_instance_uid="1.1", slice_location=1.0)
 
             series_list = scan_series(root)
 
-            series_dict = {s.series_instance_uid: s for s in series_list}
+            # Should have 1 series
+            assert len(series_list) == 1
+            assert series_list[0].n_slices == 2
 
-            assert series_dict["1.1"].dose_class == "full"
-            assert series_dict["1.2"].dose_class == "quarter"
-            assert series_dict["1.3"].dose_class == "half"
+    def test_scan_series_files_attribute(self):
+        """SeriesInfo includes files list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+
+            (root / "series1").mkdir()
+            _create_ct_dicom(root / "series1" / "slice1.dcm", series_instance_uid="1.1", slice_location=0.0)
+
+            series_list = scan_series(root)
+
+            assert series_list[0].files is not None
+            assert len(series_list[0].files) == 1
 
 
 class TestLoadDicomSeries:

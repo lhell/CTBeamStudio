@@ -23,7 +23,6 @@ import visualization.mpr as _mpr
 logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
 import streamlit as st
-from streamlit_image_coordinates import streamlit_image_coordinates
 from pathlib import Path
 
 import numpy as np
@@ -202,11 +201,14 @@ def main():
             )
 
         with col_coords:
-            show_coords = st.checkbox("Show coords", value=False, help="Show pixel value on image hover")
+            show_coords = st.checkbox("Show coords", value=False, disabled=True, help="Coords shown on hover")
 
         # MPR Display - 3 columns
         st.markdown("---")
         st.subheader("MPR Views")
+
+        # Enable hover coordinates (always on now)
+        setup_image_interaction()
 
         axial_col, coronal_col, sagittal_col = st.columns(3)
 
@@ -220,23 +222,56 @@ def main():
         clamp_slice_state("coronal_slice", coronal_max)
         clamp_slice_state("sagittal_slice", sagittal_max)
 
-        # Helper to make image click focus its slider
-        def focus_on_click(slider_key: str):
-            js = f"""
+        # Helper to show coordinates on image hover and click to focus slider
+        def setup_image_interaction():
+            js = """
             <script>
-                var observer = new MutationObserver(function(mutations) {{
-                    var img = window.parent.document.querySelector('img[data-testid="stImage"]');
-                    if (img) {{
-                        img.style.cursor = 'pointer';
-                        img.onclick = function() {{
-                            var slider = window.parent.document.querySelector('[data-testid="stSlider"] input[key="{slider_key}"]');
-                            if (slider) {{
-                                slider.focus();
-                            }}
-                        }};
-                    }}
-                }});
-                observer.observe(window.parent.document.body, {{childList: true, subtree: true}});
+            function setupImageInteraction() {
+                const imgs = window.parent.document.querySelectorAll('.stImage img');
+                imgs.forEach(img => {
+                    if (img.dataset.interactionSetup === 'true') return;
+                    img.dataset.interactionSetup = 'true';
+                    
+                    // Find parent column to get the slider key
+                    const col = img.closest('[data-testid="stVerticalColumn"]');
+                    
+                    // Create tooltip
+                    const tooltip = window.parent.document.createElement('div');
+                    tooltip.style.cssText = `
+                        position: absolute;
+                        background: rgba(0,0,0,0.7);
+                        color: white;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        pointer-events: none;
+                        display: none;
+                        z-index: 1000;
+                    `;
+                    img.parentElement.style.position = 'relative';
+                    img.parentElement.appendChild(tooltip);
+                    
+                    img.style.cursor = 'pointer';
+                    
+                    img.addEventListener('mousemove', (e) => {
+                        const rect = img.getBoundingClientRect();
+                        const x = Math.round((e.clientX - rect.left) * img.naturalWidth / rect.width);
+                        const y = Math.round((e.clientY - rect.top) * img.naturalHeight / rect.height);
+                        tooltip.textContent = `x: ${x}, y: ${y}`;
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+                        tooltip.style.top = (e.clientY - rect.top - 25) + 'px';
+                    });
+                    
+                    img.addEventListener('mouseleave', () => {
+                        tooltip.style.display = 'none';
+                    });
+                });
+            }
+            
+            setupImageInteraction();
+            const observer = new MutationObserver(() => setupImageInteraction());
+            observer.observe(window.parent.document.body, {childList: true, subtree: true});
             </script>
             """
             st.markdown(js, unsafe_allow_html=True)
@@ -250,16 +285,7 @@ def main():
             st.caption(
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
-            if show_coords:
-                axial_coords = streamlit_image_coordinates(
-                    axial_windowed, key="axial_coords", use_column_width=True
-                )
-                if axial_coords:
-                    x, y = axial_coords["x"], axial_coords["y"]
-                    st.caption(f"x: {x}, y: {y} | Value: {int(axial_slice[y, x])} HU")
-            else:
-                st.image(axial_windowed, clamp=True, use_container_width=True)
-            focus_on_click("axial_slice")
+            st.image(axial_windowed, clamp=True, use_container_width=True)
 
         # Coronal view
         with coronal_col:
@@ -274,18 +300,7 @@ def main():
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
             )
-            if show_coords:
-                coronal_coords = streamlit_image_coordinates(
-                    coronal_resampled, key="coronal_coords", use_column_width=True
-                )
-                if coronal_coords:
-                    x, y = coronal_coords["x"], coronal_coords["y"]
-                    # Map back to original slice coordinates
-                    orig_y = int(y * coronal_spacing[0] / min(coronal_spacing[0], coronal_spacing[1]))
-                    st.caption(f"x: {x}, y: {y} | Value: {int(coronal_slice[orig_y, x])} HU")
-            else:
-                st.image(coronal_resampled, clamp=True, use_container_width=True)
-            focus_on_click("coronal_slice")
+            st.image(coronal_resampled, clamp=True, use_container_width=True)
 
         # Sagittal view
         with sagittal_col:
@@ -300,18 +315,7 @@ def main():
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
             )
-            if show_coords:
-                sagittal_coords = streamlit_image_coordinates(
-                    sagittal_resampled, key="sagittal_coords", use_column_width=True
-                )
-                if sagittal_coords:
-                    x, y = sagittal_coords["x"], sagittal_coords["y"]
-                    # Map back to original slice coordinates
-                    orig_y = int(y * sagittal_spacing[0] / min(sagittal_spacing[0], sagittal_spacing[1]))
-                    st.caption(f"x: {x}, y: {y} | Value: {int(sagittal_slice[orig_y, x])} HU")
-            else:
-                st.image(sagittal_resampled, clamp=True, use_container_width=True)
-            focus_on_click("sagittal_slice")
+            st.image(sagittal_resampled, clamp=True, use_container_width=True)
 
     else:
         # Welcome screen / Demo mode

@@ -2,7 +2,6 @@
 
 import logging
 import sys
-import time
 from pathlib import Path
 
 # Configure logging
@@ -38,175 +37,76 @@ def main():
     data_path = st.sidebar.text_input(
         "DICOM Folder Path",
         value=r"C:\Users\hellwege\AAPMLowDose\1mm B30-selected\full_1mm\L067\full_1mm",
-        help="Enter path to DICOM folder",
     )
 
-    # Show file count and options only if nothing loaded yet
-    if data_path and Path(data_path).exists() and "volume" not in st.session_state:
-        file_count = len(list(Path(data_path).iterdir()))
-        st.sidebar.markdown(f"**Files in directory:** {file_count}")
-
-        slice_option = st.sidebar.radio(
-            "Slices to load:", ["All slices", "Custom number"], key="slice_option_init"
-        )
-
-        n_slices = None
-        if slice_option == "Custom number":
-            n_slices = st.sidebar.number_input(
-                "Number of slices (max " + str(file_count) + ")",
-                min_value=1,
-                max_value=file_count,
-                value=100,
-                step=1,
-            )
-
-        st.sidebar.markdown("---")
+    path_ok = bool(data_path and Path(data_path).exists())
+    if not path_ok:
+        st.sidebar.warning("Enter a valid folder path")
     else:
-        n_slices = None
+        # Scan: persist result in session state so it survives reruns
+        if st.sidebar.button("Scan Directory"):
+            with st.spinner("Scanning directory..."):
+                st.session_state["series_list"] = scan_series(Path(data_path))
 
-    # Scan button
-    scan_button = st.sidebar.button("Scan Directory")
+        series_list = st.session_state.get("series_list") or []
+        if not series_list:
+            st.sidebar.info("No series scanned yet — click 'Scan Directory'.")
+        else:
+            series_options = [
+                f"{s.series_description or 'Unknown'} - {s.n_slices} slices ({s.dose_class})"
+                for s in series_list
+            ]
+            selected_idx = st.sidebar.selectbox(
+                "Select Series",
+                range(len(series_options)),
+                format_func=lambda i: series_options[i],
+            )
+            selected_series = series_list[selected_idx]
+            st.sidebar.markdown(
+                f"**Patient:** {selected_series.patient_id} | "
+                f"**Slices:** {selected_series.n_slices} | "
+                f"**Dose:** {selected_series.dose_class}"
+            )
+            st.sidebar.markdown("---")
 
-    series_list = []
-
-    # Check if path exists
-    if data_path and Path(data_path).exists() and scan_button:
-        try:
-            # Show progress bar for scanning
-            scan_progress = st.progress(0)
-            scan_status = st.empty()
-            scan_status.text("Scanning directory...")
-
-            # Run scan in background and animate progress
-            import threading
-
-            result = [None]
-
-            def do_scan():
-                result[0] = scan_series(Path(data_path))
-
-            scan_thread = threading.Thread(target=do_scan)
-            scan_thread.start()
-
-            # Animate progress bar while scanning (loop forward only)
-            p = 10
-            while scan_thread.is_alive():
-                scan_progress.progress(p)
-                p += 10
-                if p > 90:
-                    p = 10
-                time.sleep(0.3)
-
-            scan_thread.join()
-            series_list = result[0]
-
-            scan_progress.progress(100)
-            scan_status.text(f"Scan complete! Found {len(series_list)} series")
-
-            if series_list:
-                st.sidebar.subheader("Available Series")
-
-                # Create selection options
-                series_options = [
-                    f"{s.series_description or 'Unknown'} - {s.n_slices} slices ({s.dose_class})"
-                    for s in series_list
-                ]
-                selected_idx = st.sidebar.selectbox(
-                    "Select Series",
-                    range(len(series_options)),
-                    format_func=lambda i: series_options[i],
+            # SINGLE load-options block
+            file_count = len(list(Path(data_path).iterdir()))
+            slice_option = st.sidebar.radio(
+                "Slices to load:",
+                ["All slices", "Custom number"],
+                key="slice_option",
+            )
+            n_slices = None
+            if slice_option == "Custom number":
+                n_slices = st.sidebar.number_input(
+                    f"Number of slices (max {file_count})",
+                    min_value=1,
+                    max_value=file_count,
+                    value=100,
                 )
 
-                selected_series = series_list[selected_idx]
-
-                # Display series info
-                st.sidebar.markdown("---")
-                st.sidebar.markdown(f"**Patient:** {selected_series.patient_id}")
-                st.sidebar.markdown(f"**Slices:** {selected_series.n_slices}")
-                st.sidebar.markdown(f"**Dose:** {selected_series.dose_class}")
-
-                # Load options
-                st.sidebar.markdown("---")
-
-                # Show file count
-                all_files_in_dir = list(Path(data_path).iterdir())
-                file_count = len(all_files_in_dir)
-                st.sidebar.markdown(f"**Files in directory:** {file_count}")
-
-                st.sidebar.subheader("Load Options")
-
-                slice_option = st.sidebar.radio(
-                    "Slices to load:",
-                    ["All slices", "Custom number"],
-                    key="slice_option_load",
+            if st.sidebar.button("Load Series"):
+                files = (
+                    list(Path(data_path).iterdir())[:n_slices]
+                    if n_slices
+                    else list(Path(data_path).iterdir())
                 )
 
-                n_slices = None
-                if slice_option == "Custom number":
-                    n_slices = st.sidebar.number_input(
-                        "Number of slices (max " + str(file_count) + ")",
-                        min_value=1,
-                        max_value=file_count,
-                        value=100,
-                        step=1,
+                progress_bar = st.progress(0, text="Loading DICOM series...")
+
+                def report(done, total):
+                    progress_bar.progress(
+                        done / total, text=f"Loaded {done}/{total} slices"
                     )
 
-                # Load button
-                if st.sidebar.button("Load Series"):
-                    with st.spinner("Loading DICOM series..."):
-                        # Show progress bar
-                        # Get files, optionally limited
-                        all_files = list(Path(data_path).iterdir())
-                        total_files = len(all_files)
-                        if n_slices:
-                            files = all_files[:n_slices]
-                        else:
-                            files = all_files
+                volume = load_dicom_series(files, progress=report)
+                st.session_state["volume"] = volume
+                st.session_state["series"] = selected_series
+                st.toast(f"Loaded {len(files)} slices!")
 
-                        # Show progress bar with X/max
-                        progress_bar = st.progress(0)
-
-                        # Progress text below bar
-                        progress_text = st.container()
-                        with progress_text:
-                            st.markdown(f"### {len(files)}/{total_files}")
-
-                        status_text = st.empty()
-                        status_text.text(f"Loading {len(files)} files...")
-
-                        progress_bar.progress(50)
-
-                        volume = load_dicom_series(files)
-
-                        # Update to show completion
-                        progress_bar.progress(100)
-                        with progress_text:
-                            st.markdown(f"### {len(files)}/{total_files} ✓")
-                        status_text.text("Done!")
-
-                        # Show all loaded files in scrollable list
-                        st.sidebar.markdown("---")
-                        st.sidebar.subheader("Loaded Files")
-
-                        # Create scrollable list using HTML
-                        file_list = "<div style='height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 5px;'>"
-                        for f in files:
-                            file_list += f"<div>{f.name}</div>"
-                        file_list += "</div>"
-                        st.sidebar.markdown(file_list, unsafe_allow_html=True)
-
-                        st.session_state["volume"] = volume
-                        st.session_state["series"] = selected_series
-
-                    st.success(f"Loaded {len(files)} slices!")
-
-            else:
-                st.sidebar.warning("No series found in directory")
-
-        except Exception as e:
-            st.sidebar.error(f"Error: {str(e)}")
-    else:
-        st.sidebar.info("Enter a valid folder path")
+                with st.sidebar.expander(f"Loaded Files ({len(files)})"):
+                    for f in files:
+                        st.text(f.name)
 
     # Main area
     if "volume" in st.session_state:
@@ -316,14 +216,14 @@ def main():
 
         st.markdown("""
         ## Features
-        
+
         - **DICOM Loading** - Read CT scans from DICOM files
         - **Windowing** - Presets for lung, abdomen, bone, brain + manual controls
         - **MPR** - Multi-planar reconstruction (axial, coronal, sagittal)
         - **3D View** - Volume visualization (coming soon)
-        
+
         ## Demo Mode
-        
+
         Use the demo phantom to test without real data.
         """)
 

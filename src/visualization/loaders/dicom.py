@@ -25,7 +25,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import pydicom
@@ -242,7 +242,11 @@ def _detect_unit(arrays: np.ndarray) -> tuple[str, float, float, str]:
     return ("HU", 1.0, -1024, "low")
 
 
-def load_dicom_series(files: list[Path], unit: str = None) -> Volume:
+def load_dicom_series(
+    files: list[Path],
+    unit: str = None,
+    progress: Callable[[int, int], None] = None,
+) -> Volume:
     """Load a DICOM series and return as Volume.
 
     Sorts slices by their position along the scan axis, validates
@@ -251,6 +255,8 @@ def load_dicom_series(files: list[Path], unit: str = None) -> Volume:
 
     Args:
         files: List of paths to DICOM files in the series.
+        unit: Optional unit override ("HU", "1/mm", "1/cm").
+        progress: Optional callback function(current, total) for progress updates.
 
     Returns:
         Volume object with the CT data in HU.
@@ -262,11 +268,17 @@ def load_dicom_series(files: list[Path], unit: str = None) -> Volume:
     if not files:
         raise ValueError("No files provided")
 
+    total_files = len(files)
+
     # Read all slices and collect metadata
     slices: list[tuple[Dataset, np.ndarray, np.ndarray, Path]] = []
 
-    for file_path in files:
+    for i, file_path in enumerate(files, start=1):
         ds, pixel_array, position = _read_dicom_slice(file_path)
+
+        # Report progress
+        if progress:
+            progress(i, total_files)
 
         # Check for gantry tilt
         if _check_gantry_tilt(ds):

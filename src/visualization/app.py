@@ -165,13 +165,9 @@ def main():
         sagittal_max = volume.array.shape[2] - 1
 
         # Clamp slice indices to valid range (in case session state has stale values)
-        axial_idx = min(st.session_state.get("axial_slice", axial_max // 2), axial_max)
-        coronal_idx = min(
-            st.session_state.get("coronal_slice", coronal_max // 2), coronal_max
-        )
-        sagittal_idx = min(
-            st.session_state.get("sagittal_slice", sagittal_max // 2), sagittal_max
-        )
+        axial_idx = max(0, min(st.session_state.get("axial_slice", axial_max // 2), axial_max))
+        coronal_idx = max(0, min(st.session_state.get("coronal_slice", coronal_max // 2), coronal_max))
+        sagittal_idx = max(0, min(st.session_state.get("sagittal_slice", sagittal_max // 2), sagittal_max))
 
         # Axial view
         with axial_col:

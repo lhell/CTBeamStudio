@@ -164,15 +164,20 @@ def main():
         coronal_max = volume.array.shape[1] - 1
         sagittal_max = volume.array.shape[2] - 1
 
+        # Clamp slice indices to valid range (in case session state has stale values)
+        axial_idx = min(st.session_state.get("axial_slice", axial_max // 2), axial_max)
+        coronal_idx = min(
+            st.session_state.get("coronal_slice", coronal_max // 2), coronal_max
+        )
+        sagittal_idx = min(
+            st.session_state.get("sagittal_slice", sagittal_max // 2), sagittal_max
+        )
+
         # Axial view
         with axial_col:
             st.markdown("**Axial**")
             axial_idx = st.slider(
-                "Slice",
-                min_value=0,
-                max_value=axial_max,
-                value=st.session_state.get("axial_slice", axial_max // 2),
-                key="axial_slice",
+                "Slice", min_value=0, max_value=axial_max, value=axial_idx, key="axial_slice"
             )
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
@@ -185,11 +190,7 @@ def main():
         with coronal_col:
             st.markdown("**Coronal**")
             coronal_idx = st.slider(
-                "Slice",
-                min_value=0,
-                max_value=coronal_max,
-                value=st.session_state.get("coronal_slice", coronal_max // 2),
-                key="coronal_slice",
+                "Slice", min_value=0, max_value=coronal_max, value=coronal_idx, key="coronal_slice"
             )
             coronal_slice, coronal_spacing = extract_slice(
                 volume, "coronal", coronal_idx
@@ -204,11 +205,7 @@ def main():
         with sagittal_col:
             st.markdown("**Sagittal**")
             sagittal_idx = st.slider(
-                "Slice",
-                min_value=0,
-                max_value=sagittal_max,
-                value=st.session_state.get("sagittal_slice", sagittal_max // 2),
-                key="sagittal_slice",
+                "Slice", min_value=0, max_value=sagittal_max, value=sagittal_idx, key="sagittal_slice"
             )
             sagittal_slice, sagittal_spacing = extract_slice(
                 volume, "sagittal", sagittal_idx

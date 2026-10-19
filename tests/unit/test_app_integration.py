@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from visualization.volume import Volume
 from visualization.mpr import extract_slice
-from visualization.windowing import apply_window, WINDOW_PRESETS
+from visualization.volume import Volume
+from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
 class TestMPRWindowingIntegration:

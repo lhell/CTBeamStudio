@@ -1,7 +1,8 @@
 """MPR (Multi-Planar Reconstruction) for CT volumes."""
 
-import numpy as np
 from typing import Tuple
+
+import numpy as np
 
 from visualization.volume import Volume
 

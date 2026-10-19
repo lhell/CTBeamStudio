@@ -218,6 +218,27 @@ def main():
         clamp_slice_state("coronal_slice", coronal_max)
         clamp_slice_state("sagittal_slice", sagittal_max)
 
+        # Helper to make image click focus its slider
+        def focus_on_click(slider_key: str):
+            js = f"""
+            <script>
+                var observer = new MutationObserver(function(mutations) {{
+                    var img = window.parent.document.querySelector('img[data-testid="stImage"]');
+                    if (img) {{
+                        img.style.cursor = 'pointer';
+                        img.onclick = function() {{
+                            var slider = window.parent.document.querySelector('[data-testid="stSlider"] input[key="{slider_key}"]');
+                            if (slider) {{
+                                slider.focus();
+                            }}
+                        }};
+                    }}
+                }});
+                observer.observe(window.parent.document.body, {{childList: true, subtree: true}});
+            </script>
+            """
+            st.markdown(js, unsafe_allow_html=True)
+
         # Axial view
         with axial_col:
             st.markdown("**Axial**")
@@ -225,6 +246,7 @@ def main():
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
             st.image(axial_windowed, clamp=True, use_container_width=True)
+            focus_on_click("axial_slice")
             st.caption(
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
@@ -240,6 +262,7 @@ def main():
             # Resample to isotropic for correct aspect ratio
             coronal_resampled = to_isotropic(coronal_windowed, coronal_spacing)
             st.image(coronal_resampled, clamp=True, use_container_width=True)
+            focus_on_click("coronal_slice")
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
             )
@@ -255,6 +278,7 @@ def main():
             # Resample to isotropic for correct aspect ratio
             sagittal_resampled = to_isotropic(sagittal_windowed, sagittal_spacing)
             st.image(sagittal_resampled, clamp=True, use_container_width=True)
+            focus_on_click("sagittal_slice")
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
             )

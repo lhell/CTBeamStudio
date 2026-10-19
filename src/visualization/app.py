@@ -23,6 +23,7 @@ import visualization.mpr as _mpr
 logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
 import streamlit as st
+from streamlit_image_coordinates import streamlit_image_coordinates
 from pathlib import Path
 
 import numpy as np
@@ -177,7 +178,7 @@ def main():
         st.markdown("---")
         st.subheader("Windowing")
 
-        col_preset, col_center, col_width = st.columns(3)
+        col_preset, col_center, col_width, col_coords = st.columns(4)
 
         with col_preset:
             window_preset = st.selectbox(
@@ -201,6 +202,9 @@ def main():
                 max_value=4000,
                 value=WINDOW_PRESETS[window_preset][1],
             )
+
+        with col_coords:
+            show_coords = st.checkbox("Show coords", value=False, help="Show pixel value on image hover")
 
         # MPR Display - 3 columns
         st.markdown("---")
@@ -245,7 +249,15 @@ def main():
             axial_idx = st.slider("Slice", 0, axial_max, key="axial_slice")
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
-            st.image(axial_windowed, clamp=True, use_container_width=True)
+            if show_coords:
+                axial_coords = streamlit_image_coordinates(
+                    axial_windowed, key="axial_coords", use_container_width=True
+                )
+                if axial_coords:
+                    x, y = axial_coords["x"], axial_coords["y"]
+                    st.caption(f"x: {x}, y: {y} | Value: {int(axial_slice[y, x])} HU")
+            else:
+                st.image(axial_windowed, clamp=True, use_container_width=True)
             focus_on_click("axial_slice")
             st.caption(
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
@@ -261,7 +273,17 @@ def main():
             coronal_windowed = apply_window(coronal_slice, center, width)
             # Resample to isotropic for correct aspect ratio
             coronal_resampled = to_isotropic(coronal_windowed, coronal_spacing)
-            st.image(coronal_resampled, clamp=True, use_container_width=True)
+            if show_coords:
+                coronal_coords = streamlit_image_coordinates(
+                    coronal_resampled, key="coronal_coords", use_container_width=True
+                )
+                if coronal_coords:
+                    x, y = coronal_coords["x"], coronal_coords["y"]
+                    # Map back to original slice coordinates
+                    orig_y = int(y * coronal_spacing[0] / min(coronal_spacing[0], coronal_spacing[1]))
+                    st.caption(f"x: {x}, y: {y} | Value: {int(coronal_slice[orig_y, x])} HU")
+            else:
+                st.image(coronal_resampled, clamp=True, use_container_width=True)
             focus_on_click("coronal_slice")
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
@@ -277,7 +299,17 @@ def main():
             sagittal_windowed = apply_window(sagittal_slice, center, width)
             # Resample to isotropic for correct aspect ratio
             sagittal_resampled = to_isotropic(sagittal_windowed, sagittal_spacing)
-            st.image(sagittal_resampled, clamp=True, use_container_width=True)
+            if show_coords:
+                sagittal_coords = streamlit_image_coordinates(
+                    sagittal_resampled, key="sagittal_coords", use_container_width=True
+                )
+                if sagittal_coords:
+                    x, y = sagittal_coords["x"], sagittal_coords["y"]
+                    # Map back to original slice coordinates
+                    orig_y = int(y * sagittal_spacing[0] / min(sagittal_spacing[0], sagittal_spacing[1]))
+                    st.caption(f"x: {x}, y: {y} | Value: {int(sagittal_slice[orig_y, x])} HU")
+            else:
+                st.image(sagittal_resampled, clamp=True, use_container_width=True)
             focus_on_click("sagittal_slice")
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"

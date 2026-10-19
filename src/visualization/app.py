@@ -26,7 +26,6 @@ logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
-from scipy.ndimage import zoom
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
@@ -51,6 +50,8 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
     Returns:
         Resampled image with square pixels
     """
+    from scipy.ndimage import zoom
+
     row_sp, col_sp = spacing
     if abs(row_sp - col_sp) < 1e-6:
         return img  # Already isotropic

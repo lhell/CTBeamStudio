@@ -13,15 +13,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Add project root to path for imports
-# Use resolve() to get absolute path, then go up to project root
+# Use resolve() to get absolute path
 app_path = Path(__file__).resolve()
-src_path = app_path.parent  # src/visualization
-sys.path.insert(0, str(src_path.resolve()))  # Force absolute path
-
-# Remove any cached visualization modules to ensure fresh load
-for mod_name in list(sys.modules.keys()):
-    if mod_name.startswith("visualization"):
-        del sys.modules[mod_name]
+src_path = app_path.parent.parent  # src/visualization -> src -> project root
+sys.path.insert(0, str(src_path.resolve()))  # Add src/ to path
 
 # Debug: log where modules are loaded from
 import visualization.mpr as _mpr
@@ -231,7 +226,7 @@ def main():
             axial_windowed = apply_window(axial_slice, center, width)
             st.image(axial_windowed, clamp=True, use_container_width=True)
             st.caption(
-                f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: {axial_spacing}"
+                f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
 
         # Coronal view
@@ -246,7 +241,7 @@ def main():
             coronal_resampled = to_isotropic(coronal_windowed, coronal_spacing)
             st.image(coronal_resampled, clamp=True, use_container_width=True)
             st.caption(
-                f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: {coronal_spacing}"
+                f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
             )
 
         # Sagittal view
@@ -261,7 +256,7 @@ def main():
             sagittal_resampled = to_isotropic(sagittal_windowed, sagittal_spacing)
             st.image(sagittal_resampled, clamp=True, use_container_width=True)
             st.caption(
-                f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: {sagittal_spacing}"
+                f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
             )
 
     else:

@@ -60,39 +60,52 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
 
 
 def setup_image_interaction() -> None:
-    """Show x,y pixel coordinates on image hover."""
+    """Click an image to focus its slice slider, then navigate with arrow keys."""
     js = """
     <script>
-    function setupImageInteraction() {
-        const doc = window.parent.document;
+    const doc = window.parent.document;
+    let activeCol = null;
+
+    const thumbIn = (col) => col ? col.querySelector('div[role="slider"]') : null;
+    const colOf = (el) => el.closest('[data-testid="stColumn"]')
+                       || el.closest('[data-testid="column"]');
+
+    function attach() {
         doc.querySelectorAll('[data-testid="stImage"] img').forEach(img => {
-            if (img.dataset.interactionSetup === 'true') return;
-            img.dataset.interactionSetup = 'true';
+            if (img.dataset.focusSetup === 'true') return;
+            img.dataset.focusSetup = 'true';
+            img.style.cursor = 'pointer';
 
-            const tooltip = doc.createElement('div');
-            tooltip.style.cssText = `
-                position:absolute; background:rgba(0,0,0,.7); color:#fff;
-                padding:4px 8px; border-radius:4px; font-size:12px;
-                pointer-events:none; display:none; z-index:1000;`;
-            img.parentElement.style.position = 'relative';
-            img.parentElement.appendChild(tooltip);
-            img.style.cursor = 'crosshair';
-
-            img.addEventListener('mousemove', (e) => {
-                const rect = img.getBoundingClientRect();
-                const x = Math.round((e.clientX - rect.left) * img.naturalWidth / rect.width);
-                const y = Math.round((e.clientY - rect.top) * img.naturalHeight / rect.height);
-                tooltip.textContent = `x: ${x}, y: ${y}`;
-                tooltip.style.display = 'block';
-                tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                tooltip.style.top  = (e.clientY - rect.top  - 25) + 'px';
+            img.addEventListener('mousedown', (e) => {
+                e.preventDefault();               // don't let the click steal focus
+                activeCol = colOf(img);
+                const thumb = thumbIn(activeCol);
+                if (!thumb) return;
+                thumb.focus();
+                doc.querySelectorAll('[data-testid="stImage"] img')
+                   .forEach(i => i.style.outline = 'none');
+                img.style.outline = '2px solid #ff4b4b';
             });
-            img.addEventListener('mouseleave', () => tooltip.style.display = 'none');
         });
     }
-    setupImageInteraction();
-    new MutationObserver(setupImageInteraction)
-        .observe(window.parent.document.body, {childList: true, subtree: true});
+
+    // After each rerun Streamlit re-renders the slider and focus drops to <body>.
+    // Restore it, but never steal focus from a real input.
+    function refocus() {
+        if (!activeCol) return;
+        const ae = doc.activeElement;
+        if (ae && ae !== doc.body && ae.tagName !== 'HTML') return;
+        const thumb = thumbIn(activeCol);
+        if (thumb) thumb.focus();
+    }
+
+    attach();
+    let t;
+    new MutationObserver(() => {
+        attach();
+        clearTimeout(t);
+        t = setTimeout(refocus, 50);
+    }).observe(doc.body, {childList: true, subtree: true});
     </script>
     """
     components.html(js, height=0)

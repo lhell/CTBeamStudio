@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 # Use resolve() to get absolute path, then go up to project root
 app_path = Path(__file__).resolve()
 src_path = app_path.parent  # src/visualization
-project_root = src_path.parent  # project root (contains src/)
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+sys.path.insert(0, str(src_path.resolve()))  # Force absolute path
+
+# Remove any cached visualization modules to ensure fresh load
+for mod_name in list(sys.modules.keys()):
+    if mod_name.startswith("visualization"):
+        del sys.modules[mod_name]
 
 # Debug: log where modules are loaded from
 import visualization.mpr as _mpr

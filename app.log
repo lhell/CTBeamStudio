@@ -169,3 +169,16 @@
 2026-10-19 14:53:18,850 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 14:53:20,066 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 14:53:21,216 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-19 14:55:53,315 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:55:57,579 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 14:56:19,603 - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 166, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen
+2026-10-19 14:56:19,703 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py

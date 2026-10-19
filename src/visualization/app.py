@@ -157,11 +157,6 @@ def main():
                 format_func=lambda i: series_options[i],
             )
             selected_series = series_list[selected_idx]
-            st.sidebar.markdown(
-                f"**Patient:** {selected_series.patient_id} | "
-                f"**Slices:** {selected_series.n_slices} | "
-                f"**Dose:** {selected_series.dose_class}"
-            )
             st.sidebar.markdown("---")
 
             # SINGLE load-options block

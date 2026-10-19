@@ -47,3 +47,6 @@ venv/
 
 # Superpowers (auto-generated)
 .superpowers/
+
+# Worktrees
+.worktrees/

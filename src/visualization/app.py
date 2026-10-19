@@ -23,6 +23,14 @@ from visualization.volume import Volume
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
+def clamp_slice_state(key: str, max_idx: int) -> None:
+    """Keep a slider's session-state value inside [0, max_idx]."""
+    if key in st.session_state:
+        st.session_state[key] = int(max(0, min(st.session_state[key], max_idx)))
+    else:
+        st.session_state[key] = max_idx // 2
+
+
 def main():
     st.set_page_config(
         page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"
@@ -107,10 +115,9 @@ def main():
                 volume = load_dicom_series(files, progress=report)
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
-                # Reset slice indices for new volume
-                st.session_state["axial_slice"] = volume.array.shape[0] // 2
-                st.session_state["coronal_slice"] = volume.array.shape[1] // 2
-                st.session_state["sagittal_slice"] = volume.array.shape[2] // 2
+                # Clear old slice indices so clamp_slice_state will center them
+                for k in ("axial_slice", "coronal_slice", "sagittal_slice"):
+                    st.session_state.pop(k, None)
                 st.toast(f"Loaded {len(files)} slices!")
 
                 with st.sidebar.expander(f"Loaded Files ({len(files)})"):
@@ -164,17 +171,15 @@ def main():
         coronal_max = volume.array.shape[1] - 1
         sagittal_max = volume.array.shape[2] - 1
 
-        # Clamp slice indices to valid range (in case session state has stale values)
-        axial_idx = max(0, min(st.session_state.get("axial_slice", axial_max // 2), axial_max))
-        coronal_idx = max(0, min(st.session_state.get("coronal_slice", coronal_max // 2), coronal_max))
-        sagittal_idx = max(0, min(st.session_state.get("sagittal_slice", sagittal_max // 2), sagittal_max))
+        # Clamp slice indices in session state BEFORE creating sliders
+        clamp_slice_state("axial_slice", axial_max)
+        clamp_slice_state("coronal_slice", coronal_max)
+        clamp_slice_state("sagittal_slice", sagittal_max)
 
         # Axial view
         with axial_col:
             st.markdown("**Axial**")
-            axial_idx = st.slider(
-                "Slice", min_value=0, max_value=axial_max, value=axial_idx, key="axial_slice"
-            )
+            axial_idx = st.slider("Slice", 0, axial_max, key="axial_slice")
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
             st.image(axial_windowed, clamp=True, use_container_width=True)
@@ -185,9 +190,7 @@ def main():
         # Coronal view
         with coronal_col:
             st.markdown("**Coronal**")
-            coronal_idx = st.slider(
-                "Slice", min_value=0, max_value=coronal_max, value=coronal_idx, key="coronal_slice"
-            )
+            coronal_idx = st.slider("Slice", 0, coronal_max, key="coronal_slice")
             coronal_slice, coronal_spacing = extract_slice(
                 volume, "coronal", coronal_idx
             )
@@ -200,9 +203,7 @@ def main():
         # Sagittal view
         with sagittal_col:
             st.markdown("**Sagittal**")
-            sagittal_idx = st.slider(
-                "Slice", min_value=0, max_value=sagittal_max, value=sagittal_idx, key="sagittal_slice"
-            )
+            sagittal_idx = st.slider("Slice", 0, sagittal_max, key="sagittal_slice")
             sagittal_slice, sagittal_spacing = extract_slice(
                 volume, "sagittal", sagittal_idx
             )

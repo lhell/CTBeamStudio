@@ -6,6 +6,8 @@ import numpy as np
 
 from visualization.volume import Volume
 
+AXIS = {"axial": 0, "coronal": 1, "sagittal": 2}
+
 
 def extract_slice(
     volume: Volume, plane: str, index: int
@@ -34,6 +36,19 @@ def extract_slice(
     # Normalize plane name
     plane = plane.lower().strip()
 
+    if plane not in AXIS:
+        raise ValueError(
+            f"plane must be 'axial', 'coronal', or 'sagittal', got '{plane}'"
+        )
+
+    # Validate index against the source axis in the volume (before slicing)
+    axis = AXIS[plane]
+    size = volume.array.shape[axis]
+    if not 0 <= index < size:
+        raise IndexError(
+            f"index {index} out of bounds for {plane} axis (size {size})"
+        )
+
     # Extract slice and determine in-plane spacing based on plane orientation
     if plane == "axial":
         # Axial: slice along z-axis (head-to-feet)
@@ -55,17 +70,5 @@ def extract_slice(
         # Spacing: (z_spacing, y_spacing)
         slice_array = volume.array[:, :, index]
         in_plane_spacing = (volume.spacing[0], volume.spacing[1])
-
-    else:
-        raise ValueError(
-            f"plane must be 'axial', 'coronal', or 'sagittal', got '{plane}'"
-        )
-
-    # Validate index bounds
-    max_index = slice_array.shape[0] - 1
-    if index < 0 or index > max_index:
-        raise IndexError(
-            f"index {index} out of bounds for dimension size {slice_array.shape[0]}"
-        )
 
     return slice_array, in_plane_spacing

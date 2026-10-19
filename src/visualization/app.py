@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import streamlit as st
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
+from visualization.mpr import extract_slice
 from visualization.volume import Volume
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
@@ -214,48 +215,90 @@ def main():
 
         st.markdown(f"### {series.series_description or 'CT Scan'}")
 
-        # Controls
-        col1, col2, col3 = st.columns(3)
+        # Windowing controls (common for all planes)
+        st.markdown("---")
+        st.subheader("Windowing")
 
-        with col1:
-            # Windowing
+        col_preset, col_center, col_width = st.columns(3)
+
+        with col_preset:
             window_preset = st.selectbox(
-                "Window Preset",
+                "Preset",
                 options=list(WINDOW_PRESETS.keys()),
                 index=1,  # abdomen default
             )
-            center, width = WINDOW_PRESETS[window_preset]
 
-        with col2:
-            # Slice selector
-            slice_idx = st.slider(
+        with col_center:
+            center = st.slider(
+                "Center (HU)",
+                min_value=-1000,
+                max_value=3000,
+                value=WINDOW_PRESETS[window_preset][0],
+            )
+
+        with col_width:
+            width = st.slider(
+                "Width (HU)",
+                min_value=1,
+                max_value=4000,
+                value=WINDOW_PRESETS[window_preset][1],
+            )
+
+        # MPR Display - 3 columns
+        st.markdown("---")
+        st.subheader("MPR Views")
+
+        axial_col, coronal_col, sagittal_col = st.columns(3)
+
+        # Get dimensions for each plane
+        axial_max = volume.array.shape[0] - 1
+        coronal_max = volume.array.shape[1] - 1
+        sagittal_max = volume.array.shape[2] - 1
+
+        # Axial view
+        with axial_col:
+            st.markdown("**Axial**")
+            axial_idx = st.slider(
                 "Slice",
                 min_value=0,
-                max_value=volume.n_slices - 1,
-                value=volume.n_slices // 2,
+                max_value=axial_max,
+                value=axial_max // 2,
+                key="axial_slice",
             )
+            axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
+            axial_windowed = apply_window(axial_slice, center, width)
+            st.image(axial_windowed, clamp=True, use_container_width=True)
+            st.caption(f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: {axial_spacing}")
 
-        with col3:
-            # Display info
-            st.markdown(f"**Shape:** {volume.shape}")
-            st.markdown(f"**Spacing:** {volume.spacing}")
-
-        # Display image
-        if slice_idx < volume.array.shape[0]:
-            slice_data = volume.array[slice_idx]
-
-            # Apply windowing
-            windowed = apply_window(slice_data, center, width)
-
-            st.image(
-                windowed, caption=f"Slice {slice_idx + 1}/{volume.n_slices}", clamp=True
+        # Coronal view
+        with coronal_col:
+            st.markdown("**Coronal**")
+            coronal_idx = st.slider(
+                "Slice",
+                min_value=0,
+                max_value=coronal_max,
+                value=coronal_max // 2,
+                key="coronal_slice",
             )
+            coronal_slice, coronal_spacing = extract_slice(volume, "coronal", coronal_idx)
+            coronal_windowed = apply_window(coronal_slice, center, width)
+            st.image(coronal_windowed, clamp=True, use_container_width=True)
+            st.caption(f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: {coronal_spacing}")
 
-            # Show HU at center
-            center_y = volume.array.shape[1] // 2
-            center_x = volume.array.shape[2] // 2
-            hu_value = volume.array[slice_idx, center_y, center_x]
-            st.caption(f"HU at center: {hu_value}")
+        # Sagittal view
+        with sagittal_col:
+            st.markdown("**Sagittal**")
+            sagittal_idx = st.slider(
+                "Slice",
+                min_value=0,
+                max_value=sagittal_max,
+                value=sagittal_max // 2,
+                key="sagittal_slice",
+            )
+            sagittal_slice, sagittal_spacing = extract_slice(volume, "sagittal", sagittal_idx)
+            sagittal_windowed = apply_window(sagittal_slice, center, width)
+            st.image(sagittal_windowed, clamp=True, use_container_width=True)
+            st.caption(f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: {sagittal_spacing}")
 
     else:
         # Welcome screen / Demo mode
@@ -265,8 +308,8 @@ def main():
         ## Features
         
         - **DICOM Loading** - Read CT scans from DICOM files
-        - **Windowing** - Presets for lung, abdomen, bone, brain
-        - **MPR** - Multi-planar reconstruction (coming soon)
+        - **Windowing** - Presets for lung, abdomen, bone, brain + manual controls
+        - **MPR** - Multi-planar reconstruction (axial, coronal, sagittal)
         - **3D View** - Volume visualization (coming soon)
         
         ## Demo Mode

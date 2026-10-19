@@ -60,52 +60,96 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
 
 
 def setup_image_interaction() -> None:
-    """Click an image to focus its slice slider, then navigate with arrow keys."""
+    """Click image -> focus its slider; arrows/Home/End/Tab navigate slices."""
     js = """
     <script>
-    const doc = window.parent.document;
-    let activeCol = null;
+    const win = window.parent, doc = win.parent ? window.parent.document : document;
+    win.__mpr = win.__mpr || { plane: null };
+    const S = win.__mpr;
+    const ORDER = ['axial', 'coronal', 'sagittal'];
 
-    const thumbIn = (col) => col ? col.querySelector('div[role="slider"]') : null;
     const colOf = (el) => el.closest('[data-testid="stColumn"]')
                        || el.closest('[data-testid="column"]');
 
-    function attach() {
-        doc.querySelectorAll('[data-testid="stImage"] img').forEach(img => {
-            if (img.dataset.focusSetup === 'true') return;
-            img.dataset.focusSetup = 'true';
-            img.style.cursor = 'pointer';
+    function planes() {
+        const map = {};
+        doc.querySelectorAll('.mpr-anchor[data-plane]').forEach(a => {
+            const c = colOf(a);
+            if (c) map[a.dataset.plane] = c;
+        });
+        return map;
+    }
+    const thumbIn = (col) => col ? col.querySelector('div[role="slider"]') : null;
 
-            img.addEventListener('mousedown', (e) => {
-                e.preventDefault();               // don't let the click steal focus
-                activeCol = colOf(img);
-                const thumb = thumbIn(activeCol);
-                if (!thumb) return;
-                thumb.focus();
-                doc.querySelectorAll('[data-testid="stImage"] img')
-                   .forEach(i => i.style.outline = 'none');
-                img.style.outline = '2px solid #ff4b4b';
-            });
+    function paint() {
+        const p = planes();
+        Object.entries(p).forEach(([name, col]) => {
+            const img = col.querySelector('[data-testid="stImage"] img');
+            if (img) img.style.outline = (name === S.plane) ? '2px solid #ff4b4b' : 'none';
         });
     }
 
-    // After each rerun Streamlit re-renders the slider and focus drops to <body>.
-    // Restore it, but never steal focus from a real input.
-    function refocus() {
-        if (!activeCol) return;
+    function focusPlane(name) {
+        const t = thumbIn(planes()[name]);
+        if (!t) return;
+        S.plane = name;
+        t.focus({ preventScroll: true });
+        paint();
+    }
+
+    function attach() {
+        Object.entries(planes()).forEach(([name, col]) => {
+            const img = col.querySelector('[data-testid="stImage"] img');
+            if (!img || img.dataset.mprBound) return;
+            img.dataset.mprBound = '1';
+            img.style.cursor = 'pointer';
+            img.addEventListener('mousedown', e => { e.preventDefault(); focusPlane(name); });
+        });
+        paint();
+    }
+
+    function activePlane() {
         const ae = doc.activeElement;
-        if (ae && ae !== doc.body && ae.tagName !== 'HTML') return;
-        const thumb = thumbIn(activeCol);
-        if (thumb) thumb.focus();
+        if (!ae || !ae.closest) return null;
+        const col = colOf(ae);
+        if (!col) return null;
+        const p = planes();
+        return ORDER.find(k => p[k] === col) || null;
+    }
+
+    if (!win.__mprKeys) {
+        win.__mprKeys = true;
+        doc.addEventListener('keydown', e => {
+            const name = activePlane();
+            if (!name) return;
+            if (e.key === 'Home' || e.key === 'End') {
+                const btns = planes()[name].querySelectorAll('[data-testid="stButton"] button');
+                const b = e.key === 'Home' ? btns[0] : btns[1];
+                if (b) { e.preventDefault(); S.plane = name; b.click(); }
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const step = e.shiftKey ? ORDER.length - 1 : 1;
+                focusPlane(ORDER[(ORDER.indexOf(name) + step) % ORDER.length]);
+            }
+            // Arrow keys: handled natively by the slider
+        }, true);
     }
 
     attach();
-    let t;
-    new MutationObserver(() => {
-        attach();
-        clearTimeout(t);
-        t = setTimeout(refocus, 50);
-    }).observe(doc.body, {childList: true, subtree: true});
+    if (!win.__mprObs) {
+        let t;
+        win.__mprObs = new MutationObserver(() => {
+            attach();
+            clearTimeout(t);
+            t = setTimeout(() => {
+                if (!S.plane) return;
+                const ae = doc.activeElement;
+                if (ae && ae !== doc.body && ae.tagName !== 'HTML') return;  // don't steal focus
+                focusPlane(S.plane);
+            }, 60);
+        });
+        win.__mprObs.observe(doc.body, { childList: true, subtree: true });
+    }
     </script>
     """
     components.html(js, height=0)
@@ -269,10 +313,24 @@ def main():
         clamp_slice_state("coronal_slice", coronal_max)
         clamp_slice_state("sagittal_slice", sagittal_max)
 
+        # Helper function for slider with anchor and jump buttons
+        def slice_slider(plane: str, key: str, max_idx: int):
+            st.markdown(
+                f'<div class="mpr-anchor" data-plane="{plane}"></div>',
+                unsafe_allow_html=True,
+            )
+            idx = st.slider("Slice", 0, max_idx, key=key, label_visibility="collapsed")
+            b_min, b_max = st.columns(2)
+            b_min.button("⏮", key=f"{key}_min", use_container_width=True,
+                         on_click=lambda: st.session_state.update({key: 0}))
+            b_max.button("⏭", key=f"{key}_max", use_container_width=True,
+                         on_click=lambda: st.session_state.update({key: max_idx}))
+            return idx
+
         # Axial view
         with axial_col:
             st.markdown("**Axial**")
-            axial_idx = st.slider("Slice", 0, axial_max, key="axial_slice")
+            axial_idx = slice_slider("axial", "axial_slice", axial_max)
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
             st.caption(
@@ -283,7 +341,7 @@ def main():
         # Coronal view
         with coronal_col:
             st.markdown("**Coronal**")
-            coronal_idx = st.slider("Slice", 0, coronal_max, key="coronal_slice")
+            coronal_idx = slice_slider("coronal", "coronal_slice", coronal_max)
             coronal_slice, coronal_spacing = extract_slice(
                 volume, "coronal", coronal_idx
             )
@@ -298,7 +356,7 @@ def main():
         # Sagittal view
         with sagittal_col:
             st.markdown("**Sagittal**")
-            sagittal_idx = st.slider("Slice", 0, sagittal_max, key="sagittal_slice")
+            sagittal_idx = slice_slider("sagittal", "sagittal_slice", sagittal_max)
             sagittal_slice, sagittal_spacing = extract_slice(
                 volume, "sagittal", sagittal_idx
             )

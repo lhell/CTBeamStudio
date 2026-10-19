@@ -17,11 +17,7 @@ class TestMPRWindowingIntegration:
         array = np.arange(490).reshape(10, 7, 7).astype(np.int16)
         # Add some HU-like values (air: -1000, water: 0, bone: +800)
         array = array * 200 - 1000  # Range: -1000 to +8800 HU
-        return Volume(
-            array=array,
-            spacing=(3.0, 0.7, 0.7),
-            origin=(0.0, 0.0, 0.0)
-        )
+        return Volume(array=array, spacing=(3.0, 0.7, 0.7), origin=(0.0, 0.0, 0.0))
 
     def test_axial_mpr_with_windowing(self, test_volume):
         """Test axial slice extraction + windowing pipeline."""
@@ -82,11 +78,7 @@ class TestSliderBounds:
     def test_volume(self):
         # 3D volume: 10 slices, 10x10 pixels each
         array = np.arange(1000).reshape(10, 10, 10).astype(np.int16)
-        return Volume(
-            array=array,
-            spacing=(1.0, 1.0, 1.0),
-            origin=(0.0, 0.0, 0.0)
-        )
+        return Volume(array=array, spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0))
 
     def test_axial_slider_bounds(self, test_volume):
         """Axial slider max should be shape[0] - 1."""
@@ -123,11 +115,7 @@ class TestVolumeInfoDisplay:
     @pytest.fixture
     def test_volume(self):
         array = np.zeros((20, 512, 512), dtype=np.int16)
-        return Volume(
-            array=array,
-            spacing=(2.5, 0.5, 0.5),
-            origin=(0.0, 0.0, 0.0)
-        )
+        return Volume(array=array, spacing=(2.5, 0.5, 0.5), origin=(0.0, 0.0, 0.0))
 
     def test_shape_display(self, test_volume):
         """Test shape property works for display."""

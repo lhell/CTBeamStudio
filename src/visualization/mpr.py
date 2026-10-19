@@ -6,7 +6,9 @@ from typing import Tuple
 from visualization.volume import Volume
 
 
-def extract_slice(volume: Volume, plane: str, index: int) -> Tuple[np.ndarray, Tuple[float, float]]:
+def extract_slice(
+    volume: Volume, plane: str, index: int
+) -> Tuple[np.ndarray, Tuple[float, float]]:
     """Extract an orthogonal slice from a 3D volume.
 
     Args:
@@ -54,11 +56,15 @@ def extract_slice(volume: Volume, plane: str, index: int) -> Tuple[np.ndarray, T
         in_plane_spacing = (volume.spacing[0], volume.spacing[1])
 
     else:
-        raise ValueError(f"plane must be 'axial', 'coronal', or 'sagittal', got '{plane}'")
+        raise ValueError(
+            f"plane must be 'axial', 'coronal', or 'sagittal', got '{plane}'"
+        )
 
     # Validate index bounds
     max_index = slice_array.shape[0] - 1
     if index < 0 or index > max_index:
-        raise IndexError(f"index {index} out of bounds for dimension size {slice_array.shape[0]}")
+        raise IndexError(
+            f"index {index} out of bounds for dimension size {slice_array.shape[0]}"
+        )
 
     return slice_array, in_plane_spacing

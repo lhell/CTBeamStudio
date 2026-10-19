@@ -16,11 +16,7 @@ class TestExtractSlice:
         # Shape: (10, 7, 7) — 10 slices, 7x7 pixels
         # Spacing: (3.0, 0.7, 0.7) — anisotropic (z=3.0mm, y=x=0.7mm)
         array = np.arange(490).reshape(10, 7, 7).astype(np.int16)
-        volume = Volume(
-            array=array,
-            spacing=(3.0, 0.7, 0.7),
-            origin=(0.0, 0.0, 0.0)
-        )
+        volume = Volume(array=array, spacing=(3.0, 0.7, 0.7), origin=(0.0, 0.0, 0.0))
         return volume
 
     def test_axial_slice(self, sample_volume):

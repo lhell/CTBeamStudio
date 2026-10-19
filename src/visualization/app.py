@@ -268,7 +268,9 @@ def main():
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
             st.image(axial_windowed, clamp=True, use_container_width=True)
-            st.caption(f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: {axial_spacing}")
+            st.caption(
+                f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: {axial_spacing}"
+            )
 
         # Coronal view
         with coronal_col:
@@ -280,10 +282,14 @@ def main():
                 value=coronal_max // 2,
                 key="coronal_slice",
             )
-            coronal_slice, coronal_spacing = extract_slice(volume, "coronal", coronal_idx)
+            coronal_slice, coronal_spacing = extract_slice(
+                volume, "coronal", coronal_idx
+            )
             coronal_windowed = apply_window(coronal_slice, center, width)
             st.image(coronal_windowed, clamp=True, use_container_width=True)
-            st.caption(f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: {coronal_spacing}")
+            st.caption(
+                f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: {coronal_spacing}"
+            )
 
         # Sagittal view
         with sagittal_col:
@@ -295,10 +301,14 @@ def main():
                 value=sagittal_max // 2,
                 key="sagittal_slice",
             )
-            sagittal_slice, sagittal_spacing = extract_slice(volume, "sagittal", sagittal_idx)
+            sagittal_slice, sagittal_spacing = extract_slice(
+                volume, "sagittal", sagittal_idx
+            )
             sagittal_windowed = apply_window(sagittal_slice, center, width)
             st.image(sagittal_windowed, clamp=True, use_container_width=True)
-            st.caption(f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: {sagittal_spacing}")
+            st.caption(
+                f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: {sagittal_spacing}"
+            )
 
     else:
         # Welcome screen / Demo mode

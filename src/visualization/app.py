@@ -218,6 +218,26 @@ def main():
         coronal_max = volume.array.shape[1] - 1
         sagittal_max = volume.array.shape[2] - 1
 
+        # Process crosshair clicks from previous render BEFORE creating sliders
+        # Read coordinate values from session state and update slice indices
+        if "axial_click" in st.session_state and st.session_state["axial_click"]:
+            coords = st.session_state["axial_click"]
+            y, x = coords.get("y", 0), coords.get("x", 0)
+            st.session_state["coronal_slice"] = max(0, min(int(x * coronal_max / volume.array.shape[2]), coronal_max))
+            st.session_state["sagittal_slice"] = max(0, min(int(y * sagittal_max / volume.array.shape[0]), sagittal_max))
+
+        if "coronal_click" in st.session_state and st.session_state["coronal_click"]:
+            coords = st.session_state["coronal_click"]
+            y, x = coords.get("y", 0), coords.get("x", 0)
+            st.session_state["axial_slice"] = max(0, min(int(y * axial_max / volume.array.shape[1]), axial_max))
+            st.session_state["sagittal_slice"] = max(0, min(int(x * sagittal_max / volume.array.shape[2]), sagittal_max))
+
+        if "sagittal_click" in st.session_state and st.session_state["sagittal_click"]:
+            coords = st.session_state["sagittal_click"]
+            y, x = coords.get("y", 0), coords.get("x", 0)
+            st.session_state["axial_slice"] = max(0, min(int(y * axial_max / volume.array.shape[1]), axial_max))
+            st.session_state["coronal_slice"] = max(0, min(int(x * coronal_max / volume.array.shape[2]), coronal_max))
+
         # Clamp slice indices in session state BEFORE creating sliders
         clamp_slice_state("axial_slice", axial_max)
         clamp_slice_state("coronal_slice", coronal_max)
@@ -257,18 +277,6 @@ def main():
             axial_coords = streamlit_image_coordinates(
                 axial_windowed, key="axial_click", use_column_width="auto"
             )
-            # Crosshair: clicking axial updates coronal and sagittal
-            if axial_coords:
-                y, x = axial_coords["x"], axial_coords["y"]
-                # Convert to slice indices (approximate)
-                new_coronal = int(x * coronal_max / axial_windowed.shape[1])
-                new_sagittal = int(y * sagittal_max / axial_windowed.shape[0])
-                st.session_state["coronal_slice"] = max(
-                    0, min(new_coronal, coronal_max)
-                )
-                st.session_state["sagittal_slice"] = max(
-                    0, min(new_sagittal, sagittal_max)
-                )
 
         # Coronal view
         with coronal_col:
@@ -288,16 +296,6 @@ def main():
                 key="coronal_click",
                 use_column_width="auto",
             )
-            # Crosshair: clicking coronal updates axial and sagittal
-            if coronal_coords:
-                y, x = coronal_coords["x"], coronal_coords["y"]
-                # axial uses row (y), sagittal uses col (x)
-                new_axial = int(y * axial_max / coronal_resampled.shape[0])
-                new_sagittal = int(x * sagittal_max / coronal_resampled.shape[1])
-                st.session_state["axial_slice"] = max(0, min(new_axial, axial_max))
-                st.session_state["sagittal_slice"] = max(
-                    0, min(new_sagittal, sagittal_max)
-                )
 
         # Sagittal view
         with sagittal_col:
@@ -317,16 +315,6 @@ def main():
                 key="sagittal_click",
                 use_column_width="auto",
             )
-            # Crosshair: clicking sagittal updates axial and coronal
-            if sagittal_coords:
-                y, x = sagittal_coords["x"], sagittal_coords["y"]
-                # axial uses row (y), coronal uses col (x)
-                new_axial = int(y * axial_max / sagittal_resampled.shape[0])
-                new_coronal = int(x * coronal_max / sagittal_resampled.shape[1])
-                st.session_state["axial_slice"] = max(0, min(new_axial, axial_max))
-                st.session_state["coronal_slice"] = max(
-                    0, min(new_coronal, coronal_max)
-                )
 
     else:
         # Welcome screen / Demo mode

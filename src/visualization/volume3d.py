@@ -185,7 +185,9 @@ def create_volume_figure(
 
         # Colors for different levels (grayscale gradient)
         gray_levels = np.linspace(0.2, 0.8, n_levels)
-        colors = [f"rgb({int(g * 255)}, {int(g * 255)}, {int(g * 255)})" for g in gray_levels]
+        colors = [
+            f"rgb({int(g * 255)}, {int(g * 255)}, {int(g * 255)})" for g in gray_levels
+        ]
 
         for i, level in enumerate(levels):
             verts, faces = extract_isosurface(volume_array, level)

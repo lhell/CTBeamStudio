@@ -106,12 +106,13 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
 
 def main():
     st.set_page_config(
-        page_title="CT Orientation Viewer", layout="wide"
+        page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"
     )
 
-    # No title - series description shown when loaded
-
-    # Sidebar: Data selection
+    # Sidebar: Title and Data selection
+    st.sidebar.title("🏥 CT Orientation Viewer")
+    
+    # Data section in sidebar
     st.sidebar.header("Data")
 
     # Folder picker using text input

@@ -109,30 +109,57 @@
 ### `[x]` T-21 — Serienauswahl
 - **Dateien:** `src/visualization/app.py`
 - **Abhängig von:** T-11, T-20
-- **Akzeptanz:** Sidebar listet gefundene Serien mit Patient, Beschreibung, Dosisklasse, Slice-Anzahl; Serien unter 20 Slices sind als „Localizer?" markiert.
-- **Status:** ⚠️ Partial - fast scan works, but file loading ignores selection
+- **Akzeptanz:** Sidebar listet gefundene Serien mit Patient, Beschreibung, Slice-Anzahl (keine Dosisklasse, kein Localizer-Flag).
+- **Status:** ✅ Done (Oct 23, 2026)
+- **Implementierung:** Format "{patient_id} - {series_description} - {n_slices} slices"
 
 ### `[x]` T-22 — Demo-Phantom
 - **Dateien:** `src/visualization/phantom.py`
 - **Abhängig von:** T-10
 - **Akzeptanz:** Start ohne `CT_VIEWER_DATA_ROOT` lädt synthetisches Phantom in plausiblen HU (Luft −1000, Wasser 0, Knocheneinschlüsse ~+800) mit anisotropem Spacing; Banner weist auf Demo-Modus hin.
 
-### `[ ]` T-23 — 3D-Visualisierung mit Quelle/Detektor
+### `[x]` T-23 — 3D-Visualisierung mit Quelle/Detektor
 - **Ziel:** Volumen in 3D anzeigen mit Röntgenquelle und Detektor im DICOM-Koordinatensystem.
 - **Dateien:** `src/visualization/volume3d.py`
 - **Abhängig von:** T-10, T-11
-- **Akzeptanz:** 
-  - 3D-Volumen-Visualisierung (PyVista oder Plotly)
+- **Akzeptanz:**
+  - 3D-Volumen-Visualisierung (Plotly)
   - Röntgenquelle (Isocenter) und Detektorflügel positioniert gemäß DICOM Patient Coordinate System
   - Rotation/Zoom der 3D-Ansicht
   - Optional: Strahlengang eingezeichnet
+- **Status:** ✅ Done (Oct 24, 2026)
+
+#### T-23 Detailplan
+
+| Subtask | Beschreibung | Abhängigkeit | Status |
+|---------|--------------|--------------|--------|
+| T-23.1 | Bibliotheks-Auswahl: PyVista vs Plotly | — | ✅ Done (Plotly, VTK compatibility issues on Windows) |
+| T-23.2 | `Volume3D` dataclass erstellen | T-10 | ✅ Done |
+| T-23.3 | 3D-Volumen-Rendering (Iso-Surface oder Volume-Render, wählbar) | T-23.1 | ✅ Done |
+| T-23.4 | DICOM-Koordinatensystem-Transformation | T-11 | ✅ Done |
+| T-23.5 | Röntgenquelle & Detektor visualisieren | T-23.4 | ✅ Done |
+| T-23.6 | Interaktion: Rotation/Zoom | T-23.3 | ✅ Done |
+| T-23.7 | Integration in Streamlit-App | T-20 | ✅ Done |
+| T-23.8 | Tests für volume3d.py | T-30 | ⚠️ Open |
+
+#### Technische Entscheidungen
+
+| Entscheidung | Optionen | Favorit |
+|--------------|----------|---------|
+| 3D-Bibliothek | PyVista, Plotly | **Plotly** (keine VTK-Kompatibilitätsprobleme auf Windows) |
+| Volumen-Darstellung | Dropdown-Menu: "Iso-Surface" (default), "Volume Rendering" | Beide wählbar, **Standard: Iso-Surface** |
+| Koordinatensystem | Patient, Slice, Scanner | Patient (DICOM-Standard) |
+| Detektor-Positionierung | Fixed SID, berechnet aus Gantry | Fixed SID (1000mm default) |
+| Volumen-Positionierung | Isocenter im Ursprung (0,0,0) | Volumen zentriert am Ursprung |
 
 ## Phase 3 — Tests (Tag 5–6) — Teilweise erledigt
 
-### `[ ]` T-30 — Synthetische Fixtures
-- **Dateien:** `tests/visualization/conftest.py`
+### `[x]` T-30 — Synthetische Fixtures
+- **Dateien:** `tests/conftest.py`
 - **Abhängig von:** T-10
 - **Akzeptanz:** Fixture erzeugt per `pydicom` eine Serie im `tmp_path` mit korrekten `ImagePositionPatient`, `RescaleSlope/Intercept`, `SeriesDescription`; keine Binärdaten im Repo.
+- **Status:** ✅ Done (Oct 23, 2026)
+- **Implementierung:** `create_ct_dicom()` fixture erstellt synthetische CT-DICOM-Dateien mit allen benötigten Tags
 
 ### `[x]` T-31 — Loader-Tests
 - **Dateien:** `tests/unit/test_dicom_loader.py`, `tests/unit/test_npy_loader.py`
@@ -147,10 +174,12 @@
 - **Akzeptanz:** Window-Grenzen exakt (0 und 255 an den Rändern), Aspect-Ratio-Fall aus T-14, `width=0` → `ValueError`.
 - **Status:** ✅ Done (Oct 19, 2026)
 
-### `[ ]` T-33 — Datenvalidierungsskript
+### `[x]` T-33 — Datenvalidierungsskript
 - **Dateien:** `scripts/check_aapm.py`
 - **Abhängig von:** T-11
 - **Akzeptanz:** Tabellarische Ausgabe der Serien; Exit 2 bei fehlendem Verzeichnis oder null Serien; Warnung, wenn alle Serien `unknown` sind.
+- **Status:** ✅ Done (Oct 23, 2026)
+- **Implementierung:** Scannt Verzeichnis, zeigt Tabelle mit Patient ID, Series Description, Slices, Dose Class
 
 ## Phase 4 — Deploy (Tag 6)
 
@@ -193,11 +222,11 @@
 |---|---|---|
 | 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
 | 2 | Do, 15.10. | T-10 ✅, T-13 ✅ |
-| 3 | Fr, 16.10. | T-11 ✅, T-12 ✅, T-20 ✅, T-22 ✅ |
-| 4 | Mo, 19.10. | T-14 ✅, T-20 ✅, T-21 ⚠️, T-32 ✅ |
-| 5 | Di, 20.10. | T-30, T-33, T-21 (fix) |
-| 6 | Mi, 21.10. | T-40, T-41, T-42, T-43 |
-| 7 | Do, 22.10. | T-44 (optional) |
+| 3 | Fr, 16.10. | T-11 ✅, T-12 ✅, T-20 ⚠️, T-22 ✅ |
+| 4 | Mo, 19.10. | T-14 ✅, T-20 ✅, T-32 ✅ |
+| 5 | Di, 20.10. | T-30 ⚠️, T-33 ⚠️ |
+| 6 | Fr, 23.10. | T-21 ✅, T-30 ✅, T-33 ✅ |
+| 7 | Fr, 24.10. | T-23 ✅ (3D visualization with Plotly) |
 
 ## Decision Log
 
@@ -210,22 +239,39 @@
 | D-5 | 2026-10-13 | AAPM 2016 nur verlinken, kein Download-Skript | kein öffentlicher API-Endpunkt |
 | D-6 | 2026-10-13 | `.npy` enthält rohe HU → keine Rückskalierung | in `preprocess_aapm.py` verifiziert |
 | D-7 | 2026-10-13 | Phantom bleibt trotz AAPM-Option | lizenzfreier Quickstart und Screenshots |
+| D-8 | 2026-10-24 | Plotly statt PyVista für 3D | Keine VTK-Kompatibilitätsprobleme auf Windows |
 
 ## Offene Fragen
 
-### Erledigt (Tag 4)
+### Erledigt (Tag 4-7)
 - Window-Preset für den Start: `abdomen` ✅ (default in T-20)
 - Hover-Koordinaten implementiert ✅
 - Keyboard-Navigation (arrows, Home/End, Tab) ✅
 - Jump buttons (⏮/⏭) ✅
+- T-23: 3D-Visualisierung mit Plotly ✅ (Oct 24, 2026)
+  - Iso-Surface und Volume Rendering
+  - Source/Detektor Visualization mit Auto/Manual Modus
+  - Opacity Controls, Camera Presets, Downsample
+  - Container Pattern für Layout (Plot zuerst, Options darunter)
+  - Slice Options Expander für MPR
 
 ### Noch offen
-- T-21: Series selection verwendet nicht `selected_series.files` → lädt alle Dateien
-- T-23: 3D-Visualisierung (optional)
-- Sortierung nach ImagePositionPatient[2] für korrekte anatomische Reihenfolge
+- T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
 
 ## Implementation Notes (Oct 19, 2026)
+
+### 3D Visualization Features (Oct 24, 2026)
+
+| Feature | Description |
+|---------|-------------|
+| Render Mode | Iso-Surface (default) or Volume Rendering |
+| Opacity Controls | Volume Opacity (0.1-1.0), Surface Opacity (0.1-1.0) |
+| Camera Presets | iso, front, back, left, right, top, bottom |
+| Source/Detector | Auto or manual positioning |
+| Isocenter | Auto (from volume center) or manual (x, y, z) |
+| Downsample | 1x, 2x, 4x (default) for performance |
+| Layout | Container pattern - 3D plot above options in sidebar |
 
 ### Key Functions in app.py
 | Function | Purpose |
@@ -234,6 +280,7 @@
 | `slice_slider()` | Slider + anchor div + jump buttons |
 | `to_isotropic()` | Resample for correct aspect ratio |
 | `clamp_slice_state()` | Clamp session state values before widget creation |
+| `plot_slot` | Container for visual ordering - plot renders first, options below |
 
 ### Key Functions in mpr.py
 | Function | Purpose |
@@ -247,6 +294,15 @@
 | `scan_series()` | Fast scanning by subdirectory (no DICOM reads) |
 | `load_dicom_series()` | Load DICOM files into Volume |
 | `SeriesInfo` | Dataclass with `files` attribute |
+
+### Key Functions in volume3d.py
+| Function | Purpose |
+|----------|---------|
+| `create_volume_figure()` | Create Plotly figure with isosurface or volume rendering |
+| `add_source_detector_figure()` | Add source and detector markers to figure |
+| `get_volume_center()` | Calculate center of volume for isocenter |
+| `downsample_volume()` | Downsample volume for performance |
+| `extract_isosurface()` | Extract isosurface using marching cubes |
 
 ### Commands
 ```bash

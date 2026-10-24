@@ -24,18 +24,18 @@ import visualization.mpr as _mpr
 logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 
 import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
-import plotly.graph_objects as go
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
-from visualization.windowing import WINDOW_PRESETS, apply_window
 from visualization.volume3d import (
-    create_volume_figure,
     add_source_detector_figure,
+    create_volume_figure,
     get_volume_center,
 )
+from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
 # Cache for loaded volumes (survives refresh within same server)

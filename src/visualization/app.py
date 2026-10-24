@@ -227,8 +227,6 @@ def main():
         volume = st.session_state["volume"]
         series = st.session_state["series"]
 
-        st.markdown(f"### {series.series_description or 'CT Scan'}")
-
         # Reserve visual slot for 3D plot FIRST
         plot_slot = st.container()
 

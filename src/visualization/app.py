@@ -373,45 +373,6 @@ def main():
         # Render into the reserved slot
         with plot_slot:
             st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
-        try:
-            spacing = volume.spacing
-        except AttributeError:
-            spacing = (1.0, 1.0, 1.0)
-        
-        fig = create_volume_figure(
-            volume.array,
-            spacing=spacing,
-            render_mode=render_mode,
-            opacity=volume_opacity,
-            surface_opacity=surface_opacity,
-            colormap="bone",
-            downsample=downsample,
-            camera_preset=camera_preset,
-            n_iso_levels=n_iso_levels,
-            iso_threshold=iso_threshold
-        )
-        
-        # Add source/detector if enabled
-        if show_geometry:
-            if isocenter is None:
-                isocenter = get_volume_center(volume.array, spacing)
-            
-            fig = add_source_detector_figure(
-                fig,
-                volume_array=volume.array,
-                spacing=spacing,
-                isocenter=isocenter,
-                sid=sid,
-                sdd=sid,
-                gantry_angle=gantry_angle,
-                show_source=True,
-                show_detector=True,
-                source_pos=source_pos,
-                detector_pos=detector_pos
-            )
-        
-        # Render 3D view using Plotly (first in main area)
-        st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
 
         # Get dimensions for each plane (needed for slice sliders)
         axial_max = volume.array.shape[0] - 1

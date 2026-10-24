@@ -26,11 +26,54 @@ logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_image_coordinates import streamlit_image_coordinates
+import plotly.graph_objects as go
 
 from visualization.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
 from visualization.windowing import WINDOW_PRESETS, apply_window
+from visualization.volume3d import create_volume_figure, add_source_detector_figure, get_volume_center
+
+
+# Cache for loaded volumes (survives refresh within same server)
+@st.cache_data(ttl=3600)
+def load_volume_cached(file_paths_str: list, unit: str = None):
+    """Load volume from file paths with caching."""
+    from pathlib import Path
+    files = [Path(p) for p in file_paths_str]
+    return load_dicom_series(files, unit=unit)
+
+
+# File to store last loaded paths for auto-load on refresh
+CACHE_FILE = Path("data/.last_loaded.json")
+
+
+def save_last_loaded(files: list):
+    """Save last loaded file paths to cache file."""
+    import json
+    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    data = {"files": [str(f) for f in files]}
+    CACHE_FILE.write_text(json.dumps(data))
+
+
+def load_last_loaded() -> list | None:
+    """Load last saved file paths from cache file."""
+    import json
+    if not CACHE_FILE.exists():
+        return None
+    try:
+        data = json.loads(CACHE_FILE.read_text())
+        files = [Path(f) for f in data.get("files", [])]
+        if files and all(f.exists() for f in files):
+            return files
+    except Exception:
+        pass
+    return None
+
+
+def clear_last_loaded():
+    """Clear the cache file."""
+    if CACHE_FILE.exists():
+        CACHE_FILE.unlink()
 
 
 def clamp_slice_state(key: str, max_idx: int) -> None:
@@ -66,7 +109,7 @@ def main():
         page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"
     )
 
-    st.title("🏥 CT Orientation Viewer")
+    st.title("🏥")
 
     # Sidebar: Data selection
     st.sidebar.header("Data")
@@ -96,7 +139,7 @@ def main():
         series_list = st.session_state.get("series_list") or []
         if series_list:
             series_options = [
-                f"{s.series_description or 'Unknown'} - {s.n_slices} slices ({s.dose_class})"
+                f"{s.patient_id} - {s.series_description or 'Unknown'} - {s.n_slices} slices"
                 for s in series_list
             ]
             selected_idx = st.sidebar.selectbox(
@@ -139,15 +182,10 @@ def main():
                         else list(Path(data_path).iterdir())
                     )
 
-                progress_bar = st.progress(0, text="Loading DICOM series...")
-
-                def report(done, total):
-                    progress_bar.progress(
-                        done / total, text=f"Loaded {done}/{total} slices"
-                    )
-
-                volume = load_dicom_series(files, progress=report)
-                progress_bar.empty()  # Clear progress bar
+                with st.spinner("Loading DICOM series..."):
+                    # Convert Path objects to strings for cache key
+                    file_paths_str = [str(f) for f in files]
+                    volume = load_volume_cached(file_paths_str)
 
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
@@ -160,13 +198,28 @@ def main():
                     "Loaded %d slices, shape=%s", len(files), volume.array.shape
                 )
                 st.toast(f"Loaded {len(files)} slices!")
+                save_last_loaded(files)
 
-    # Show loaded files expander (persists across reruns)
-    loaded = st.session_state.get("loaded_files")
-    if loaded:
-        with st.sidebar.expander(f"Loaded Files ({len(loaded)})"):
-            for f in loaded:
-                st.text(f.name)
+    # Auto-load from cache file on refresh (silent)
+    if "volume" not in st.session_state:
+        cached_files = load_last_loaded()
+        if cached_files:
+            file_paths_str = [str(f) for f in cached_files]
+            volume = load_volume_cached(file_paths_str)
+            st.session_state["volume"] = volume
+            st.session_state["loaded_files"] = cached_files
+            st.session_state["series"] = type('S', (), {'series_description': 'CT Orientation Viewer', 'patient_id': 'Unknown', 'n_slices': len(cached_files)})()
+
+    # Clear cache button
+    if st.sidebar.button("🗑️ Clear Cache"):
+        # Clear session state
+        for k in list(st.session_state.keys()):
+            del st.session_state[k]
+        # Clear Streamlit cache
+        st.cache_data.clear()
+        # Clear cache file
+        clear_last_loaded()
+        st.rerun()
 
     # Main area
     if "volume" in st.session_state:
@@ -175,113 +228,257 @@ def main():
 
         st.markdown(f"### {series.series_description or 'CT Scan'}")
 
-        # Windowing controls (common for all planes)
-        st.markdown("---")
-        st.subheader("Windowing")
+        # Reserve visual slot for 3D plot FIRST
+        plot_slot = st.container()
 
-        col_preset, col_center, col_width = st.columns(3)
-
-        with col_preset:
-            window_preset = st.selectbox(
-                "Preset",
-                options=list(WINDOW_PRESETS.keys()),
-                index=1,  # abdomen default
+        # 3D controls in expander (appears BELOW the plot)
+        with st.expander("3D Options", expanded=False):
+            col3d_1, col3d_2 = st.columns(2)
+            
+            with col3d_1:
+                render_mode = st.selectbox(
+                    "Render Mode",
+                    ["iso", "volume"],
+                    format_func=lambda x: "Iso-Surface" if x == "iso" else "Volume",
+                    key="3d_render_mode"
+                )
+            
+            with col3d_2:
+                camera_preset = st.selectbox(
+                    "Camera",
+                    options=["iso", "front", "back", "left", "right", "top", "bottom"],
+                    index=0,
+                    format_func=lambda x: x.capitalize(),
+                    key="3d_camera"
+                )
+            
+            col_transp_1, col_transp_2 = st.columns(2)
+            with col_transp_1:
+                volume_opacity = st.slider("Volume Opacity", min_value=0.1, max_value=1.0, value=0.6, key="3d_volume_opacity")
+            with col_transp_2:
+                surface_opacity = st.slider("Surface Opacity", min_value=0.1, max_value=1.0, value=0.7, key="3d_surface_opacity")
+            
+            # Iso-surface controls (shown when iso mode selected)
+            if render_mode == "iso":
+                col_iso_1, col_iso_2 = st.columns(2)
+                with col_iso_1:
+                    n_iso_levels = st.slider("Iso-Surface Levels", min_value=1, max_value=10, value=5, key="3d_n_levels")
+                with col_iso_2:
+                    try:
+                        v_min = int(np.min(volume.array))
+                        v_max = int(np.max(volume.array))
+                    except:
+                        v_min, v_max = -1000, 1000
+                    iso_threshold = st.slider(
+                        "Iso Threshold (HU)",
+                        min_value=v_min,
+                        max_value=v_max,
+                        value=(v_min + 200, v_max - 200),
+                        key="3d_iso_threshold"
+                    )
+            else:
+                n_iso_levels = 5
+                iso_threshold = None
+            
+            col_geo_1, col_geo_2 = st.columns(2)
+            with col_geo_1:
+                show_geometry = st.checkbox("Show Source/Detector", value=True, key="3d_show_geometry")
+            with col_geo_2:
+                downsample = st.selectbox(
+                    "Downsample",
+                    options=[1, 2, 4],
+                    index=2,
+                    format_func=lambda x: f"{x}x",
+                    key="3d_downsample"
+                )
+            
+            col_sid, col_angle = st.columns(2)
+            with col_sid:
+                sid = st.number_input("SID (mm)", value=1000.0, step=100.0, key="3d_sid")
+            with col_angle:
+                gantry_angle = st.number_input("Gantry Angle (°)", value=0.0, step=15.0, key="3d_gantry")
+            
+            col_iso_auto_1, col_iso_auto_2 = st.columns(2)
+            with col_iso_auto_1:
+                auto_isocenter = st.checkbox("Auto Isocenter", value=True, key="3d_auto_iso")
+            with col_iso_auto_2:
+                auto_geo = st.checkbox("Auto Source/Detector", value=True, key="3d_auto_geo")
+            
+            if not auto_isocenter:
+                col_x, col_y, col_z = st.columns(3)
+                with col_x:
+                    iso_x = st.number_input("Iso X", value=0.0, step=10.0, key="3d_iso_x")
+                with col_y:
+                    iso_y = st.number_input("Iso Y", value=0.0, step=10.0, key="3d_iso_y")
+                with col_z:
+                    iso_z = st.number_input("Iso Z", value=0.0, step=10.0, key="3d_iso_z")
+                isocenter = (iso_x, iso_y, iso_z)
+            else:
+                isocenter = None
+            
+            if not auto_geo:
+                col_src, col_det = st.columns(2)
+                with col_src:
+                    src_x = st.number_input("Source X", value=-500.0, step=50.0, key="3d_src_x")
+                    src_y = st.number_input("Source Y", value=0.0, step=50.0, key="3d_src_y")
+                    src_z = st.number_input("Source Z", value=0.0, step=50.0, key="3d_src_z")
+                    source_pos = (src_x, src_y, src_z)
+                with col_det:
+                    det_x = st.number_input("Detector X", value=500.0, step=50.0, key="3d_det_x")
+                    det_y = st.number_input("Detector Y", value=0.0, step=50.0, key="3d_det_y")
+                    det_z = st.number_input("Detector Z", value=0.0, step=50.0, key="3d_det_z")
+                    detector_pos = (det_x, det_y, det_z)
+            else:
+                source_pos = None
+                detector_pos = None
+        
+        # Generate 3D plot and render into reserved slot
+        try:
+            spacing = volume.spacing
+        except AttributeError:
+            spacing = (1.0, 1.0, 1.0)
+        
+        fig = create_volume_figure(
+            volume.array,
+            spacing=spacing,
+            render_mode=render_mode,
+            opacity=volume_opacity,
+            surface_opacity=surface_opacity,
+            colormap="bone",
+            downsample=downsample,
+            camera_preset=camera_preset,
+            n_iso_levels=n_iso_levels,
+            iso_threshold=iso_threshold
+        )
+        
+        # Add source/detector if enabled
+        if show_geometry:
+            if isocenter is None:
+                isocenter = get_volume_center(volume.array, spacing)
+            
+            fig = add_source_detector_figure(
+                fig,
+                volume_array=volume.array,
+                spacing=spacing,
+                isocenter=isocenter,
+                sid=sid,
+                sdd=sid,
+                gantry_angle=gantry_angle,
+                show_source=True,
+                show_detector=True,
+                source_pos=source_pos,
+                detector_pos=detector_pos
             )
-
-        with col_center:
-            center = st.slider(
-                "Center (HU)",
-                min_value=-1000,
-                max_value=3000,
-                value=WINDOW_PRESETS[window_preset][0],
+        
+        # Render into the reserved slot
+        with plot_slot:
+            st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
+        try:
+            spacing = volume.spacing
+        except AttributeError:
+            spacing = (1.0, 1.0, 1.0)
+        
+        fig = create_volume_figure(
+            volume.array,
+            spacing=spacing,
+            render_mode=render_mode,
+            opacity=volume_opacity,
+            surface_opacity=surface_opacity,
+            colormap="bone",
+            downsample=downsample,
+            camera_preset=camera_preset,
+            n_iso_levels=n_iso_levels,
+            iso_threshold=iso_threshold
+        )
+        
+        # Add source/detector if enabled
+        if show_geometry:
+            if isocenter is None:
+                isocenter = get_volume_center(volume.array, spacing)
+            
+            fig = add_source_detector_figure(
+                fig,
+                volume_array=volume.array,
+                spacing=spacing,
+                isocenter=isocenter,
+                sid=sid,
+                sdd=sid,
+                gantry_angle=gantry_angle,
+                show_source=True,
+                show_detector=True,
+                source_pos=source_pos,
+                detector_pos=detector_pos
             )
+        
+        # Render 3D view using Plotly (first in main area)
+        st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
 
-        with col_width:
-            width = st.slider(
-                "Width (HU)",
-                min_value=1,
-                max_value=4000,
-                value=WINDOW_PRESETS[window_preset][1],
-            )
-
-        # MPR Display - 3 columns
-        st.markdown("---")
-        st.subheader("MPR Views")
-
-        # Click instruction
-        st.caption("💡 Click on an image to navigate the other planes (crosshair)")
-
-        axial_col, coronal_col, sagittal_col = st.columns(3)
-
-        # Get dimensions for each plane
+        # Get dimensions for each plane (needed for slice sliders)
         axial_max = volume.array.shape[0] - 1
         coronal_max = volume.array.shape[1] - 1
         sagittal_max = volume.array.shape[2] - 1
-
-        # Process crosshair clicks from previous render BEFORE creating sliders
-        # Read coordinate values from session state and update slice indices
-        if "axial_click" in st.session_state and st.session_state["axial_click"]:
-            coords = st.session_state["axial_click"]
-            y, x = coords.get("y", 0), coords.get("x", 0)
-            st.session_state["coronal_slice"] = max(0, min(int(x * coronal_max / volume.array.shape[2]), coronal_max))
-            st.session_state["sagittal_slice"] = max(0, min(int(y * sagittal_max / volume.array.shape[0]), sagittal_max))
-
-        if "coronal_click" in st.session_state and st.session_state["coronal_click"]:
-            coords = st.session_state["coronal_click"]
-            y, x = coords.get("y", 0), coords.get("x", 0)
-            st.session_state["axial_slice"] = max(0, min(int(y * axial_max / volume.array.shape[1]), axial_max))
-            st.session_state["sagittal_slice"] = max(0, min(int(x * sagittal_max / volume.array.shape[2]), sagittal_max))
-
-        if "sagittal_click" in st.session_state and st.session_state["sagittal_click"]:
-            coords = st.session_state["sagittal_click"]
-            y, x = coords.get("y", 0), coords.get("x", 0)
-            st.session_state["axial_slice"] = max(0, min(int(y * axial_max / volume.array.shape[1]), axial_max))
-            st.session_state["coronal_slice"] = max(0, min(int(x * coronal_max / volume.array.shape[2]), coronal_max))
 
         # Clamp slice indices in session state BEFORE creating sliders
         clamp_slice_state("axial_slice", axial_max)
         clamp_slice_state("coronal_slice", coronal_max)
         clamp_slice_state("sagittal_slice", sagittal_max)
 
-        # Helper function for slider with anchor and jump buttons
-        def slice_slider(plane: str, key: str, max_idx: int):
-            st.markdown(
-                f'<div class="mpr-anchor" data-plane="{plane}"></div>',
-                unsafe_allow_html=True,
-            )
-            idx = st.slider("Slice", 0, max_idx, key=key, label_visibility="collapsed")
-            b_min, b_max = st.columns(2)
-            b_min.button(
-                "⏮",
-                key=f"{key}_min",
-                use_container_width=True,
-                on_click=lambda: st.session_state.update({key: 0}),
-            )
-            b_max.button(
-                "⏭",
-                key=f"{key}_max",
-                use_container_width=True,
-                on_click=lambda: st.session_state.update({key: max_idx}),
-            )
-            return idx
+        # Slice options in expander
+        with st.expander("Slice Options", expanded=True):
+            # Windowing controls
+            col_preset, col_center, col_width = st.columns(3)
+
+            with col_preset:
+                window_preset = st.selectbox(
+                    "Preset",
+                    options=list(WINDOW_PRESETS.keys()),
+                    index=1,  # abdomen default
+                )
+
+            with col_center:
+                center = st.slider(
+                    "Center (HU)",
+                    min_value=-1000,
+                    max_value=3000,
+                    value=WINDOW_PRESETS[window_preset][0],
+                )
+
+            with col_width:
+                width = st.slider(
+                    "Width (HU)",
+                    min_value=1,
+                    max_value=4000,
+                    value=WINDOW_PRESETS[window_preset][1],
+                )
+            
+            # Slice selection sliders
+            col_axial, col_coronal, col_sagittal = st.columns(3)
+            
+            with col_axial:
+                axial_idx = st.slider("Axial Slice", 0, axial_max, key="axial_slice")
+            
+            with col_coronal:
+                coronal_idx = st.slider("Coronal Slice", 0, coronal_max, key="coronal_slice")
+            
+            with col_sagittal:
+                sagittal_idx = st.slider("Sagittal Slice", 0, sagittal_max, key="sagittal_slice")
+
+        # MPR Display - 3 columns
+        axial_col, coronal_col, sagittal_col = st.columns(3)
 
         # Axial view
         with axial_col:
             st.markdown("**Axial**")
-            axial_idx = slice_slider("axial", "axial_slice", axial_max)
             axial_slice, axial_spacing = extract_slice(volume, "axial", axial_idx)
             axial_windowed = apply_window(axial_slice, center, width)
             st.caption(
                 f"Slice {axial_idx + 1}/{axial_max + 1} | Spacing: ({axial_spacing[0]:.8f}, {axial_spacing[1]:.8f})"
             )
-            axial_coords = streamlit_image_coordinates(
-                axial_windowed, key="axial_click", use_column_width="auto"
-            )
+            st.image(axial_windowed, clamp=True, use_column_width=True)
 
         # Coronal view
         with coronal_col:
             st.markdown("**Coronal**")
-            coronal_idx = slice_slider("coronal", "coronal_slice", coronal_max)
             coronal_slice, coronal_spacing = extract_slice(
                 volume, "coronal", coronal_idx
             )
@@ -291,16 +488,11 @@ def main():
             st.caption(
                 f"Slice {coronal_idx + 1}/{coronal_max + 1} | Spacing: ({coronal_spacing[0]:.8f}, {coronal_spacing[1]:.8f})"
             )
-            coronal_coords = streamlit_image_coordinates(
-                coronal_resampled,
-                key="coronal_click",
-                use_column_width="auto",
-            )
+            st.image(coronal_resampled, clamp=True, use_column_width=True)
 
         # Sagittal view
         with sagittal_col:
             st.markdown("**Sagittal**")
-            sagittal_idx = slice_slider("sagittal", "sagittal_slice", sagittal_max)
             sagittal_slice, sagittal_spacing = extract_slice(
                 volume, "sagittal", sagittal_idx
             )
@@ -310,11 +502,7 @@ def main():
             st.caption(
                 f"Slice {sagittal_idx + 1}/{sagittal_max + 1} | Spacing: ({sagittal_spacing[0]:.8f}, {sagittal_spacing[1]:.8f})"
             )
-            sagittal_coords = streamlit_image_coordinates(
-                sagittal_resampled,
-                key="sagittal_click",
-                use_column_width="auto",
-            )
+            st.image(sagittal_resampled, clamp=True, use_column_width=True)
 
     else:
         # Welcome screen / Demo mode

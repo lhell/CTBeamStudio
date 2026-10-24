@@ -27,12 +27,12 @@ dependencies = [
     "pydicom>=3.0.0",
     "numpy>=1.24.0",
     "scipy>=1.11.0",
-    "streamlit>=1.28.0",
+    "scikit-image>=0.22.0",
+    "streamlit>=1.28.0,<1.40.0",
     "streamlit-image-coordinates>=0.0.6",
-    "pyvista>=0.42.0",
-    "vtk>=9.3.0",
     "plotly>=5.18.0",
     "pillow>=10.0.0",
+    "pandas>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -74,3 +74,4 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+

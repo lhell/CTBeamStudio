@@ -58,7 +58,7 @@ def get_camera_preset(preset: str, bounds: tuple) -> dict:
 
     # Calculate diagonal for distance
     diagonal = math.sqrt((xmax - xmin) ** 2 + (ymax - ymin) ** 2 + (zmax - zmin) ** 2)
-    distance = diagonal * 0.8  # Closer zoom
+    distance = diagonal * 1.5
 
     presets = {
         "iso": {
@@ -275,7 +275,6 @@ def create_volume_figure(
                     mode="markers",
                     marker=dict(
                         size=marker_size,  # Based on voxel spacing
-                        symbol="square",  # Cubes
                         color=vals_norm,
                         colorscale="Greys",  # Use Plotly's built-in colorscale
                         opacity=opacity,  # User-adjustable transparency

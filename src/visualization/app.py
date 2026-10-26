@@ -269,15 +269,15 @@ def main():
             with col_transp_1:
                 volume_opacity = st.slider(
                     "Volume Opacity",
-                    min_value=0.05,
+                    min_value=0.1,
                     max_value=1.0,
-                    value=0.05,
+                    value=0.6,
                     key="3d_volume_opacity",
                 )
             with col_transp_2:
                 surface_opacity = st.slider(
                     "Surface Opacity",
-                    min_value=0.05,
+                    min_value=0.1,
                     max_value=1.0,
                     value=0.7,
                     key="3d_surface_opacity",
@@ -459,7 +459,7 @@ def main():
         clamp_slice_state("sagittal_slice", sagittal_max)
 
         # Slice options in expander
-        with st.expander("Slice Options", expanded=False):
+        with st.expander("Slice Options", expanded=True):
             # Windowing controls
             col_preset, col_center, col_width = st.columns(3)
 

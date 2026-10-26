@@ -38,49 +38,13 @@ from visualization.volume3d import (
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
-# Cache for loaded volumes (survives refresh within same server)
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_volume_cached(file_paths_str: list, unit: str = None, _progress_callback=None):
-    """Load volume from file paths with caching."""
-    from pathlib import Path
-
-    files = [Path(p) for p in file_paths_str]
-    return load_dicom_series(files, unit=unit, progress=_progress_callback)
-
-
-# File to store last loaded paths for auto-load on refresh
-CACHE_FILE = Path("data/.last_loaded.json")
-
-
-def save_last_loaded(files: list):
-    """Save last loaded file paths to cache file."""
-    import json
-
-    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    data = {"files": [str(f) for f in files]}
-    CACHE_FILE.write_text(json.dumps(data))
-
-
-def load_last_loaded() -> list | None:
-    """Load last saved file paths from cache file."""
-    import json
-
-    if not CACHE_FILE.exists():
-        return None
-    try:
-        data = json.loads(CACHE_FILE.read_text())
-        files = [Path(f) for f in data.get("files", [])]
-        if files and all(f.exists() for f in files):
-            return files
-    except Exception:
-        pass
-    return None
-
-
-def clear_last_loaded():
-    """Clear the cache file."""
-    if CACHE_FILE.exists():
-        CACHE_FILE.unlink()
+# Import caching functions from volume_cache module
+from visualization.volume_cache import (
+    clear_last_loaded,
+    load_last_loaded,
+    load_volume_cached,
+    save_last_loaded,
+)
 
 
 def clamp_slice_state(key: str, max_idx: int) -> None:

@@ -89,7 +89,7 @@ def render_sidebar():
                         else list(Path(data_path).iterdir())
                     )
 
-                from visualization.app import (
+                from visualization.volume_cache import (
                     load_volume_cached,
                     save_last_loaded,
                 )
@@ -185,7 +185,7 @@ def render_sidebar():
         # Clear Streamlit cache
         st.cache_data.clear()
         # Clear cache file
-        from visualization.app import clear_last_loaded
+        from visualization.volume_cache import clear_last_loaded
 
         clear_last_loaded()
         st.rerun()

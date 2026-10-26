@@ -97,6 +97,61 @@ def get_trajectory_positions(geometry, n_projections: int):
     return source_positions, detector_positions
 
 
+def add_trajectory_to_figure(
+    fig: go.Figure,
+    source_positions: list,
+    detector_positions: list,
+    downsample: int = 1,
+) -> go.Figure:
+    """Add source and detector trajectory to Plotly figure.
+
+    Args:
+        fig: Plotly figure
+        source_positions: List of (x, y, z) source positions
+        detector_positions: List of (x, y, z) detector positions
+        downsample: Show every Nth position
+
+    Returns:
+        Updated Plotly figure
+    """
+    # Downsample positions
+    src_x = [p[0] for p in source_positions[::downsample]]
+    src_y = [p[1] for p in source_positions[::downsample]]
+    src_z = [p[2] for p in source_positions[::downsample]]
+
+    det_x = [p[0] for p in detector_positions[::downsample]]
+    det_y = [p[1] for p in detector_positions[::downsample]]
+    det_z = [p[2] for p in detector_positions[::downsample]]
+
+    # Add source trajectory (red/orange small markers)
+    fig.add_trace(
+        go.Scatter3d(
+            x=src_x,
+            y=src_y,
+            z=src_z,
+            mode="markers",
+            marker=dict(size=3, color="orange", opacity=0.8),
+            name="Source Trajectory",
+            showlegend=True,
+        )
+    )
+
+    # Add detector trajectory (turquoise small markers)
+    fig.add_trace(
+        go.Scatter3d(
+            x=det_x,
+            y=det_y,
+            z=det_z,
+            mode="markers",
+            marker=dict(size=3, color="turquoise", opacity=0.8),
+            name="Detector Trajectory",
+            showlegend=True,
+        )
+    )
+
+    return fig
+
+
 def downsample_volume(volume_array: np.ndarray, factor: int = 4) -> np.ndarray:
     """Downsample volume by integer factor.
 

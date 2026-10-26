@@ -302,6 +302,7 @@ def main():
                 n_iso_levels = 5
                 iso_threshold = None
 
+            # Projection geometry controls
             col_geo_1, col_geo_2 = st.columns(2)
             with col_geo_1:
                 show_geometry = st.checkbox(
@@ -310,11 +311,58 @@ def main():
             with col_geo_2:
                 downsample = st.selectbox(
                     "Downsample",
-                    options=[1, 2, 4],
-                    index=2,
-                    format_func=lambda x: f"{x}x",
+                    options=[1, 10, 100, 1000],
+                    index=1,
+                    format_func=lambda x: f"1/{x}",
                     key="3d_downsample",
                 )
+
+            # Load projection geometry file
+            col_geo_file, col_n_proj = st.columns(2)
+            with col_geo_file:
+                geometry_file = st.file_uploader(
+                    "Geometry TXT file", type=["txt"], key="3d_geometry_file"
+                )
+            with col_n_proj:
+                n_projections = st.number_input(
+                    "Number of projections",
+                    min_value=1,
+                    value=51326,
+                    step=1000,
+                    key="3d_n_projections",
+                )
+
+            # Load projection geometry and generate trajectory
+            projection_geometry = None
+            if geometry_file is not None:
+                import io
+
+                from visualization.loaders.projection import load_projection_geometry
+                from visualization.volume3d import (
+                    get_trajectory_positions,
+                )
+
+                # Save uploaded file to temporary path
+                with io.BytesIO(geometry_file.read()) as f:
+                    content = f.read().decode("utf-8")
+
+                # Create temp file for loader
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".txt", delete=False
+                ) as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                try:
+                    projection_geometry = load_projection_geometry(tmp_path)
+                except Exception as e:
+                    st.error(f"Failed to load geometry: {e}")
+                finally:
+                    import os
+
+                    os.unlink(tmp_path)
 
             col_sid, col_angle = st.columns(2)
             with col_sid:
@@ -401,7 +449,10 @@ def main():
                 camera_preset=camera_preset,
             )
             # Display the PyVista screenshot
-            st.image(pyvista_result["screenshot"], caption=f"PyVista Volume | Voxel spacing: ({pyvista_result['spacing'][0]:.2f}, {pyvista_result['spacing'][1]:.2f}, {pyvista_result['spacing'][2]:.2f}) mm")
+            st.image(
+                pyvista_result["screenshot"],
+                caption=f"PyVista Volume | Voxel spacing: ({pyvista_result['spacing'][0]:.2f}, {pyvista_result['spacing'][1]:.2f}, {pyvista_result['spacing'][2]:.2f}) mm",
+            )
         else:
             fig = create_volume_figure(
                 volume.array,
@@ -421,19 +472,31 @@ def main():
                 if isocenter is None:
                     isocenter = get_volume_center(volume.array, spacing)
 
-                fig = add_source_detector_figure(
-                    fig,
-                    volume_array=volume.array,
-                    spacing=spacing,
-                    isocenter=isocenter,
-                    sid=sid,
-                    sdd=sid,
-                    gantry_angle=gantry_angle,
-                    show_source=True,
-                    show_detector=True,
-                    source_pos=source_pos,
-                    detector_pos=detector_pos,
-                )
+                # Add trajectory if projection geometry is loaded
+                if projection_geometry is not None:
+                    from visualization.volume3d import add_trajectory_to_figure
+
+                    src_positions, det_positions = get_trajectory_positions(
+                        projection_geometry, n_projections
+                    )
+                    fig = add_trajectory_to_figure(
+                        fig, src_positions, det_positions, downsample
+                    )
+                else:
+                    # Use legacy single source/detector
+                    fig = add_source_detector_figure(
+                        fig,
+                        volume_array=volume.array,
+                        spacing=spacing,
+                        isocenter=isocenter,
+                        sid=sid,
+                        sdd=sid,
+                        gantry_angle=gantry_angle,
+                        show_source=True,
+                        show_detector=True,
+                        source_pos=source_pos,
+                        detector_pos=detector_pos,
+                    )
 
             # Render into the reserved slot
             with plot_slot:

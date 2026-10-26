@@ -107,7 +107,7 @@ def render_sidebar():
                         status_text.text(f"Loading {current}/{total} slices...")
 
                     # Load with progress callback
-                    volume = load_volume_cached(file_paths_str, progress_callback=update_progress)
+                    volume = load_volume_cached(file_paths_str, _progress_callback=update_progress)
 
                     # Clear progress UI
                     progress_bar.empty()

@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from math import pi
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+
+    YAML_AVAILABLE = True
+except ImportError:
+    yaml = None  # type: ignore
+    YAML_AVAILABLE = False
 
 
 @dataclass
@@ -169,7 +175,14 @@ def load_geometry_from_yaml(yaml_path: Path) -> ProjectionGeometry:
 
     Returns:
         ProjectionGeometry object with extracted parameters
+
+    Raises:
+        ImportError: If PyYAML is not installed
     """
+    if not YAML_AVAILABLE:
+        raise ImportError(
+            "PyYAML is required for YAML loading. Install with: pip install pyyaml"
+        )
     with open(yaml_path) as f:
         data = yaml.safe_load(f)
     return ProjectionGeometry(**data)

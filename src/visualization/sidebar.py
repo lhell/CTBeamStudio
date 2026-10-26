@@ -154,12 +154,12 @@ def render_sidebar():
         step=1000,
         key="sidebar_n_projections",
     )
-    downsample = st.sidebar.selectbox(
-        "Downsample",
+    trajectory_downsample = st.sidebar.selectbox(
+        "Trajectory Downsample",
         options=[1, 10, 100, 1000],
         index=1,
         format_func=lambda x: f"1/{x}",
-        key="sidebar_downsample",
+        key="sidebar_trajectory_downsample",
     )
 
     # Clear cache button
@@ -176,4 +176,4 @@ def render_sidebar():
         clear_last_loaded()
         st.rerun()
 
-    return volume, projection_geometry, n_projections, downsample
+    return volume, projection_geometry, n_projections, trajectory_downsample

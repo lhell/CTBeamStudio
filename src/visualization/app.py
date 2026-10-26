@@ -39,7 +39,7 @@ from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
 # Cache for loaded volumes (survives refresh within same server)
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_volume_cached(file_paths_str: list, unit: str = None):
     """Load volume from file paths with caching."""
     from pathlib import Path
@@ -119,7 +119,7 @@ def main():
     # Render sidebar and get values
     from visualization.sidebar import render_sidebar
 
-    volume, projection_geometry, n_projections, downsample = render_sidebar()
+    volume, projection_geometry, n_projections, trajectory_downsample = render_sidebar()
 
     # Main area
     if "volume" in st.session_state:
@@ -286,6 +286,8 @@ def main():
                 caption=f"PyVista Volume | Voxel spacing: ({pyvista_result['spacing'][0]:.2f}, {pyvista_result['spacing'][1]:.2f}, {pyvista_result['spacing'][2]:.2f}) mm",
             )
         else:
+            # Use separate downsample for volume rendering (not the trajectory downsample)
+            volume_downsample = st.session_state.get("volume_downsample", 4)
             fig = create_volume_figure(
                 volume.array,
                 spacing=spacing,
@@ -293,7 +295,7 @@ def main():
                 opacity=opacity,
                 surface_opacity=opacity,
                 colormap="bone",
-                downsample=downsample,
+                downsample=volume_downsample,
                 camera_preset=camera_preset,
                 n_iso_levels=n_iso_levels,
                 iso_threshold=iso_threshold,
@@ -315,7 +317,7 @@ def main():
                         projection_geometry, n_projections
                     )
                     fig = add_trajectory_to_figure(
-                        fig, src_positions, det_positions, downsample
+                        fig, src_positions, det_positions, trajectory_downsample
                     )
                 else:
                     # Use legacy single source/detector

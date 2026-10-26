@@ -269,15 +269,15 @@ def main():
             with col_transp_1:
                 volume_opacity = st.slider(
                     "Volume Opacity",
-                    min_value=0.1,
+                    min_value=0.05,
                     max_value=1.0,
-                    value=0.6,
+                    value=0.05,
                     key="3d_volume_opacity",
                 )
             with col_transp_2:
                 surface_opacity = st.slider(
                     "Surface Opacity",
-                    min_value=0.1,
+                    min_value=0.05,
                     max_value=1.0,
                     value=0.7,
                     key="3d_surface_opacity",

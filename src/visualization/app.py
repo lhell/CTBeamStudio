@@ -149,6 +149,13 @@ def main():
                     key="3d_camera",
                 )
 
+            # Trajectory toggle
+            show_trajectory = st.checkbox(
+                "Show Trajectory",
+                value=projection_geometry is not None,
+                key="3d_show_trajectory",
+            )
+
             # Single opacity slider
             opacity = st.slider(
                 "Opacity",
@@ -297,8 +304,8 @@ def main():
                 if isocenter is None:
                     isocenter = get_volume_center(volume.array, spacing)
 
-                # Add trajectory if projection geometry is loaded
-                if projection_geometry is not None:
+                # Add trajectory if enabled and projection geometry is loaded
+                if show_trajectory and projection_geometry is not None:
                     from visualization.volume3d import (
                         add_trajectory_to_figure,
                         get_trajectory_positions,

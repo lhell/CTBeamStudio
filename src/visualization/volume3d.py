@@ -729,7 +729,7 @@ def create_pyvista_volume(
 
     # Render and capture screenshot
     plotter.render()
-    screenshot = plotter.screenshotTransparent()
+    screenshot = plotter.screenshot(transparent_background=True)
     plotter.close()
 
     # Convert to bytes

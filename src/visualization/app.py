@@ -444,7 +444,7 @@ def main():
         clamp_slice_state("sagittal_slice", sagittal_max)
 
         # Slice options in expander
-        with st.expander("Slice Options", expanded=True):
+        with st.expander("Slice Options", expanded=False):
             # Windowing controls
             col_preset, col_center, col_width = st.columns(3)
 

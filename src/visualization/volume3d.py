@@ -664,6 +664,9 @@ def create_pyvista_volume(
     if not PYVISTA_AVAILABLE:
         raise ImportError("PyVista is not available. Install with: pip install pyvista")
 
+    # Enable off-screen rendering
+    pv.OFF_SCREEN = True
+
     # Downsample for performance
     if downsample > 1:
         vol_ds = downsample_volume(volume_array, downsample)
@@ -678,17 +681,17 @@ def create_pyvista_volume(
     grid.spacing = ds_spacing
     grid.origin = (0, 0, 0)
 
-    # Add volume data
-    # PyVista expects Fortran order for ImageData
+    # Add volume data - PyVista expects Fortran order for ImageData
     grid.point_data["values"] = vol_ds.flatten(order="F")
 
-    # Create plotter
-    plotter = pv.Plotter(off_screen=True, border=False, border_color="k")
+    # Create plotter with explicit window size
+    plotter = pv.Plotter(off_screen=True, window_size=(900, 900))
     plotter.set_background("#111111")
 
     # Add volume with opacity
     plotter.add_volume(
         grid,
+        scalars="values",
         opacity=opacity,
         cmap=colormap,
         show_scalar_bar=False,
@@ -727,15 +730,17 @@ def create_pyvista_volume(
         (0, 0, 1),  # view up
     ]
 
-    # Render and capture screenshot
-    plotter.render()
-    screenshot = plotter.screenshot(transparent_background=True)
-    plotter.close()
+    # Render and capture screenshot BEFORE closing
+    try:
+        plotter.render()
+        # Use return_img=True to get numpy array directly
+        screenshot = plotter.screenshot(return_img=True, transparent_background=False)
+    finally:
+        plotter.close()
 
-    # Convert to bytes
+    # Convert numpy array to bytes
     img_bytes = io.BytesIO()
     from PIL import Image
-
     Image.fromarray(screenshot).save(img_bytes, format="PNG")
     img_bytes.seek(0)
 

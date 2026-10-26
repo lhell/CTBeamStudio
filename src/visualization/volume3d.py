@@ -696,16 +696,16 @@ def create_pyvista_volume(
 
     # Set camera based on preset (using available methods)
     camera_views = {
-        "iso": ("iso", None),
-        "front": ("xz", 1),   # view_xz
-        "back": ("xz", -1),   # view_xz from opposite
-        "left": ("yz", 1),    # view_yz
-        "right": ("yz", -1),  # view_yz from opposite
-        "top": ("xy", 1),     # view_xy
-        "bottom": ("xy", -1), # view_xy from opposite
+        "iso": ("iso", 1),
+        "front": ("xz", 1),   # view from front (+Y)
+        "back": ("xz", -1),   # view from back (-Y)
+        "left": ("yz", -1),   # view from left (-X)
+        "right": ("yz", 1),   # view from right (+X)
+        "top": ("xy", 1),     # view from top (+Z)
+        "bottom": ("xy", -1), # view from bottom (-Z)
     }
 
-    view, direction = camera_views.get(camera_preset, ("iso", None))
+    view, direction = camera_views.get(camera_preset, ("iso", 1))
 
     # Get bounds for camera positioning
     b = grid.bounds

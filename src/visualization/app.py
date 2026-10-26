@@ -268,6 +268,9 @@ def main():
         except AttributeError:
             spacing = (1.0, 1.0, 1.0)
 
+        # Use separate downsample for volume rendering (not the trajectory downsample)
+        volume_downsample = st.session_state.get("volume_downsample", 4)
+
         # Handle PyVista rendering separately
         if render_mode == "pyvista":
             from visualization.volume3d import create_pyvista_volume
@@ -277,7 +280,7 @@ def main():
                 spacing=spacing,
                 opacity=opacity,
                 colormap="bone",
-                downsample=downsample,
+                downsample=volume_downsample,
                 camera_preset=camera_preset,
             )
             # Display the PyVista screenshot
@@ -286,8 +289,6 @@ def main():
                 caption=f"PyVista Volume | Voxel spacing: ({pyvista_result['spacing'][0]:.2f}, {pyvista_result['spacing'][1]:.2f}, {pyvista_result['spacing'][2]:.2f}) mm",
             )
         else:
-            # Use separate downsample for volume rendering (not the trajectory downsample)
-            volume_downsample = st.session_state.get("volume_downsample", 4)
             fig = create_volume_figure(
                 volume.array,
                 spacing=spacing,

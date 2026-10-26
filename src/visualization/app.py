@@ -35,7 +35,6 @@ from visualization.volume3d import (
     create_volume_figure,
     get_volume_center,
 )
-from visualization.windowing import WINDOW_PRESETS, apply_window
 
 # Import caching functions from volume_cache module
 from visualization.volume_cache import (
@@ -44,6 +43,7 @@ from visualization.volume_cache import (
     load_volume_cached,
     save_last_loaded,
 )
+from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
 def clamp_slice_state(key: str, max_idx: int) -> None:

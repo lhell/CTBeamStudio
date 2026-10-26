@@ -120,8 +120,11 @@ def render_sidebar():
     )
 
     # Load projection geometry (cache in session state)
-    cached_geo_key = st.session_state.get("sidebar_geometry_file")
-    if geometry_file is not None and st.session_state.get("projection_geometry") is None:
+    # Check if we already have cached geometry
+    if st.session_state.get("projection_geometry") is not None:
+        # Use cached geometry
+        projection_geometry = st.session_state.get("projection_geometry")
+    elif geometry_file is not None:
         # Save uploaded file to temporary path
         content = geometry_file.read().decode("utf-8")
 
@@ -138,13 +141,11 @@ def render_sidebar():
             st.sidebar.success("Geometry loaded!")
         except Exception as e:
             st.sidebar.error(f"Failed to load geometry: {e}")
+            projection_geometry = None
         finally:
             import os
 
             os.unlink(tmp_path)
-    elif cached_geo_key is not None:
-        # Reuse cached geometry
-        projection_geometry = st.session_state.get("projection_geometry")
 
     n_projections = st.sidebar.number_input(
         "Projections",

@@ -116,126 +116,10 @@ def main():
         page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"
     )
 
-    # Sidebar: Title and Data selection
-    st.sidebar.title("🏥 CT Orientation Viewer")
+    # Render sidebar and get values
+    from visualization.sidebar import render_sidebar
 
-    # Data section in sidebar
-    st.sidebar.header("Data")
-
-    # Folder picker using text input
-    data_path = st.sidebar.text_input(
-        "DICOM Folder Path",
-        value=r"C:\Users\hellwege\AAPMLowDose\1mm B30-selected\full_1mm\L067\full_1mm",
-    )
-
-    path_ok = bool(data_path and Path(data_path).exists())
-
-    # Clear stale state when path changes
-    if st.session_state.get("last_path") != data_path:
-        st.session_state["last_path"] = data_path
-        for k in ("series_list", "volume", "series", "loaded_files"):
-            st.session_state.pop(k, None)
-
-    if not path_ok:
-        st.sidebar.warning("Enter a valid folder path")
-    else:
-        # Scan: persist result in session state so it survives reruns
-        if st.sidebar.button("Scan Directory"):
-            with st.spinner("Scanning directory..."):
-                st.session_state["series_list"] = scan_series(Path(data_path))
-
-        series_list = st.session_state.get("series_list") or []
-        if series_list:
-            series_options = [
-                f"{s.patient_id} - {s.series_description or 'Unknown'} - {s.n_slices} slices"
-                for s in series_list
-            ]
-            selected_idx = st.sidebar.selectbox(
-                "Select Series",
-                range(len(series_options)),
-                format_func=lambda i: series_options[i],
-            )
-            selected_series = series_list[selected_idx]
-            st.sidebar.markdown("---")
-
-            # Use n_slices from selected series
-            file_count = selected_series.n_slices
-            slice_option = st.sidebar.radio(
-                "Slices to load:",
-                ["All slices", "Custom number"],
-                key="slice_option",
-            )
-            n_slices = None
-            if slice_option == "Custom number":
-                n_slices = st.sidebar.number_input(
-                    f"Number of slices (max {file_count})",
-                    min_value=1,
-                    max_value=file_count,
-                    value=100,
-                    key="n_slices_input",
-                )
-
-            if st.sidebar.button("Load Series"):
-                # Use files from selected_series if available, otherwise scan folder
-                if selected_series.files:
-                    files = (
-                        selected_series.files[:n_slices]
-                        if n_slices
-                        else selected_series.files
-                    )
-                else:
-                    files = (
-                        list(Path(data_path).iterdir())[:n_slices]
-                        if n_slices
-                        else list(Path(data_path).iterdir())
-                    )
-
-                with st.spinner("Loading DICOM series..."):
-                    # Convert Path objects to strings for cache key
-                    file_paths_str = [str(f) for f in files]
-                    volume = load_volume_cached(file_paths_str)
-
-                st.session_state["volume"] = volume
-                st.session_state["series"] = selected_series
-                st.session_state["loaded_files"] = files
-                # Clear old slice indices so clamp_slice_state will center them
-                for k in ("axial_slice", "coronal_slice", "sagittal_slice"):
-                    st.session_state.pop(k, None)
-
-                logger.info(
-                    "Loaded %d slices, shape=%s", len(files), volume.array.shape
-                )
-                st.toast(f"Loaded {len(files)} slices!")
-                save_last_loaded(files)
-
-    # Auto-load from cache file on refresh (silent)
-    if "volume" not in st.session_state:
-        cached_files = load_last_loaded()
-        if cached_files:
-            file_paths_str = [str(f) for f in cached_files]
-            volume = load_volume_cached(file_paths_str)
-            st.session_state["volume"] = volume
-            st.session_state["loaded_files"] = cached_files
-            st.session_state["series"] = type(
-                "S",
-                (),
-                {
-                    "series_description": "CT Orientation Viewer",
-                    "patient_id": "Unknown",
-                    "n_slices": len(cached_files),
-                },
-            )()
-
-    # Clear cache button
-    if st.sidebar.button("🗑️ Clear Cache"):
-        # Clear session state
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        # Clear Streamlit cache
-        st.cache_data.clear()
-        # Clear cache file
-        clear_last_loaded()
-        st.rerun()
+    volume, projection_geometry, n_projections, downsample = render_sidebar()
 
     # Main area
     if "volume" in st.session_state:
@@ -245,7 +129,7 @@ def main():
         plot_slot = st.container()
 
         # 3D controls in expander (appears BELOW the plot)
-        with st.expander("3D Options", expanded=False):
+        with st.expander("3D Options", expanded=True):
             col3d_1, col3d_2 = st.columns(2)
 
             with col3d_1:
@@ -302,67 +186,8 @@ def main():
                 n_iso_levels = 5
                 iso_threshold = None
 
-            # Projection geometry controls
-            col_geo_1, col_geo_2 = st.columns(2)
-            with col_geo_1:
-                show_geometry = st.checkbox(
-                    "Show Source/Detector", value=True, key="3d_show_geometry"
-                )
-            with col_geo_2:
-                downsample = st.selectbox(
-                    "Downsample",
-                    options=[1, 10, 100, 1000],
-                    index=1,
-                    format_func=lambda x: f"1/{x}",
-                    key="3d_downsample",
-                )
-
-            # Load projection geometry file
-            col_geo_file, col_n_proj = st.columns(2)
-            with col_geo_file:
-                geometry_file = st.file_uploader(
-                    "Geometry TXT file", type=["txt"], key="3d_geometry_file"
-                )
-            with col_n_proj:
-                n_projections = st.number_input(
-                    "Number of projections",
-                    min_value=1,
-                    value=51326,
-                    step=1000,
-                    key="3d_n_projections",
-                )
-
-            # Load projection geometry and generate trajectory
-            projection_geometry = None
-            if geometry_file is not None:
-                import io
-
-                from visualization.loaders.projection import load_projection_geometry
-                from visualization.volume3d import (
-                    get_trajectory_positions,
-                )
-
-                # Save uploaded file to temporary path
-                with io.BytesIO(geometry_file.read()) as f:
-                    content = f.read().decode("utf-8")
-
-                # Create temp file for loader
-                import tempfile
-
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".txt", delete=False
-                ) as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
-
-                try:
-                    projection_geometry = load_projection_geometry(tmp_path)
-                except Exception as e:
-                    st.error(f"Failed to load geometry: {e}")
-                finally:
-                    import os
-
-                    os.unlink(tmp_path)
+            # Projection geometry controls (using sidebar values)
+            show_geometry = True
 
             col_sid, col_angle = st.columns(2)
             with col_sid:
@@ -474,7 +299,10 @@ def main():
 
                 # Add trajectory if projection geometry is loaded
                 if projection_geometry is not None:
-                    from visualization.volume3d import add_trajectory_to_figure
+                    from visualization.volume3d import (
+                        add_trajectory_to_figure,
+                        get_trajectory_positions,
+                    )
 
                     src_positions, det_positions = get_trajectory_positions(
                         projection_geometry, n_projections

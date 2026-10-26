@@ -1,13 +1,12 @@
 """Tests for ProjectionGeometry dataclass."""
 
 import pytest
-from pathlib import Path
 
 from visualization.geometry import (
     ProjectionGeometry,
     load_geometry,
-    load_geometry_from_yaml,
     load_geometry_from_txt,
+    load_geometry_from_yaml,
 )
 
 
@@ -74,6 +73,7 @@ ACQUISITION -----------------------------------------------------
 
 # === Basic Creation Tests ===
 
+
 def test_default_geometry():
     """Test that default geometry values are correct."""
     geo = ProjectionGeometry()
@@ -135,6 +135,7 @@ def test_custom_geometry():
 
 # === Validation Tests ===
 
+
 def test_validation_negative_sdd():
     """Test that negative SDD raises ValueError."""
     with pytest.raises(ValueError, match="sdd must be positive"):
@@ -172,6 +173,7 @@ def test_validation_negative_pitch():
 
 
 # === Computed Properties Tests ===
+
 
 def test_computed_collimation_width():
     """Test collimation_width computation."""
@@ -212,6 +214,7 @@ def test_computed_cone_angle():
 
 
 # === Loader Tests ===
+
 
 def test_load_geometry_from_yaml(yaml_file):
     """Test loading geometry from YAML file."""

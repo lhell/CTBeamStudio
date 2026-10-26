@@ -50,7 +50,7 @@ def get_camera_preset(preset: str, bounds: tuple) -> dict:
 
     # Calculate diagonal for distance
     diagonal = math.sqrt((xmax - xmin) ** 2 + (ymax - ymin) ** 2 + (zmax - zmin) ** 2)
-    distance = diagonal * 1.5
+    distance = diagonal * 0.8  # Closer zoom
 
     presets = {
         "iso": {

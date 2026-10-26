@@ -94,7 +94,7 @@ def render_sidebar():
                     save_last_loaded,
                 )
 
-                with st.spinner("Loading DICOM series..."):
+                with st.spinner("Caching volume..."):
                     # Convert Path objects to strings for cache key
                     file_paths_str = [str(f) for f in files]
                     volume = load_volume_cached(file_paths_str)

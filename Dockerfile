@@ -40,5 +40,10 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
 
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Run Streamlit application
-CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0"]
+CMD ["streamlit", "run", "src/visualization/app.py", "--server.address", "0.0.0.0"]

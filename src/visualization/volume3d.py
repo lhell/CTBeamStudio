@@ -171,6 +171,9 @@ def create_volume_figure(
     # Get camera preset
     cam = get_camera_preset(camera_preset, bounds)
 
+    # Create spacing info for display
+    spacing_info = f"Voxel spacing: ({spacing[0]:.2f}, {spacing[1]:.2f}, {spacing[2]:.2f}) mm"
+
     if render_mode == "iso":
         # Isosurface rendering - extract contours at multiple levels
         if iso_threshold is not None:
@@ -309,6 +312,17 @@ def create_volume_figure(
         legend=dict(
             x=0.02, y=0.98, font=dict(color="white", size=10), bgcolor="rgba(0,0,0,0.5)"
         ),
+        annotations=[
+            dict(
+                text=spacing_info,
+                x=0.02, y=0.02,
+                xref="paper", yref="paper",
+                showarrow=False,
+                font=dict(color="white", size=12),
+                bgcolor="rgba(0,0,0,0.5)",
+                borderpad=4,
+            )
+        ],
     )
 
     return fig

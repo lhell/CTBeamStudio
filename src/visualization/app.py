@@ -37,7 +37,6 @@ from visualization.volume3d import (
 )
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
-
 # Import caching functions from volume_cache module
 from visualization.volume_cache import (
     clear_last_loaded,

@@ -349,8 +349,10 @@ def load_dicom_series(
         detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
             array
         )
-        print(f"[load_dicom_series] Detected unit: {detected_unit} "
-              f"(confidence: {confidence})")
+        print(
+            f"[load_dicom_series] Detected unit: {detected_unit} "
+            f"(confidence: {confidence})"
+        )
         print(f"  Using: slope={detected_slope}, intercept={detected_intercept}")
         print(f"  Data range: [{array.min()}, {array.max()}], dtype: {array.dtype}")
         unit = detected_unit

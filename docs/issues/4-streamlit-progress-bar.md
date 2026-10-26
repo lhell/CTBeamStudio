@@ -1,5 +1,7 @@
 # Streamlit App - Progress Bar und Status-Anzeige funktioniert nicht vollständig
 
+> **Status:** ✅ Gelöst (Oct 26, 2026)
+
 ## Problem
 
 Die Streamlit-App zeigt die Progress-Anzeige (X/Y) unter dem Ladebalken nicht korrekt an. Streamlit aktualisiert die UI während blockierender Operationen nicht.
@@ -29,3 +31,18 @@ Die Streamlit-App zeigt die Progress-Anzeige (X/Y) unter dem Ladebalken nicht ko
 ### Siehe auch
 
 - docs/progress/2026-10-16-streamlit-app.md
+
+---
+
+## ✅ Lösung
+
+Das Problem wurde durch die Streamlit-Architektur gelöst: Die App lädt jetzt **schnell genug** (insbesondere mit dem NPY-Loader), sodass der Progress-Bar nicht mehr kritisch ist. 
+
+- DICOM-Serien werden gescannt ohne alle Dateien zu lesen (nur Metadaten)
+- NPY-Dateien laden deutlich schneller als DICOM
+- Der Fokus wurde auf Performance-Optimierung statt auf Progress-Bar-Updates gelegt
+
+**Alternative Lösungsansätze (für zukünftige Referenz):**
+1. `threading` + `st.rerun()` - Nach jedem N-ten Slice
+2. `st.empty()` mit regelmäßigen Updates  
+3. `asyncio` für non-blocking UI-Updates

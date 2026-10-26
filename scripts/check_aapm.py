@@ -43,7 +43,9 @@ def main():
         sys.exit(2)
 
     # Print table header
-    print(f"{'Patient ID':<15} {'Series Description':<30} {'Slices':<10} {'Dose Class'}")
+    print(
+        f"{'Patient ID':<15} {'Series Description':<30} {'Slices':<10} {'Dose Class'}"
+    )
     print("-" * 70)
 
     # Print each series
@@ -61,7 +63,10 @@ def main():
 
     # Warning if all series are unknown
     if unknown_count == len(series_list):
-        print(f"\nWarning: All {len(series_list)} series have unknown dose classification", file=sys.stderr)
+        print(
+            f"\nWarning: All {len(series_list)} series have unknown dose classification",
+            file=sys.stderr,
+        )
 
     print(f"\nTotal: {len(series_list)} series(s)")
 

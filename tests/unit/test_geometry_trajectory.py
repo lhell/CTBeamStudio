@@ -1,9 +1,11 @@
 """Tests for geometry trajectory functions."""
 
+import plotly.graph_objects as go
 import pytest
 
 from visualization.geometry import ProjectionGeometry
 from visualization.volume3d import (
+    add_trajectory_to_figure,
     get_detector_position,
     get_source_position,
     get_trajectory_positions,
@@ -67,3 +69,40 @@ def test_get_source_position_with_offsets():
     # Base at 0°: (600, 0, 0) + offset (10, 20, 0) = (610, 20, 0)
     assert pos[0] == pytest.approx(610.0, rel=0.01)
     assert pos[1] == pytest.approx(20.0, rel=0.01)
+
+
+def test_add_trajectory_to_figure():
+    """Test adding trajectory to Plotly figure."""
+    geo = ProjectionGeometry(sid=600.0)
+
+    # Generate small number of positions
+    src_positions, det_positions = get_trajectory_positions(geo, n_projections=4)
+
+    # Create empty figure and add trajectory
+    fig = go.Figure()
+    fig = add_trajectory_to_figure(fig, src_positions, det_positions, downsample=1)
+
+    # Should have 2 traces: source and detector
+    assert len(fig.data) == 2
+
+    # First trace is source (orange)
+    assert fig.data[0].marker.color == "orange"
+    assert fig.data[0].name == "Source Trajectory"
+
+    # Second trace is detector (turquoise)
+    assert fig.data[1].marker.color == "turquoise"
+    assert fig.data[1].name == "Detector Trajectory"
+
+
+def test_add_trajectory_to_figure_with_downsample():
+    """Test trajectory downsampling."""
+    geo = ProjectionGeometry(sid=600.0)
+
+    src_positions, det_positions = get_trajectory_positions(geo, n_projections=10)
+
+    fig = go.Figure()
+    fig = add_trajectory_to_figure(fig, src_positions, det_positions, downsample=5)
+
+    # Should have 10/5 = 2 points per trace
+    assert len(fig.data[0].x) == 2  # Source
+    assert len(fig.data[1].x) == 2  # Detector

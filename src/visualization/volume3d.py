@@ -264,7 +264,7 @@ def create_volume_figure(
                     mode="markers",
                     marker=dict(
                         size=marker_size,  # Based on voxel spacing
-                        symbol="circle",  # Balls instead of cubes
+                        symbol="square",  # Cubes
                         color=vals_norm,
                         colorscale="Greys",  # Use Plotly's built-in colorscale
                         opacity=opacity,  # User-adjustable transparency

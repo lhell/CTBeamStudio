@@ -1,8 +1,5 @@
 """Tests for projection geometry loader."""
 
-import pytest
-from pathlib import Path
-
 from visualization.loaders.projection import load_projection_geometry
 
 
@@ -25,10 +22,10 @@ ACQUISITION -----------------------------------------------------
 """
     txt_file = tmp_path / "geometry.txt"
     txt_file.write_text(txt_content)
-    
+
     # Load geometry
     geo = load_projection_geometry(txt_file)
-    
+
     # Verify values
     assert geo.sdd == 1085.6
     assert geo.n_det_rows == 64

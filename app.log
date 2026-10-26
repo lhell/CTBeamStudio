@@ -381,3 +381,257 @@ ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remo
 2026-10-19 22:52:40,133 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 22:52:43,098 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
 2026-10-19 22:52:45,664 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:53:40,490 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:53:43,235 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:53:44,883 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:53:45,888 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:53:49,621 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-19 22:53:55,782 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:03,275 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:04,573 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:06,716 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:10,850 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:15,127 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:20,028 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:23,993 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:38,674 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:40,961 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:42,715 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:45,279 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:47,032 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:48,290 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:49,847 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:52,383 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:53,900 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:56,091 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:54:58,212 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:01,741 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:03,864 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:06,390 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:07,230 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:10,619 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:11,780 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:14,352 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:16,908 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:19,343 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:22,829 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:26,026 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:29,177 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:31,835 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:34,425 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:35,589 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:36,324 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-19 22:55:37,385 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:26,468 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:35,726 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:40,587 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:44,612 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:46,192 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:24:50,468 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:24:59,337 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:28:31,508 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:28:35,209 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:28:37,611 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:28:39,060 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:28:40,538 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:32:17,904 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:32:22,436 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:32:24,217 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:32:25,371 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:32:29,268 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:33:51,495 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:33:57,655 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:34:01,766 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:34:03,244 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:34:04,222 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:34:05,536 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:36:21,702 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:36:26,307 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:36:28,081 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:36:29,710 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:36:31,119 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:39:44,442 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:39:48,477 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:39:51,795 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:39:53,033 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:39:54,519 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:41:26,943 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:41:30,940 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:41:32,608 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:41:33,739 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:41:35,209 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:41:42,028 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:14,658 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:21,105 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:23,693 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:25,523 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:26,961 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:42:32,168 - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 166, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen
+2026-10-23 13:42:39,878 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:42:41,803 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:43:23,066 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:43:26,192 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:43:28,116 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:43:29,295 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:43:30,579 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:47:00,014 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:03,755 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:05,281 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:06,247 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:07,397 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:47:09,896 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:13,152 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:14,731 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:15,526 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:47:15,564 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:48:44,730 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:48:48,275 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:48:49,937 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:48:51,253 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:48:52,417 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:48:55,556 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:49:22,010 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:30,715 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:34,300 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:36,282 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:37,973 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:39,266 - INFO - Loaded 100 slices, shape=(100, 512, 512)
+2026-10-23 13:53:53,953 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:55,341 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:53:59,239 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 13:55:48,543 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:05:26,857 - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\hellwege\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 166, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen
+2026-10-23 14:05:27,059 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:08:03,570 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:08:13,895 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:08:17,077 - WARNING - Matplotlib is building the font cache; this may take a moment.
+2026-10-23 14:08:18,860 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:08:20,166 - INFO - generated new fontManager
+2026-10-23 14:13:34,037 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:14:13,590 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-23 14:14:44,742 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:24:24,930 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:25:23,107 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:26:16,350 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:26:25,535 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:26:55,748 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:27:05,233 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:27:17,503 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:27:20,324 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:27:55,635 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:28:01,186 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:29:27,087 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:29:31,976 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:29:45,051 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:29:59,709 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:32:36,364 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:33:46,018 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:34:51,958 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:35:20,222 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:35:32,969 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:35:43,429 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:37:08,492 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:37:14,805 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:37:48,407 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:38:15,175 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:38:39,001 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:40:22,963 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:41:37,641 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:43:05,708 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:43:22,983 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 11:44:49,658 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:15:16,173 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:16:58,722 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:17:03,326 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:21:16,740 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:21:56,273 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:22:23,834 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:22:27,867 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:22:53,324 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:29,990 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:40,270 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:40,568 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:42,575 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:51,125 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:55,174 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:28:57,996 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:00,088 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:05,970 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:24,917 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:29,048 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:31,000 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:34,631 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:40,731 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:41,132 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-24 13:29:52,817 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:09:46,534 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:10:17,611 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:10:17,708 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:10:19,193 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:10:21,946 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:10:40,268 - INFO - Loaded 560 slices, shape=(560, 512, 512)
+2026-10-26 13:11:04,037 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:11:26,533 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:12:30,641 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:12:46,103 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:12:57,878 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:13:30,855 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:13:31,743 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:13:47,361 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:14:40,949 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:15:10,671 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:15:26,624 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:16:18,452 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:16:43,744 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:16:48,063 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:17:38,440 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:17:57,192 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:19:02,381 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:19:15,114 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:19:39,444 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:22:23,363 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:23:07,203 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:23:21,984 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:27:33,164 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:36:41,356 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:37:29,664 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:45:28,232 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:45:56,822 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:46:22,615 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:46:59,076 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:47:15,489 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:49:57,284 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:50:47,361 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:51:07,672 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:53:09,114 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:53:26,734 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:53:38,515 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:54:30,369 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:55:19,630 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:56:28,485 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:56:53,955 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:57:01,804 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:57:37,159 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 13:58:07,294 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 14:03:43,298 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 14:03:43,856 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 14:04:36,698 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py
+2026-10-26 14:06:31,044 - INFO - mpr loaded from C:\Users\hellwege\PycharmProjects\CTOrientationViewer\src\visualization\mpr.py

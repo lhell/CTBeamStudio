@@ -258,6 +258,28 @@
 ### Noch offen
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
+- T-40: Dockerfile
+- T-41: CI
+- T-42: README
+- T-43: Requirements
+- T-44: Deployment
+- Docker Self-Deployment
+
+## Erledigt (Oct 26, 2026)
+
+### Projection Geometry (Heute hinzugefügt)
+- ✅ ProjectionGeometry dataclass mit Validierung
+- ✅ YAML Loader (load_geometry_from_yaml)
+- ✅ TXT Loader (load_geometry_from_txt) - Mayo Clinic Format
+- ✅ Auto-Detect (load_geometry)
+- ✅ Unit Tests für Geometry (test_geometry.py)
+- ✅ Trajectory Tests (test_geometry_trajectory.py)
+- ✅ Geometry Loader für User-Dateien (loaders/projection.py)
+- ✅ 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
+
+### Phase 1-3
+- Alle Tasks T-10 bis T-33 ✅
+- T-23: 3D-Visualisierung ✅ (Oct 24)
 
 ## Implementation Notes (Oct 19, 2026)
 

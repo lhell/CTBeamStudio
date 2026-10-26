@@ -11,6 +11,7 @@ from skimage import measure
 # PyVista is optional - only import if rendering with PyVista
 try:
     import pyvista as pv
+
     PYVISTA_AVAILABLE = True
 except ImportError:
     PYVISTA_AVAILABLE = False
@@ -18,81 +19,81 @@ except ImportError:
 
 def get_source_position(geometry, source_angle: float = 0.0):
     """Calculate source position from ProjectionGeometry.
-    
+
     Args:
         geometry: ProjectionGeometry object
         source_angle: Source angle in degrees (0 = anterior = +X, positive = CCW)
-        
+
     Returns:
         (x, y, z) source position in mm
     """
     angle_rad = math.radians(source_angle)
-    
+
     # Base position: on circle at SID distance, at anterior (0°) = +X direction
     base_x = geometry.sid * math.cos(angle_rad)
     base_y = geometry.sid * math.sin(angle_rad)
     base_z = 0.0
-    
+
     # Apply source offsets
     x = base_x + geometry.source_offset_x
     y = base_y + geometry.source_offset_y
     z = base_z + geometry.source_offset_z
-    
+
     return (x, y, z)
 
 
 def get_detector_position(geometry, source_angle: float = 0.0):
     """Calculate detector position from ProjectionGeometry.
-    
+
     Args:
         geometry: ProjectionGeometry object
         source_angle: Source angle in degrees
-        
+
     Returns:
         (x, y, z) detector position in mm
     """
     angle_rad = math.radians(source_angle)
-    
+
     # Detector is opposite to source on the central beam
     base_x = -geometry.sid * math.cos(angle_rad)
     base_y = -geometry.sid * math.sin(angle_rad)
     base_z = 0.0
-    
+
     # Apply detector offsets (independent of source)
     x = base_x + geometry.detector_offset_x
     y = base_y + geometry.detector_offset_y
     # Detector Z follows source Z offset
-    
+
     return (x, y, base_z)
 
 
 def get_trajectory_positions(geometry, n_projections: int):
     """Generate source and detector positions for all projections.
-    
+
     Args:
         geometry: ProjectionGeometry object
         n_projections: Total number of projections in the scan
-        
+
     Returns:
         (source_positions, detector_positions) as lists of (x,y,z) tuples
     """
     source_positions = []
     detector_positions = []
-    
+
     # For helical scan, total angle > 360°
     # Calculate total angle based on number of projections
     # Each projection is evenly spaced
     total_angle = 360.0 * (n_projections / 2304)  # 2304 projections per rotation
-    
+
     for i in range(n_projections):
         source_angle = (i / n_projections) * total_angle
-        
+
         src = get_source_position(geometry, source_angle)
         det = get_detector_position(geometry, source_angle)
-        
+
         source_positions.append(src)
         detector_positions.append(det)
-    
+
     return source_positions, detector_positions
 
 
@@ -260,7 +261,9 @@ def create_volume_figure(
     cam = get_camera_preset(camera_preset, bounds)
 
     # Create spacing info for display
-    spacing_info = f"Voxel spacing: ({spacing[0]:.2f}, {spacing[1]:.2f}, {spacing[2]:.2f}) mm"
+    spacing_info = (
+        f"Voxel spacing: ({spacing[0]:.2f}, {spacing[1]:.2f}, {spacing[2]:.2f}) mm"
+    )
 
     if render_mode == "iso":
         # Isosurface rendering - extract contours at multiple levels
@@ -402,8 +405,10 @@ def create_volume_figure(
         annotations=[
             dict(
                 text=spacing_info,
-                x=0.02, y=0.02,
-                xref="paper", yref="paper",
+                x=0.02,
+                y=0.02,
+                xref="paper",
+                yref="paper",
                 showarrow=False,
                 font=dict(color="white", size=12),
                 bgcolor="rgba(0,0,0,0.5)",
@@ -779,12 +784,12 @@ def create_pyvista_volume(
     # Set camera based on preset (using available methods)
     camera_views = {
         "iso": ("iso", 1),
-        "front": ("xz", 1),   # view from front (+Y)
-        "back": ("xz", -1),   # view from back (-Y)
-        "left": ("yz", -1),   # view from left (-X)
-        "right": ("yz", 1),   # view from right (+X)
-        "top": ("xy", 1),     # view from top (+Z)
-        "bottom": ("xy", -1), # view from bottom (-Z)
+        "front": ("xz", 1),  # view from front (+Y)
+        "back": ("xz", -1),  # view from back (-Y)
+        "left": ("yz", -1),  # view from left (-X)
+        "right": ("yz", 1),  # view from right (+X)
+        "top": ("xy", 1),  # view from top (+Z)
+        "bottom": ("xy", -1),  # view from bottom (-Z)
     }
 
     view, direction = camera_views.get(camera_preset, ("iso", 1))
@@ -820,6 +825,7 @@ def create_pyvista_volume(
     # Convert numpy array to bytes
     img_bytes = io.BytesIO()
     from PIL import Image
+
     Image.fromarray(screenshot).save(img_bytes, format="PNG")
     img_bytes.seek(0)
 

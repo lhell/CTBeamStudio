@@ -265,23 +265,14 @@ def main():
                     key="3d_camera",
                 )
 
-            col_transp_1, col_transp_2 = st.columns(2)
-            with col_transp_1:
-                volume_opacity = st.slider(
-                    "Volume Opacity",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.6,
-                    key="3d_volume_opacity",
-                )
-            with col_transp_2:
-                surface_opacity = st.slider(
-                    "Surface Opacity",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.7,
-                    key="3d_surface_opacity",
-                )
+            # Single opacity slider
+            opacity = st.slider(
+                "Opacity",
+                min_value=0.1,
+                max_value=1.0,
+                value=0.6,
+                key="3d_opacity",
+            )
 
             # Iso-surface controls (shown when iso mode selected)
             if render_mode == "iso":
@@ -404,7 +395,7 @@ def main():
             pyvista_result = create_pyvista_volume(
                 volume.array,
                 spacing=spacing,
-                opacity=volume_opacity,
+                opacity=opacity,
                 colormap="bone",
                 downsample=downsample,
                 camera_preset=camera_preset,
@@ -416,8 +407,8 @@ def main():
                 volume.array,
                 spacing=spacing,
                 render_mode=render_mode,
-                opacity=volume_opacity,
-                surface_opacity=surface_opacity,
+                opacity=opacity,
+                surface_opacity=opacity,
                 colormap="bone",
                 downsample=downsample,
                 camera_preset=camera_preset,

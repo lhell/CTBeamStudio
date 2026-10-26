@@ -32,6 +32,8 @@ def render_sidebar():
     # Initialize session state for series list
     if "series_list" not in st.session_state:
         st.session_state["series_list"] = []
+    if "last_scanned_path" not in st.session_state:
+        st.session_state["last_scanned_path"] = ""
 
     projection_geometry = st.session_state.get("projection_geometry")
     n_projections = st.session_state.get("sidebar_n_projections", 51326)
@@ -39,14 +41,17 @@ def render_sidebar():
     volume = st.session_state.get("volume")
 
     if data_path and Path(data_path).exists():
-        if st.sidebar.button("Scan Directory"):
+        # Auto-scan when path changes (Enter key)
+        if data_path != st.session_state["last_scanned_path"]:
+            st.session_state["last_scanned_path"] = data_path
             with st.spinner("Scanning for DICOM series..."):
                 st.session_state["series_list"] = scan_series(Path(data_path))
 
         series_list = st.session_state.get("series_list") or []
         if series_list:
             series_options = [
-                f"{s.patient_id} - {s.series_description or 'Unknown'} - {s.n_slices} slices"
+                f"{s.patient_id} - {s.series_description or 'Unknown'} - "
+                f"{s.n_slices} slices"
                 for s in series_list
             ]
             selected_idx = st.sidebar.selectbox(
@@ -89,7 +94,7 @@ def render_sidebar():
                         else list(Path(data_path).iterdir())
                     )
 
-                from visualization.app import (
+                from visualization.volume_cache import (
                     load_volume_cached,
                     save_last_loaded,
                 )
@@ -121,14 +126,15 @@ def render_sidebar():
 
     # Load projection geometry (cache in session state)
     cached_geo_key = st.session_state.get("sidebar_geometry_file")
-    if geometry_file is not None and st.session_state.get("projection_geometry") is None:
+    if (
+        geometry_file is not None
+        and st.session_state.get("projection_geometry") is None
+    ):
         # Save uploaded file to temporary path
         content = geometry_file.read().decode("utf-8")
 
         # Create temp file for loader
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
 
@@ -170,7 +176,7 @@ def render_sidebar():
         # Clear Streamlit cache
         st.cache_data.clear()
         # Clear cache file
-        from visualization.app import clear_last_loaded
+        from visualization.volume_cache import clear_last_loaded
 
         clear_last_loaded()
         st.rerun()

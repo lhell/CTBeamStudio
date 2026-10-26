@@ -25,7 +25,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import numpy as np
 import pydicom
@@ -143,27 +143,32 @@ def _read_dicom_slice(file_path: Path) -> tuple[Dataset, np.ndarray, np.ndarray]
     pixel_array = ds.pixel_array.astype(np.float32)
 
     # Get ImagePositionPatient [x, y, z]
-    position = np.array(ds.ImagePositionPatient)
+    # Handle case where attribute is missing
+    try:
+        position = np.array(ds.ImagePositionPatient)
+    except (AttributeError, TypeError):
+        # Use zero position as fallback
+        position = np.array([0.0, 0.0, 0.0])
 
     return ds, pixel_array, position
 
 
-def scan_series(root: Path, max_depth: int = 5) -> list[SeriesInfo]:
+def scan_series(root: Path) -> list[SeriesInfo]:
     """Scan a directory for DICOM series.
 
     Groups DICOM files by subdirectory (fast) or returns single series.
 
     Args:
         root: Path to directory containing DICOM files.
-        max_depth: Maximum depth to search for DICOM files.
 
     Returns:
         List of SeriesInfo objects, one per series found.
     """
-    # Find all DICOM files recursively
+    # Find all DICOM files - non-recursive, just top level
     dicom_files = []
     for ext in ("*.dcm", "*.ima"):
-        dicom_files.extend(root.rglob(ext))
+        dicom_files.extend(root.glob(ext))
+        dicom_files.extend(root.glob(f"*/{ext}"))  # one level deep
 
     # Remove duplicates
     dicom_files = list(set(dicom_files))
@@ -278,10 +283,12 @@ def load_dicom_series(
 
     # Get orientation from first slice to calculate normal
     first_ds = slices[0][0]
-    if not hasattr(first_ds, "ImageOrientationPatient"):
-        raise ValueError("ImageOrientationPatient not found in DICOM")
+    try:
+        orientation = first_ds.ImageOrientationPatient
+    except (AttributeError, TypeError):
+        # Default to standard axial orientation
+        orientation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
 
-    orientation = first_ds.ImageOrientationPatient
     normal = _calculate_normal_from_orientation(orientation)
 
     # Sort slices by position projected onto normal (ascending)
@@ -325,9 +332,14 @@ def load_dicom_series(
 
     # Get pixel spacing from first slice (in-plane)
     first_ds = slices[0][0]
-    pixel_spacing = first_ds.PixelSpacing  # [row, col] = [y, x]
-    row_spacing = float(pixel_spacing[0])
-    col_spacing = float(pixel_spacing[1])
+    try:
+        pixel_spacing = first_ds.PixelSpacing  # [row, col] = [y, x]
+        row_spacing = float(pixel_spacing[0])
+        col_spacing = float(pixel_spacing[1])
+    except (AttributeError, TypeError):
+        # Default to 1mm pixel spacing
+        row_spacing = 1.0
+        col_spacing = 1.0
 
     # Stack pixel arrays into volume (z, y, x)
     array = np.stack(pixel_arrays, axis=0)
@@ -337,9 +349,8 @@ def load_dicom_series(
         detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
             array
         )
-        print(
-            f"[load_dicom_series] Detected unit: {detected_unit} (confidence: {confidence})"
-        )
+        print(f"[load_dicom_series] Detected unit: {detected_unit} "
+              f"(confidence: {confidence})")
         print(f"  Using: slope={detected_slope}, intercept={detected_intercept}")
         print(f"  Data range: [{array.min()}, {array.max()}], dtype: {array.dtype}")
         unit = detected_unit

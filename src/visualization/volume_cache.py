@@ -3,18 +3,15 @@
 import json
 from pathlib import Path
 
-import streamlit as st
-
 from visualization.loaders.dicom import load_dicom_series
 
 CACHE_FILE = Path("data/.last_loaded.json")
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def load_volume_cached(
     file_paths_str: list, unit: str | None = None, _progress_callback=None
 ):
-    """Load volume from file paths with caching."""
+    """Load volume from file paths (no caching due to Volume serialization issues)."""
     files = [Path(p) for p in file_paths_str]
     return load_dicom_series(files, unit=unit, progress=_progress_callback)
 
@@ -30,9 +27,7 @@ def load_last_loaded() -> list | None:
     if not CACHE_FILE.exists():
         return None
     try:
-        files = [
-            Path(f) for f in json.loads(CACHE_FILE.read_text()).get("files", [])
-        ]
+        files = [Path(f) for f in json.loads(CACHE_FILE.read_text()).get("files", [])]
         return files if files and all(f.exists() for f in files) else None
     except Exception:
         return None

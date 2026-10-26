@@ -40,12 +40,12 @@ from visualization.windowing import WINDOW_PRESETS, apply_window
 
 # Cache for loaded volumes (survives refresh within same server)
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_volume_cached(file_paths_str: list, unit: str = None):
+def load_volume_cached(file_paths_str: list, unit: str = None, progress_callback=None):
     """Load volume from file paths with caching."""
     from pathlib import Path
 
     files = [Path(p) for p in file_paths_str]
-    return load_dicom_series(files, unit=unit)
+    return load_dicom_series(files, unit=unit, progress=progress_callback)
 
 
 # File to store last loaded paths for auto-load on refresh

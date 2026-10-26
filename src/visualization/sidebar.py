@@ -97,7 +97,21 @@ def render_sidebar():
                 with st.spinner("Caching volume..."):
                     # Convert Path objects to strings for cache key
                     file_paths_str = [str(f) for f in files]
-                    volume = load_volume_cached(file_paths_str)
+
+                    # Create progress bar
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    def update_progress(current: int, total: int):
+                        progress_bar.progress(current / total)
+                        status_text.text(f"Loading {current}/{total} slices...")
+
+                    # Load with progress callback
+                    volume = load_volume_cached(file_paths_str, progress_callback=update_progress)
+
+                    # Clear progress UI
+                    progress_bar.empty()
+                    status_text.empty()
 
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series

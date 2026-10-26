@@ -221,21 +221,27 @@ def create_volume_figure(
     else:
         # Volume rendering - use voxel visualization with interpolated appearance
         # Use less aggressive downsampling for smoother look
-        vol_ds = downsample_volume(volume_array, max(downsample, 4))
+        ds = max(downsample, 4)
+        vol_ds = downsample_volume(volume_array, ds)
 
         # Get voxel values for coloring
         voxel_vals = vol_ds.flatten()
 
         # Create coordinates - flatten first to match voxel_vals (centered at origin)
         z, y, x = vol_ds.shape
-        # Adjust spacing to create overlapping spheres effect
-        vol_spacing = tuple(s * max(downsample, 4) * 0.7 for s in spacing)
+        # Actual spacing after downsampling (in mm)
+        vol_spacing = tuple(s * ds for s in spacing)
         zz, yy, xx = np.meshgrid(
             np.arange(z) * vol_spacing[0] + origin_z,
             np.arange(y) * vol_spacing[1] + origin_y,
             np.arange(x) * vol_spacing[2] + origin_x,
             indexing="ij",
         )
+
+        # Calculate marker size based on voxel spacing (approximate pixels per mm)
+        # Scale factor: 8 pixels per mm of spacing
+        avg_spacing = np.mean(vol_spacing)
+        marker_size = max(4, int(avg_spacing * 8))
 
         # Flatten coordinates to match voxel_vals
         xx_flat = xx.flatten()
@@ -257,7 +263,7 @@ def create_volume_figure(
                     z=zz_flat[mask],
                     mode="markers",
                     marker=dict(
-                        size=4,  # Slightly larger for overlap effect
+                        size=marker_size,  # Based on voxel spacing
                         color=vals_norm,
                         colorscale="Greys",  # Use Plotly's built-in colorscale
                         opacity=opacity,  # User-adjustable transparency

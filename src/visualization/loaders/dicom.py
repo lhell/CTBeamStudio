@@ -148,22 +148,22 @@ def _read_dicom_slice(file_path: Path) -> tuple[Dataset, np.ndarray, np.ndarray]
     return ds, pixel_array, position
 
 
-def scan_series(root: Path) -> list[SeriesInfo]:
+def scan_series(root: Path, max_depth: int = 5) -> list[SeriesInfo]:
     """Scan a directory for DICOM series.
 
     Groups DICOM files by subdirectory (fast) or returns single series.
 
     Args:
         root: Path to directory containing DICOM files.
+        max_depth: Maximum depth to search for DICOM files.
 
     Returns:
         List of SeriesInfo objects, one per series found.
     """
-    # Find all DICOM files - non-recursive, just top level
+    # Find all DICOM files recursively
     dicom_files = []
     for ext in ("*.dcm", "*.ima"):
-        dicom_files.extend(root.glob(ext))
-        dicom_files.extend(root.glob(f"*/{ext}"))  # one level deep
+        dicom_files.extend(root.rglob(ext))
 
     # Remove duplicates
     dicom_files = list(set(dicom_files))

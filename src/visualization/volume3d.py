@@ -486,7 +486,7 @@ def add_source_detector_figure(
             z=[source_pos[2], detector_pos[2]],
             mode="lines",
             line=dict(color="red", width=4),
-            name="Beam",
+            name="Central beam",
             showlegend=True,
         )
     )

@@ -1,11 +1,19 @@
-"""3D volume visualization using scipy and plotly."""
+"""3D volume visualization using scipy, plotly, and pyvista."""
 
+import io
 import math
 
 import numpy as np
 import plotly.graph_objects as go
 from scipy import ndimage
 from skimage import measure
+
+# PyVista is optional - only import if rendering with PyVista
+try:
+    import pyvista as pv
+    PYVISTA_AVAILABLE = True
+except ImportError:
+    PYVISTA_AVAILABLE = False
 
 
 def downsample_volume(volume_array: np.ndarray, factor: int = 4) -> np.ndarray:
@@ -630,3 +638,88 @@ def add_source_detector(
     )
 
     return {"figure": fig}
+
+
+def create_pyvista_volume(
+    volume_array: np.ndarray,
+    spacing: tuple[float, float, float] = (1.0, 1.0, 1.0),
+    opacity: float = 0.5,
+    colormap: str = "bone",
+    downsample: int = 4,
+    camera_preset: str = "iso",
+):
+    """Create PyVista volume rendering and return screenshot.
+
+    Args:
+        volume_array: 3D numpy array (z, y, x) in HU
+        spacing: Voxel spacing in mm (z, y, x)
+        opacity: Volume opacity (0-1)
+        colormap: Matplotlib colormap name
+        downsample: Downsampling factor for performance
+        camera_preset: Camera view preset
+
+    Returns:
+        Dict with 'screenshot' (bytes), 'spacing' info
+    """
+    if not PYVISTA_AVAILABLE:
+        raise ImportError("PyVista is not available. Install with: pip install pyvista")
+
+    # Downsample for performance
+    if downsample > 1:
+        vol_ds = downsample_volume(volume_array, downsample)
+        ds_spacing = tuple(s * downsample for s in spacing)
+    else:
+        vol_ds = volume_array
+        ds_spacing = spacing
+
+    # Create ImageData with proper spacing
+    grid = pv.ImageData()
+    grid.dimensions = vol_ds.shape[::-1]  # PyVista uses (x, y, z)
+    grid.spacing = ds_spacing
+    grid.origin = (0, 0, 0)
+
+    # Add volume data
+    # PyVista expects Fortran order for ImageData
+    grid.point_data["values"] = vol_ds.flatten(order="F")
+
+    # Create plotter
+    plotter = pv.Plotter(off_screen=True, border=False, border_color="k")
+    plotter.set_background("#111111")
+
+    # Add volume with opacity
+    plotter.add_volume(
+        grid,
+        opacity=opacity,
+        cmap=colormap,
+        show_scalar_bar=False,
+    )
+
+    # Set camera based on preset
+    camera_funcs = {
+        "iso": plotter.view_isometric,
+        "front": plotter.view_front,
+        "back": plotter.view_back,
+        "left": plotter.view_left,
+        "right": plotter.view_right,
+        "top": plotter.view_top,
+        "bottom": plotter.view_bottom,
+    }
+    if camera_preset in camera_funcs:
+        camera_funcs[camera_preset]()
+
+    # Render and capture screenshot
+    plotter.render()
+    screenshot = plotter.screenshotTransparent()
+    plotter.close()
+
+    # Convert to bytes
+    img_bytes = io.BytesIO()
+    from PIL import Image
+
+    Image.fromarray(screenshot).save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+
+    return {
+        "screenshot": img_bytes.getvalue(),
+        "spacing": ds_spacing,
+    }

@@ -251,8 +251,8 @@ def main():
             with col3d_1:
                 render_mode = st.selectbox(
                     "Render Mode",
-                    ["iso", "volume"],
-                    format_func=lambda x: "Iso-Surface" if x == "iso" else "Volume",
+                    ["iso", "volume", "pyvista"],
+                    format_func=lambda x: "Iso-Surface" if x == "iso" else ("PyVista" if x == "pyvista" else "Plotly Volume"),
                     key="3d_render_mode",
                 )
 
@@ -397,41 +397,56 @@ def main():
         except AttributeError:
             spacing = (1.0, 1.0, 1.0)
 
-        fig = create_volume_figure(
-            volume.array,
-            spacing=spacing,
-            render_mode=render_mode,
-            opacity=volume_opacity,
-            surface_opacity=surface_opacity,
-            colormap="bone",
-            downsample=downsample,
-            camera_preset=camera_preset,
-            n_iso_levels=n_iso_levels,
-            iso_threshold=iso_threshold,
-        )
+        # Handle PyVista rendering separately
+        if render_mode == "pyvista":
+            from visualization.volume3d import create_pyvista_volume
 
-        # Add source/detector if enabled
-        if show_geometry:
-            if isocenter is None:
-                isocenter = get_volume_center(volume.array, spacing)
-
-            fig = add_source_detector_figure(
-                fig,
-                volume_array=volume.array,
+            pyvista_result = create_pyvista_volume(
+                volume.array,
                 spacing=spacing,
-                isocenter=isocenter,
-                sid=sid,
-                sdd=sid,
-                gantry_angle=gantry_angle,
-                show_source=True,
-                show_detector=True,
-                source_pos=source_pos,
-                detector_pos=detector_pos,
+                opacity=volume_opacity,
+                colormap="bone",
+                downsample=downsample,
+                camera_preset=camera_preset,
+            )
+            # Display the PyVista screenshot
+            st.image(pyvista_result["screenshot"], caption=f"PyVista Volume | Voxel spacing: ({pyvista_result['spacing'][0]:.2f}, {pyvista_result['spacing'][1]:.2f}, {pyvista_result['spacing'][2]:.2f}) mm")
+        else:
+            fig = create_volume_figure(
+                volume.array,
+                spacing=spacing,
+                render_mode=render_mode,
+                opacity=volume_opacity,
+                surface_opacity=surface_opacity,
+                colormap="bone",
+                downsample=downsample,
+                camera_preset=camera_preset,
+                n_iso_levels=n_iso_levels,
+                iso_threshold=iso_threshold,
             )
 
-        # Render into the reserved slot
-        with plot_slot:
-            st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
+            # Add source/detector if enabled
+            if show_geometry:
+                if isocenter is None:
+                    isocenter = get_volume_center(volume.array, spacing)
+
+                fig = add_source_detector_figure(
+                    fig,
+                    volume_array=volume.array,
+                    spacing=spacing,
+                    isocenter=isocenter,
+                    sid=sid,
+                    sdd=sid,
+                    gantry_angle=gantry_angle,
+                    show_source=True,
+                    show_detector=True,
+                    source_pos=source_pos,
+                    detector_pos=detector_pos,
+                )
+
+            # Render into the reserved slot
+            with plot_slot:
+                st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
 
         # Get dimensions for each plane (needed for slice sliders)
         axial_max = volume.array.shape[0] - 1

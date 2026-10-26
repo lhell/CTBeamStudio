@@ -251,8 +251,8 @@ def main():
             with col3d_1:
                 render_mode = st.selectbox(
                     "Render Mode",
-                    ["iso", "volume", "pyvista"],
-                    format_func=lambda x: "Iso-Surface" if x == "iso" else ("PyVista" if x == "pyvista" else "Plotly Volume"),
+                    ["iso", "pyvista"],
+                    format_func=lambda x: "Iso-Surface" if x == "iso" else "PyVista",
                     key="3d_render_mode",
                 )
 

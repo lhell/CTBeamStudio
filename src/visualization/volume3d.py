@@ -853,7 +853,7 @@ def create_pyvista_volume(
     b = grid.bounds
     center = ((b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2)
     diagonal = ((b[1] - b[0]) ** 2 + (b[3] - b[2]) ** 2 + (b[5] - b[4]) ** 2) ** 0.5
-    distance = diagonal * 1.5
+    distance = diagonal * 1.0  # Closer zoom to match Plotly
 
     camera_positions = {
         "iso": (distance, -distance, distance),

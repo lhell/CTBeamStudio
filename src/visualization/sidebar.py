@@ -89,29 +89,15 @@ def render_sidebar():
                         else list(Path(data_path).iterdir())
                     )
 
-                from visualization.volume_cache import (
+                from visualization.app import (
                     load_volume_cached,
                     save_last_loaded,
                 )
 
-                with st.spinner("Caching volume..."):
+                with st.spinner("Loading DICOM series..."):
                     # Convert Path objects to strings for cache key
                     file_paths_str = [str(f) for f in files]
-
-                    # Create progress bar
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    def update_progress(current: int, total: int):
-                        progress_bar.progress(current / total)
-                        status_text.text(f"Loading {current}/{total} slices...")
-
-                    # Load with progress callback
-                    volume = load_volume_cached(file_paths_str, _progress_callback=update_progress)
-
-                    # Clear progress UI
-                    progress_bar.empty()
-                    status_text.empty()
+                    volume = load_volume_cached(file_paths_str)
 
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
@@ -134,11 +120,8 @@ def render_sidebar():
     )
 
     # Load projection geometry (cache in session state)
-    # Check if we already have cached geometry
-    if st.session_state.get("projection_geometry") is not None:
-        # Use cached geometry
-        projection_geometry = st.session_state.get("projection_geometry")
-    elif geometry_file is not None:
+    cached_geo_key = st.session_state.get("sidebar_geometry_file")
+    if geometry_file is not None and st.session_state.get("projection_geometry") is None:
         # Save uploaded file to temporary path
         content = geometry_file.read().decode("utf-8")
 
@@ -155,11 +138,13 @@ def render_sidebar():
             st.sidebar.success("Geometry loaded!")
         except Exception as e:
             st.sidebar.error(f"Failed to load geometry: {e}")
-            projection_geometry = None
         finally:
             import os
 
             os.unlink(tmp_path)
+    elif cached_geo_key is not None:
+        # Reuse cached geometry
+        projection_geometry = st.session_state.get("projection_geometry")
 
     n_projections = st.sidebar.number_input(
         "Projections",
@@ -168,12 +153,12 @@ def render_sidebar():
         step=1000,
         key="sidebar_n_projections",
     )
-    trajectory_downsample = st.sidebar.selectbox(
-        "Trajectory Downsample",
+    downsample = st.sidebar.selectbox(
+        "Downsample",
         options=[1, 10, 100, 1000],
         index=1,
         format_func=lambda x: f"1/{x}",
-        key="sidebar_trajectory_downsample",
+        key="sidebar_downsample",
     )
 
     # Clear cache button
@@ -185,9 +170,9 @@ def render_sidebar():
         # Clear Streamlit cache
         st.cache_data.clear()
         # Clear cache file
-        from visualization.volume_cache import clear_last_loaded
+        from visualization.app import clear_last_loaded
 
         clear_last_loaded()
         st.rerun()
 
-    return volume, projection_geometry, n_projections, trajectory_downsample
+    return volume, projection_geometry, n_projections, downsample

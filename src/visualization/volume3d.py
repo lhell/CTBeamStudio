@@ -694,18 +694,38 @@ def create_pyvista_volume(
         show_scalar_bar=False,
     )
 
-    # Set camera based on preset
-    camera_funcs = {
-        "iso": plotter.view_isometric,
-        "front": plotter.view_front,
-        "back": plotter.view_back,
-        "left": plotter.view_left,
-        "right": plotter.view_right,
-        "top": plotter.view_top,
-        "bottom": plotter.view_bottom,
+    # Set camera based on preset (using available methods)
+    camera_views = {
+        "iso": ("iso", None),
+        "front": ("xz", 1),   # view_xz
+        "back": ("xz", -1),   # view_xz from opposite
+        "left": ("yz", 1),    # view_yz
+        "right": ("yz", -1),  # view_yz from opposite
+        "top": ("xy", 1),     # view_xy
+        "bottom": ("xy", -1), # view_xy from opposite
     }
-    if camera_preset in camera_funcs:
-        camera_funcs[camera_preset]()
+
+    view, direction = camera_views.get(camera_preset, ("iso", None))
+
+    # Get bounds for camera positioning
+    b = grid.bounds
+    center = ((b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2)
+    diagonal = ((b[1] - b[0]) ** 2 + (b[3] - b[2]) ** 2 + (b[5] - b[4]) ** 2) ** 0.5
+    distance = diagonal * 1.5
+
+    camera_positions = {
+        "iso": (distance, -distance, distance),
+        "xz": (center[0], center[1] + distance * direction, center[2]),
+        "yz": (center[0] + distance * direction, center[1], center[2]),
+        "xy": (center[0], center[1], center[2] + distance * direction),
+    }
+
+    pos = camera_positions.get(view, camera_positions["iso"])
+    plotter.camera_position = [
+        pos,  # position
+        center,  # focal point
+        (0, 0, 1),  # view up
+    ]
 
     # Render and capture screenshot
     plotter.render()

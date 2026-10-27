@@ -552,6 +552,4 @@ python -m pytest tests/ -v
 | Normalisierte `.npy` schleichen sich ein | T-12 `assert_hu` bricht ab |
 | Zeitplan reißt | T-23 ist explizit optional |
 
----
 
-Soll ich als nächstes T-10 bis T-12 ausimplementieren (`volume.py`, `dicom.py`, `npy.py`), oder zuerst Phase 0 — also `LICENSE`, `NOTICE`, `../SECURITY.md`, `docs/data.md` und die Guards?

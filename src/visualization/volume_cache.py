@@ -19,8 +19,6 @@ def load_volume_cached(
     Uses a simple dict cache keyed by sorted file paths.
     Cache persists for the lifetime of the server process.
     """
-    global _volume_cache
-
     # Create cache key from sorted file paths
     cache_key = tuple(sorted(file_paths_str))
 
@@ -59,6 +57,5 @@ def load_last_loaded() -> list | None:
 
 def clear_last_loaded() -> None:
     """Clear the cache file and in-memory cache."""
-    global _volume_cache
     _volume_cache.clear()
     CACHE_FILE.unlink(missing_ok=True)

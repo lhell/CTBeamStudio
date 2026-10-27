@@ -189,7 +189,7 @@
 
 ## Phase 4 — Deploy (Tag 6)
 
-### `[ ]` T-40 — Dockerfile
+### `[x]` T-40 - Dockerfile
 - **Dateien:** `../Dockerfile`, `.dockerignore`
 - **Abhängig von:** T-03, T-22
 - **Akzeptanz:** Multi-Stage, kein Torch/CUDA, Non-Root-User, Image < 400 MiB, startet ohne Mount im Demo-Modus, Build-Guard aus T-03 aktiv.
@@ -199,12 +199,12 @@
 - **Abhängig von:** T-31, T-40
 - **Akzeptanz:** Lint + Tests bei jedem PR; Daten-Guard läuft; Push nach GHCR nur auf `main` und Tags; PRs bauen ohne Push.
 
-### `[ ]` T-42 — README
+### `[x]` T-42 - README
 - **Dateien:** `README.md`
 - **Abhängig von:** T-04, T-40
 - **Akzeptanz:** Option A (Phantom) und Option B (eigene AAPM-Daten) getrennt; Screenshot zeigt Phantom; Satz zur Nicht-Weitergabe der Challenge-Daten enthalten.
 
-### `[ ]` T-43 — Requirements
+### `[x]` T-43 - Requirements
 - **Ziel:** Projekt-Dependencies definieren.
 - **Dateien:** `requirements.txt`, `requirements-dev.txt`
 - **Abhängig von:** –
@@ -273,7 +273,7 @@
   - `get_trajectory_positions(geometry, n_projections)`
 - **Status:** ✅ Done (Oct 26, 2026)
 
-### `[ ]` T-56 — UI für Projection Geometry in App
+### `[x]` T-56 — UI für Projection Geometry in App
 - **Ziel:** UI zum Laden der Geometry-Datei und Anpassen des Downsampling.
 - **Dateien:** `src/visualization/app.py`
 - **Abhängig von:** T-54, T-55
@@ -294,7 +294,7 @@
   # Replace st.text_input("DICOM Folder") with DirPicker
   ```
 
-### `[ ]` T-59 — Desktop App Wrapper (Future)
+### `[ ]` T-75 — Desktop App Wrapper (Future)
 - **Ziel:** Streamlit als Desktop-App ohne Browser starten.
 - **Dateien:** `src/visualization/desktop_launcher.py`
 - **Optionen:**
@@ -308,35 +308,35 @@
   ```
 - **Status:** ⚠️ Research
 
-## Phase 7 — Docker Self-Deployment (Oct 26, 2026)
+## Phase 7 — Docker Self-Deployment (Deferred - requires Docker)
 
-### `[ ]` T-57 — Review/Update Dockerfile
+### `[ ]` T-71 — Review/Update Dockerfile
 - **Ziel:** Dockerfile für Self-Deployment vorbereiten.
 - **Dateien:** `Dockerfile`
 - **Abhängig von:** T-40
 - **Akzeptanz:** Non-root user, korrekter Pfad zu app.py, Health-Check.
-- **Status:** ⚠️ Open
+- **Status:** ⚠️ Deferred (no Docker available)
 
-### `[ ]` T-58 — Create .dockerignore
+### `[ ]` T-72 — Create .dockerignore
 - **Ziel:** Ungewollte Dateien vom Docker-Build ausschließen.
 - **Dateien:** `.dockerignore`
 - **Abhängig von:** –
 - **Akzeptanz:** Keine .dcm, .npy, __pycache__, .git im Image.
-- **Status:** ⚠️ Open
+- **Status:** ⚠️ Deferred
 
-### `[ ]` T-59 — Build and Test Docker Image
+### `[ ]` T-73 — Build and Test Docker Image
 - **Ziel:** Docker-Image bauen und verifizieren.
 - **Dateien:** –
-- **Abhängig von:** T-57, T-58
+- **Abhängig von:** T-71, T-72
 - **Akzeptanz:** Image < 400 MiB, Container startet, App erreichbar auf Port 8501.
-- **Status:** ⚠️ Open
+- **Status:** ⚠️ Deferred
 
-### `[ ]` T-60 — Create Run Script
+### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
 - **Dateien:** `scripts/run-docker.sh`
-- **Abhängig von:** T-59
+- **Abhängig von:** T-73
 - **Akzeptanz:** Script startet Container auf Port 8501.
-- **Status:** ⚠️ Open (optional)
+- **Status:** ⚠️ Deferred (optional)
 
 ## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
 

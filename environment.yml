@@ -1,0 +1,26 @@
+# CT-Viewer conda environment with parallelproj GPU support
+#
+# Usage:
+#   conda env create -f environment.yml
+#   conda activate ct-viewer
+#   conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
+#
+# Note: parallelproj requires conda-forge for the compiled GPU backend
+
+name: ct-viewer
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  # Install these with pip after activating the environment:
+  # pip install streamlit pydicom numpy plotly pytest pyyaml scipy scikit-image array-api-compat
+  #
+  # Install these from conda-forge (GPU support):
+  # conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
+  #
+  # Or CPU-only:
+  # conda install -c conda-forge parallelproj "libparallelproj=*=cpu*" -y

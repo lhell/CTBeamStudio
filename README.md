@@ -23,85 +23,28 @@ A web-based visualization tool for CT orientation and 3D volume rendering, desig
 
 ## Installation
 
-### Option 1: Docker (Recommended)
+For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
+### Quick Start
+
+**Docker (Recommended):**
 ```bash
 docker build -t ct-viewer .
 docker run -p 8501:8501 ct-viewer
 ```
 
-### Option 2: Local with pip
-
+**Local with pip:**
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/CTOrientationViewer.git
-cd CTOrientationViewer
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
-
-# Install dependencies
 pip install -e .
-
-# Run the app
 streamlit run src/visualization/app.py
 ```
 
-### Option 3: Local with Conda (for parallelproj GPU support)
-
-**parallelproj requires conda-forge** for the compiled GPU backend. This option is required for forward projection features.
-
+**Local with Conda (for GPU forward projection):**
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/CTOrientationViewer.git
-cd CTOrientationViewer
-
-# --- Option 3a: Using environment.yml (recommended) ---
-
-# Install Miniconda if not present:
-# https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-
-# Create environment from yml
 conda env create -f environment.yml
 conda activate ct-viewer
-
-# Install parallelproj with GPU (from conda-forge)
-conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
-
-# --- Option 3b: Manual conda install ---
-
-# Create new conda environment
-conda create -n ct-viewer python=3.11 -y
-conda activate ct-viewer
-
-# Install parallelproj + PyTorch + CUDA from conda-forge
-conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
-
-# Install remaining dependencies with pip
-pip install streamlit pydicom numpy plotly pytest pyyaml scipy scikit-image array-api-compat
-
-# Run the app
 streamlit run src/visualization/app.py
 ```
-
-#### Verify parallelproj GPU support
-
-```python
-import parallelproj
-print(parallelproj.__version__)
-
-import parallelproj_core
-print(parallelproj_core.cuda_enabled)  # 1 = GPU, 0 = CPU
-```
-
-#### Troubleshooting
-
-- **"conda not found"**: Install [Miniconda](https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe)
-- **CUDA not detected**: Ensure NVIDIA GPU drivers are installed
-- **CPU-only mode**: `conda install -c conda-forge parallelproj "libparallelproj=*=cpu*"`
 
 ## Usage
 

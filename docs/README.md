@@ -5,21 +5,19 @@
 ```
 docs/
 ├── README.md                    ← This file
-├── plan.md                      ← Main implementation plan (T-01 to T-44)
-├── plan_day01.md               ← Phase 0 detailed plan (T-01 to T-04)
+├── plan.md                      ← Main implementation plan (T-01 to T-75)
 ├── data.md                      ← Data documentation (AAPM challenge, etc.)
 ├── geometry.md                  ← Projection geometry definition
 ├── testing-setup-hint.md       ← Testing setup hints
 │
-├── protocol_*.md               ← Daily work protocols
+├── progress/                    ← Daily protocols and plans
+│   ├── plan_day01.md           ← Phase 0 detailed plan (T-01 to T-04)
 │   ├── protocol_day01.md       ← Oct 14, 2026
 │   ├── protocol_day02.md       ← Oct 15, 2026
 │   ├── protocol_day03.md       ← Oct 16, 2026
 │   ├── protocol_day04.md       ← Oct 23, 2026
-│   └── protocol_day05.md       ← Oct 26, 2026 (Projection Geometry)
-│
-├── progress/                   ← Progress reports
-│   └── 2026-10-16-streamlit-app.md
+│   ├── protocol_day05.md       ← Oct 26, 2026
+│   └── protocol_day06.md       ← Oct 27, 2026
 │
 ├── issues/                     ← Issue tracking
 │   └── 4-streamlit-progress-bar.md
@@ -29,12 +27,13 @@ docs/
     │   └── 2026-10-26-projection-geometry-design.md
     │
     └── plans/
-        ├── 2026-10-15-tag2-volume-windowing.md
-        ├── 2026-10-16-tag3-loaders.md
-        ├── 2026-10-19-mpr-reslicing.md
-        ├── 2026-10-26-projection-geometry-implementation.md
-        ├── 2026-10-26-projection-geometry-3d-visualization.md
-        └── 2026-10-26-docker-self-deployment.md
+        ├── 2026-10-15_tag2_volume_windowing.md
+        ├── 2026-10-16_tag3_loaders.md
+        ├── 2026-10-19_mpr_reslicing.md
+        ├── 2026-10-26_projection_geometry_implementation.md
+        ├── 2026-10-26_projection_geometry_3d_visualization.md
+        ├── 2026-10-26_docker_self_deployment.md
+        └── 2026-10-27_parallelproj_forward_projection.md
 ```
 
 ---
@@ -43,13 +42,8 @@ docs/
 
 ### 1. Master Plan (`plan.md`)
 - **Purpose:** Overall project implementation plan
-- **Tasks:** T-01 to T-44 (Phase 0 to Phase 4)
-- **Status:** Phase 1-3 complete, Phase 4 pending
-
-### 2. Day 01 Plan (`plan_day01.md`)
-- **Purpose:** Phase 0 detailed tasks (License, Hygiene, Data Guards)
-- **Tasks:** T-01, T-02, T-03, T-04
-- **Status:** ✅ Complete (Oct 14, 2026)
+- **Tasks:** T-01 to T-75 (Phases 0-8)
+- **Status:** ~27 tasks done, 15 open
 
 ---
 
@@ -62,6 +56,7 @@ docs/
 | Day 03 | Oct 16 | Phase 1-2 (T-11, T-12, T-20) | DICOM/NPY loaders, Streamlit app |
 | Day 04 | Oct 23 | Phase 2-3 (T-21, T-30, T-33) | Series selection, fixtures, check_aapm.py |
 | Day 05 | Oct 26 | Projection Geometry | ProjectionGeometry, loaders, trajectory functions |
+| Day 06 | Oct 27 | Trajectory Visualization | Detector planes, direction arrows, helical support |
 
 ---
 
@@ -77,12 +72,13 @@ docs/
 ### Superpowers Workflows
 | File | Description | Status |
 |------|-------------|--------|
-| `2026-10-15-tag2-volume-windowing.md` | Windowing implementation | ✅ Done |
-| `2026-10-16-tag3-loaders.md` | DICOM/NPY loaders | ✅ Done |
-| `2026-10-19-mpr-reslicing.md` | MPR reslicing implementation | ✅ Done |
-| `2026-10-26-projection-geometry-implementation.md` | ProjectionGeometry class | ✅ Done |
-| `2026-10-26-projection-geometry-3d-visualization.md` | 3D trajectory visualization | 🔄 In Progress |
-| `2026-10-26-docker-self-deployment.md` | Docker self-deployment | ❌ Pending |
+| `2026-10-15_tag2_volume_windowing.md` | Windowing implementation | ✅ Done |
+| `2026-10-16_tag3_loaders.md` | DICOM/NPY loaders | ✅ Done |
+| `2026-10-19_mpr_reslicing.md` | MPR reslicing implementation | ✅ Done |
+| `2026-10-26_projection_geometry_implementation.md` | ProjectionGeometry class | ✅ Done |
+| `2026-10-26_projection_geometry_3d_visualization.md` | 3D trajectory visualization | ✅ Done |
+| `2026-10-26_docker_self_deployment.md` | Docker self-deployment | ⚠️ Deferred |
+| `2026-10-27_parallelproj_forward_projection.md` | Forward projection with parallelproj | 🔄 In Progress |
 
 ### Issues
 | File | Description | Status |
@@ -92,7 +88,7 @@ docs/
 ### Superpowers Specs
 | File | Description |
 |------|-------------|
-| `2026-10-26-projection-geometry-design.md` | ProjectionGeometry design spec |
+| `2026-10-26_projection_geometry_design.md` | ProjectionGeometry design spec |
 
 ---
 
@@ -103,18 +99,22 @@ docs/
 - **Phase 1:** Core - Volume, Loaders, Windowing (T-10 to T-14) ✅
 - **Phase 2:** App - Streamlit, Series Selection, Phantom (T-20 to T-23) ✅
 - **Phase 3:** Tests - Fixtures, Loader tests, Windowing tests (T-30 to T-33) ✅
+- **Phase 5:** Projection Geometry (T-50 to T-56) ✅
 
 ### Pending Phases
 - **Phase 4:** Deployment (T-40 to T-44)
-  - T-40: Dockerfile ❌
+  - T-40: Dockerfile ✅
   - T-41: CI ❌
-  - T-42: README ❌
-  - T-43: Requirements ❌
+  - T-42: README ✅
+  - T-43: Requirements ✅
   - T-44: Deployment ❌
 
-### In Progress
-- Projection Geometry 3D Visualization (superpowers plan)
-- Docker Self-Deployment (superpowers plan)
+- **Phase 6:** Forward Projection (T-61 to T-70) 🔄 In Progress
+
+### Deferred (Future)
+- **Phase 7:** Docker Self-Deployment (T-71 to T-74) - no Docker available
+- **T-56a:** Directory Picker UI
+- **T-75:** Desktop App Wrapper
 
 ---
 

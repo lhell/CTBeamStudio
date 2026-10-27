@@ -1,6 +1,10 @@
 """Shepp-Logan phantom generator for testing."""
 
+from typing import Optional
+
 import numpy as np
+
+from visualization.volume import Volume
 
 
 def create_shepp_logan_phantom(size: int = 256) -> np.ndarray:
@@ -78,6 +82,84 @@ def create_shepp_logan_3d(size: int = 256, num_slices: int = 256) -> np.ndarray:
     return phantom_3d
 
 
+def create_shepp_logan_hu(
+    size: int = 256,
+    num_slices: int = 128,
+    spacing: tuple[float, float, float] = (3.0, 0.7, 0.7),
+) -> Volume:
+    """
+    Create a 3D Shepp-Logan phantom scaled to Hounsfield Units.
+
+    HU mapping:
+    - Background (0): -1000 HU (air)
+    - Outer ellipse (0.8): 0 HU (water/soft tissue)
+    - Inner ellipses (0.2-0.3): varying soft tissue
+    - Bright ellipses (1.0): +800 HU (bone-like)
+
+    Parameters
+    ----------
+    size : int
+        Size of each slice (size x size)
+    num_slices : int
+        Number of slices
+    spacing : tuple
+        (z_spacing, row_spacing, col_spacing) in mm
+        Default is anisotropic: (3.0, 0.7, 0.7)
+
+    Returns
+    -------
+    Volume
+        Volume with HU values and spacing metadata
+    """
+    # Create 2D Shepp-Logan
+    phantom_2d = create_shepp_logan_phantom(size)
+
+    # Scale to HU: min → -1000 (air), max → +800 (bone)
+    # Shepp-Logan ranges from ~-0.2 to 1.0
+    # Mapping: HU = (value - min) / (max - min) * 1800 - 1000
+    hu_2d = (phantom_2d + 0.2) / 1.2 * 1800 - 1000
+
+    # Create 3D by stacking slices
+    hu_3d = np.stack([hu_2d] * num_slices, axis=0)
+
+    # Convert to int16 (typical for CT)
+    hu_3d = hu_3d.astype(np.int16)
+
+    return Volume(
+        array=hu_3d,
+        spacing=spacing,
+        origin=(0.0, 0.0, 0.0),
+        meta={"unit": "HU", "phantom": "shepp-logan"},
+    )
+
+
+def create_demo_volume(
+    size: int = 256,
+    num_slices: int = 128,
+    spacing: tuple[float, float, float] = (3.0, 0.7, 0.7),
+) -> Volume:
+    """
+    Create a demo Volume for testing without real DICOM data.
+
+    This is an alias for create_shepp_logan_hu().
+
+    Parameters
+    ----------
+    size : int
+        Size of each slice (size x size)
+    num_slices : int
+        Number of slices
+    spacing : tuple
+        (z_spacing, row_spacing, col_spacing) in mm
+
+    Returns
+    -------
+    Volume
+        Volume with HU values and spacing metadata
+    """
+    return create_shepp_logan_hu(size, num_slices, spacing)
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
@@ -95,3 +177,10 @@ if __name__ == "__main__":
 
     print(f"Phantom shape: {phantom.shape}")
     print(f"Value range: [{phantom.min():.3f}, {phantom.max():.3f}]")
+
+    # Also show HU version
+    vol = create_demo_volume()
+    print(f"\nDemo Volume:")
+    print(f"  Shape: {vol.shape}")
+    print(f"  Spacing: {vol.spacing}")
+    print(f"  HU range: [{vol.array.min()}, {vol.array.max()}]")

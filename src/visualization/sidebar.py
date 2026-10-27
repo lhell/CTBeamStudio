@@ -40,12 +40,73 @@ def render_sidebar():
     downsample = st.session_state.get("sidebar_downsample", 10)
     volume = st.session_state.get("volume")
 
+    # Auto-load from cache file on page refresh (if no volume in session)
+    auto_load_cache = st.session_state.get("auto_load_cache", True)
+
+    if volume is None and auto_load_cache:
+        from visualization.volume_cache import load_last_loaded, load_volume_cached
+
+        cached_files = load_last_loaded()
+        if cached_files:
+            # Use a placeholder that persists during load
+            status_placeholder = st.sidebar.empty()
+            status_placeholder.info("📂 Loading cached volume...")
+
+            file_paths_str = [str(f) for f in cached_files]
+            volume = load_volume_cached(file_paths_str)
+            st.session_state["volume"] = volume
+            st.session_state["loaded_files"] = cached_files
+            st.session_state["series"] = type(
+                "S",
+                (),
+                {
+                    "series_description": "Cached Volume",
+                    "patient_id": "Unknown",
+                    "n_slices": len(cached_files),
+                },
+            )()
+
+            # Clear the status message
+            status_placeholder.empty()
+            st.toast(f"Loaded {len(cached_files)} slices from cache!", icon="✅")
+
+    # Load demo phantom if no volume available
+    if volume is None and not data_path:
+        from visualization.phantom import create_demo_volume
+
+        with st.spinner("Loading demo phantom..."):
+            volume = create_demo_volume()
+            st.session_state["volume"] = volume
+            st.session_state["demo_mode"] = True
+            st.session_state["series"] = type(
+                "S",
+                (),
+                {
+                    "series_description": "Demo Phantom (Shepp-Logan)",
+                    "patient_id": "Demo",
+                    "n_slices": volume.n_slices,
+                },
+            )()
+        st.toast("Loaded demo phantom!")
+
     if data_path and Path(data_path).exists():
         # Auto-scan when path changes (Enter key)
-        if data_path != st.session_state["last_scanned_path"]:
+        if data_path != st.session_state.get("last_scanned_path"):
             st.session_state["last_scanned_path"] = data_path
-            with st.spinner("Scanning for DICOM series..."):
-                st.session_state["series_list"] = scan_series(Path(data_path))
+            try:
+                with st.spinner("Scanning for DICOM series..."):
+                    st.session_state["series_list"] = scan_series(Path(data_path))
+            except ValueError as e:
+                if "No DICOM files found" in str(e):
+                    st.sidebar.warning(
+                        f"⚠️ No DICOM files found in the selected folder.\n\n"
+                        f"**Supported formats:** `.dcm`, `.ima`\n\n"
+                        f"**Tip:** Make sure the folder contains DICOM files directly, "
+                        f"not just subdirectories."
+                    )
+                    st.session_state["series_list"] = []
+                else:
+                    raise
 
         series_list = st.session_state.get("series_list") or []
         if series_list:
@@ -102,7 +163,23 @@ def render_sidebar():
                 with st.spinner("Loading DICOM series..."):
                     # Convert Path objects to strings for cache key
                     file_paths_str = [str(f) for f in files]
-                    volume = load_volume_cached(file_paths_str)
+
+                    # Create progress bar
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    def update_progress(current: int, total: int):
+                        progress_bar.progress(current / total)
+                        status_text.text(f"Loading {current}/{total} slices...")
+
+                    # Load with progress callback
+                    volume = load_volume_cached(
+                        file_paths_str, _progress_callback=update_progress
+                    )
+
+                    # Clear progress UI
+                    progress_bar.empty()
+                    status_text.empty()
 
                 st.session_state["volume"] = volume
                 st.session_state["series"] = selected_series
@@ -160,11 +237,18 @@ def render_sidebar():
         key="sidebar_n_projections",
     )
     downsample = st.sidebar.selectbox(
-        "Downsample",
-        options=[1, 10, 100, 1000],
-        index=1,
+        "Trajectory Downsample",
+        options=[10, 50, 100, 200, 500],
+        index=0,
         format_func=lambda x: f"1/{x}",
         key="sidebar_downsample",
+    )
+
+    # Option to auto-load cache on refresh
+    auto_load_cache = st.sidebar.checkbox(
+        "Auto-load cache on refresh",
+        value=True,
+        key="auto_load_cache",
     )
 
     # Clear cache button

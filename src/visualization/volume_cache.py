@@ -7,19 +7,43 @@ from visualization.loaders.dicom import load_dicom_series
 
 CACHE_FILE = Path("data/.last_loaded.json")
 
+# In-memory cache keyed by sorted tuple of file paths
+_volume_cache: dict[tuple, object] = {}
+
 
 def load_volume_cached(
     file_paths_str: list, unit: str | None = None, _progress_callback=None
 ):
-    """Load volume from file paths (no caching due to Volume serialization issues)."""
+    """Load volume from file paths with in-memory caching.
+
+    Uses a simple dict cache keyed by sorted file paths.
+    Cache persists for the lifetime of the server process.
+    """
+    global _volume_cache
+
+    # Create cache key from sorted file paths
+    cache_key = tuple(sorted(file_paths_str))
+
+    # Check cache first
+    if cache_key in _volume_cache:
+        return _volume_cache[cache_key]
+
+    # Not cached - load the volume
     files = [Path(p) for p in file_paths_str]
-    return load_dicom_series(files, unit=unit, progress=_progress_callback)
+    volume = load_dicom_series(files, unit=unit, progress=_progress_callback)
+
+    # Store in cache
+    _volume_cache[cache_key] = volume
+
+    return volume
 
 
 def save_last_loaded(files: list) -> None:
     """Save last loaded file paths to cache file."""
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps({"files": [str(f) for f in files]}))
+    # Sort files to ensure consistent cache key
+    sorted_files = sorted(files, key=lambda f: str(f))
+    CACHE_FILE.write_text(json.dumps({"files": [str(f) for f in sorted_files]}))
 
 
 def load_last_loaded() -> list | None:
@@ -34,5 +58,7 @@ def load_last_loaded() -> list | None:
 
 
 def clear_last_loaded() -> None:
-    """Clear the cache file."""
+    """Clear the cache file and in-memory cache."""
+    global _volume_cache
+    _volume_cache.clear()
     CACHE_FILE.unlink(missing_ok=True)

@@ -37,12 +37,7 @@ from visualization.volume3d import (
 )
 
 # Import caching functions from volume_cache module
-from visualization.volume_cache import (
-    clear_last_loaded,
-    load_last_loaded,
-    load_volume_cached,
-    save_last_loaded,
-)
+from visualization.volume_cache import clear_last_loaded
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
 
@@ -79,6 +74,14 @@ def main():
         page_title="CT Orientation Viewer", page_icon="🏥", layout="wide"
     )
 
+    # Show demo mode banner if applicable
+    if st.session_state.get("demo_mode"):
+        st.info(
+            "🏥 **Demo Mode** — Using synthetic Shepp-Logan phantom. "
+            "Enter a DICOM folder path in the sidebar to load real data.",
+            icon="ℹ️",
+        )
+
     # Render sidebar and get values
     from visualization.sidebar import render_sidebar
 
@@ -111,6 +114,17 @@ def main():
                     format_func=lambda x: x.capitalize(),
                     key="3d_camera",
                 )
+
+            # Volume downsample for performance
+            volume_downsample = st.selectbox(
+                "Downsample",
+                options=[1, 2, 4, 8],
+                index=2,
+                format_func=lambda x: f"{x}x",
+                key="3d_volume_downsample",
+            )
+            # Update session state for rendering
+            st.session_state["volume_downsample"] = volume_downsample
 
             # Trajectory toggle
             show_trajectory = st.checkbox(
@@ -231,7 +245,7 @@ def main():
         except AttributeError:
             spacing = (1.0, 1.0, 1.0)
 
-        # Use separate downsample for volume rendering (not the trajectory downsample)
+        # Use downsample from UI (set by selectbox above)
         volume_downsample = st.session_state.get("volume_downsample", 4)
 
         # Handle PyVista rendering separately
@@ -281,7 +295,11 @@ def main():
                         projection_geometry, n_projections
                     )
                     fig = add_trajectory_to_figure(
-                        fig, src_positions, det_positions, trajectory_downsample
+                        fig,
+                        src_positions,
+                        det_positions,
+                        trajectory_downsample,
+                        geometry=projection_geometry,
                     )
                 else:
                     # Use legacy single source/detector

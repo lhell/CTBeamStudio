@@ -34,13 +34,13 @@ def test_get_source_position_90_degrees():
 
 
 def test_get_detector_position():
-    """Test detector position calculation - opposite to source."""
-    geo = ProjectionGeometry(sid=600.0)
+    """Test detector position calculation - opposite to source at SDD distance."""
+    geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
 
-    # At 0°, detector should be at -X (posterior)
+    # At 0°, detector should be at -X (posterior) at SDD distance
     pos = get_detector_position(geo, 0.0)
-    assert pos[0] == pytest.approx(-600.0, rel=0.01)  # X = -sid * cos(0) = -600
-    assert pos[1] == pytest.approx(0.0, rel=0.01)  # Y = -sid * sin(0) = 0
+    assert pos[0] == pytest.approx(-1000.0, rel=0.01)  # X = -sdd * cos(0) = -1000
+    assert pos[1] == pytest.approx(0.0, rel=0.01)  # Y = -sdd * sin(0) = 0
 
 
 def test_get_trajectory_positions():
@@ -73,36 +73,40 @@ def test_get_source_position_with_offsets():
 
 def test_add_trajectory_to_figure():
     """Test adding trajectory to Plotly figure."""
-    geo = ProjectionGeometry(sid=600.0)
+    geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
 
     # Generate small number of positions
     src_positions, det_positions = get_trajectory_positions(geo, n_projections=4)
 
     # Create empty figure and add trajectory
     fig = go.Figure()
-    fig = add_trajectory_to_figure(fig, src_positions, det_positions, downsample=1)
+    fig = add_trajectory_to_figure(
+        fig, src_positions, det_positions, downsample=1, geometry=geo
+    )
 
-    # Should have 2 traces: source and detector
-    assert len(fig.data) == 2
+    # Should have multiple traces: source markers, source path, arrows, detector, detector planes, beams
+    assert len(fig.data) >= 6
 
-    # First trace is source (orange)
+    # First trace is source markers (orange)
     assert fig.data[0].marker.color == "orange"
     assert fig.data[0].name == "Source Trajectory"
 
-    # Second trace is detector (turquoise)
-    assert fig.data[1].marker.color == "turquoise"
-    assert fig.data[1].name == "Detector Trajectory"
+    # Second trace is source path line (orange)
+    assert fig.data[1].mode == "lines"
+    assert "Source Path" in fig.data[1].name
 
 
 def test_add_trajectory_to_figure_with_downsample():
     """Test trajectory downsampling."""
-    geo = ProjectionGeometry(sid=600.0)
+    geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
 
     src_positions, det_positions = get_trajectory_positions(geo, n_projections=10)
 
     fig = go.Figure()
-    fig = add_trajectory_to_figure(fig, src_positions, det_positions, downsample=5)
+    fig = add_trajectory_to_figure(
+        fig, src_positions, det_positions, downsample=5, geometry=geo
+    )
 
-    # Should have 10/5 = 2 points per trace
-    assert len(fig.data[0].x) == 2  # Source
-    assert len(fig.data[1].x) == 2  # Detector
+    # Downsample to 2 points (10/5)
+    # First trace (markers) should have 2 points
+    assert len(fig.data[0].x) == 2  # Source markers

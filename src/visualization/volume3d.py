@@ -17,12 +17,13 @@ except ImportError:
     PYVISTA_AVAILABLE = False
 
 
-def get_source_position(geometry, source_angle: float = 0.0):
+def get_source_position(geometry, source_angle: float = 0.0, z_offset: float = 0.0):
     """Calculate source position from ProjectionGeometry.
 
     Args:
         geometry: ProjectionGeometry object
         source_angle: Source angle in degrees (0 = anterior = +X, positive = CCW)
+        z_offset: Z position offset for helical scans (table position)
 
     Returns:
         (x, y, z) source position in mm
@@ -32,7 +33,7 @@ def get_source_position(geometry, source_angle: float = 0.0):
     # Base position: on circle at SID distance, at anterior (0°) = +X direction
     base_x = geometry.sid * math.cos(angle_rad)
     base_y = geometry.sid * math.sin(angle_rad)
-    base_z = 0.0
+    base_z = z_offset
 
     # Apply source offsets
     x = base_x + geometry.source_offset_x
@@ -42,12 +43,13 @@ def get_source_position(geometry, source_angle: float = 0.0):
     return (x, y, z)
 
 
-def get_detector_position(geometry, source_angle: float = 0.0):
+def get_detector_position(geometry, source_angle: float = 0.0, z_offset: float = 0.0):
     """Calculate detector position from ProjectionGeometry.
 
     Args:
         geometry: ProjectionGeometry object
         source_angle: Source angle in degrees
+        z_offset: Z position offset for helical scans (table position)
 
     Returns:
         (x, y, z) detector position in mm
@@ -55,9 +57,9 @@ def get_detector_position(geometry, source_angle: float = 0.0):
     angle_rad = math.radians(source_angle)
 
     # Detector is opposite to source on the central beam
-    base_x = -geometry.sid * math.cos(angle_rad)
-    base_y = -geometry.sid * math.sin(angle_rad)
-    base_z = 0.0
+    base_x = -geometry.sdd * math.cos(angle_rad)
+    base_y = -geometry.sdd * math.sin(angle_rad)
+    base_z = z_offset
 
     # Apply detector offsets (independent of source)
     x = base_x + geometry.detector_offset_x
@@ -70,6 +72,8 @@ def get_detector_position(geometry, source_angle: float = 0.0):
 def get_trajectory_positions(geometry, n_projections: int):
     """Generate source and detector positions for all projections.
 
+    For helical scans, accounts for table feed (Z movement) during acquisition.
+
     Args:
         geometry: ProjectionGeometry object
         n_projections: Total number of projections in the scan
@@ -80,16 +84,38 @@ def get_trajectory_positions(geometry, n_projections: int):
     source_positions = []
     detector_positions = []
 
-    # For helical scan, total angle > 360°
     # Calculate total angle based on number of projections
-    # Each projection is evenly spaced
-    total_angle = 360.0 * (n_projections / 2304)  # 2304 projections per rotation
+    # Default: 2304 projections per 360° rotation (common for many scanners)
+    projections_per_rotation = getattr(geometry, "projections_per_rotation", 2304)
+    total_angle = 360.0 * (n_projections / projections_per_rotation)
+
+    # Calculate Z step per projection for helical scans
+    pitch = getattr(geometry, "pitch", 0.0)
+    n_det_rows = getattr(geometry, "n_det_rows", 64)
+    det_row_spacing = getattr(geometry, "det_row_spacing_mm", 1.0)
+
+    if pitch != 0 and n_projections > 1:
+        # Collimation width = number of rows * row width
+        collimation_width = n_det_rows * det_row_spacing
+        # Table feed per rotation = pitch * collimation_width
+        table_feed_per_rotation = pitch * collimation_width
+        # Z step per projection
+        z_step = table_feed_per_rotation / projections_per_rotation
+        # Total Z range
+        total_z = z_step * n_projections
+    else:
+        # Circular scan - no Z movement
+        z_step = 0.0
+        total_z = 0.0
 
     for i in range(n_projections):
         source_angle = (i / n_projections) * total_angle
 
-        src = get_source_position(geometry, source_angle)
-        det = get_detector_position(geometry, source_angle)
+        # Z offset for helical: start at -total_z/2 to center the helix
+        z_offset = -total_z / 2 + i * z_step
+
+        src = get_source_position(geometry, source_angle, z_offset)
+        det = get_detector_position(geometry, source_angle, z_offset)
 
         source_positions.append(src)
         detector_positions.append(det)
@@ -102,6 +128,7 @@ def add_trajectory_to_figure(
     source_positions: list,
     detector_positions: list,
     downsample: int = 1,
+    geometry=None,
 ) -> go.Figure:
     """Add source and detector trajectory to Plotly figure.
 
@@ -110,31 +137,107 @@ def add_trajectory_to_figure(
         source_positions: List of (x, y, z) source positions
         detector_positions: List of (x, y, z) detector positions
         downsample: Show every Nth position
+        geometry: ProjectionGeometry object for detector sizing
 
     Returns:
         Updated Plotly figure
     """
-    # Downsample positions
-    src_x = [p[0] for p in source_positions[::downsample]]
-    src_y = [p[1] for p in source_positions[::downsample]]
-    src_z = [p[2] for p in source_positions[::downsample]]
+    # Full trajectory for path line (all positions)
+    full_src_x = [p[0] for p in source_positions]
+    full_src_y = [p[1] for p in source_positions]
+    full_src_z = [p[2] for p in source_positions]
 
-    det_x = [p[0] for p in detector_positions[::downsample]]
-    det_y = [p[1] for p in detector_positions[::downsample]]
-    det_z = [p[2] for p in detector_positions[::downsample]]
+    # Downsample for markers and detector planes
+    src_positions = source_positions[::downsample]
+    det_positions = detector_positions[::downsample]
 
-    # Add source trajectory (red/orange small markers)
+    src_x = [p[0] for p in src_positions]
+    src_y = [p[1] for p in src_positions]
+    src_z = [p[2] for p in src_positions]
+
+    det_x = [p[0] for p in det_positions]
+    det_y = [p[1] for p in det_positions]
+    det_z = [p[2] for p in det_positions]
+
+    # Add source trajectory (orange small markers)
     fig.add_trace(
         go.Scatter3d(
             x=src_x,
             y=src_y,
             z=src_z,
             mode="markers",
-            marker=dict(size=3, color="orange", opacity=0.8),
+            marker=dict(size=4, color="orange", opacity=0.9),
             name="Source Trajectory",
             showlegend=True,
         )
     )
+
+    # Add dashed line connecting ALL source points (full trajectory path)
+    fig.add_trace(
+        go.Scatter3d(
+            x=full_src_x,
+            y=full_src_y,
+            z=full_src_z,
+            mode="lines",
+            line=dict(width=2, color="orange", dash="dash"),
+            opacity=0.5,
+            name="Source Path",
+            showlegend=True,
+        )
+    )
+
+    # Add direction arrows between source positions (every N points)
+    arrow_interval = max(1, len(source_positions) // 50)  # ~50 arrows total
+    arrow_x = []
+    arrow_y = []
+    arrow_z = []
+    arrow_u = []  # direction components
+    arrow_v = []
+    arrow_w = []
+
+    for i in range(0, len(source_positions) - 1, arrow_interval):
+        src = source_positions[i]
+        src_next = source_positions[i + 1]
+
+        # Position at source
+        arrow_x.append(src[0])
+        arrow_y.append(src[1])
+        arrow_z.append(src[2])
+
+        # Direction vector
+        dx = src_next[0] - src[0]
+        dy = src_next[1] - src[1]
+        dz = src_next[2] - src[2]
+
+        # Normalize
+        length = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if length > 0:
+            dx /= length
+            dy /= length
+            dz /= length
+
+        arrow_u.append(dx * 20)  # Scale for visibility
+        arrow_v.append(dy * 20)
+        arrow_w.append(dz * 20)
+
+    if arrow_x:
+        fig.add_trace(
+            go.Cone(
+                x=arrow_x,
+                y=arrow_y,
+                z=arrow_z,
+                u=arrow_u,
+                v=arrow_v,
+                w=arrow_w,
+                sizemode="absolute",
+                sizeref=1,
+                anchor="tail",
+                colorscale=[[0, "red"], [1, "red"]],
+                showscale=False,
+                name="Direction",
+                showlegend=True,
+            )
+        )
 
     # Add detector trajectory (turquoise small markers)
     fig.add_trace(
@@ -143,8 +246,124 @@ def add_trajectory_to_figure(
             y=det_y,
             z=det_z,
             mode="markers",
-            marker=dict(size=3, color="turquoise", opacity=0.8),
+            marker=dict(size=4, color="turquoise", opacity=0.9),
             name="Detector Trajectory",
+            showlegend=True,
+        )
+    )
+
+    # Add detector planes with correct size and low opacity
+    if geometry is not None:
+        det_cols = getattr(geometry, "n_det_cols", 512)
+        det_rows = getattr(geometry, "n_det_rows", 64)
+        col_spacing = getattr(geometry, "det_col_spacing_mm", 1.0)
+        row_spacing = getattr(geometry, "det_row_spacing_mm", 1.0)
+
+        # Detector dimensions in mm
+        det_width = det_cols * col_spacing
+        det_height = det_rows * row_spacing
+
+        # Add detector planes
+        for i, det_pos in enumerate(det_positions):
+            # Get the direction from source to detector
+            src = src_positions[i]
+            det = det_pos
+
+            # Direction vector (source to detector)
+            dir_x = det[0] - src[0]
+            dir_y = det[1] - src[1]
+            dir_z = det[2] - src[2]
+
+            # Normalize
+            length = math.sqrt(dir_x**2 + dir_y**2 + dir_z**2)
+            dir_x /= length
+            dir_y /= length
+            dir_z /= length
+
+            # Create perpendicular vectors for detector plane
+            # Using cross product with up vector, then with direction
+            up = (0, 0, 1)
+            # Handle case where direction is parallel to up
+            if abs(dir_z) > 0.99:
+                up = (1, 0, 0)
+
+            # Right vector (perpendicular to direction and up)
+            right_x = dir_y * up[2] - dir_z * up[1]
+            right_y = dir_z * up[0] - dir_x * up[2]
+            right_z = dir_x * up[1] - dir_y * up[0]
+            right_len = math.sqrt(right_x**2 + right_y**2 + right_z**2)
+            if right_len > 1e-6:
+                right_x /= right_len
+                right_y /= right_len
+                right_z /= right_len
+
+            # Up vector on detector plane (perpendicular to direction and right)
+            up_x = dir_y * right_z - dir_z * right_y
+            up_y = dir_z * right_x - dir_x * right_z
+            up_z = dir_x * right_y - dir_y * right_x
+
+            # Detector plane corners (centered on detector position)
+            hw = det_width / 2
+            hh = det_height / 2
+
+            # 4 corners of the detector plane
+            cx, cy, cz = det_pos
+            corners_x = [
+                cx + right_x * (-hw) + up_x * (-hh),
+                cx + right_x * (hw) + up_x * (-hh),
+                cx + right_x * (hw) + up_x * (hh),
+                cx + right_x * (-hw) + up_x * (hh),
+            ]
+            corners_y = [
+                cy + right_y * (-hw) + up_y * (-hh),
+                cy + right_y * (hw) + up_y * (-hh),
+                cy + right_y * (hw) + up_y * (hh),
+                cy + right_y * (-hw) + up_y * (hh),
+            ]
+            corners_z = [
+                cz + right_z * (-hw) + up_z * (-hh),
+                cz + right_z * (hw) + up_z * (-hh),
+                cz + right_z * (hw) + up_z * (hh),
+                cz + right_z * (-hw) + up_z * (hh),
+            ]
+
+            # Close the polygon
+            xs = corners_x + [corners_x[0]]
+            ys = corners_y + [corners_y[0]]
+            zs = corners_z + [corners_z[0]]
+
+            fig.add_trace(
+                go.Scatter3d(
+                    x=xs,
+                    y=ys,
+                    z=zs,
+                    mode="lines",
+                    line=dict(width=1, color="cyan"),
+                    opacity=0.1,
+                    name="Detector" if i == 0 else None,
+                    showlegend=(i == 0),
+                )
+            )
+
+    # Add central beams (lines from source to detector)
+    beam_x = []
+    beam_y = []
+    beam_z = []
+
+    for src, det in zip(src_positions, det_positions):
+        beam_x.extend([src[0], det[0], None])
+        beam_y.extend([src[1], det[1], None])
+        beam_z.extend([src[2], det[2], None])
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=beam_x,
+            y=beam_y,
+            z=beam_z,
+            mode="lines",
+            line=dict(width=1, color="yellow", dash="solid"),
+            opacity=0.15,
+            name="Central Beam",
             showlegend=True,
         )
     )

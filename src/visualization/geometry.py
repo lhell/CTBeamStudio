@@ -74,6 +74,9 @@ class ProjectionGeometry:
     pitch: float = 1.0
     """Table feed per gantry rotation / collimation width."""
 
+    projections_per_rotation: int = 2304
+    """Number of projections per 360° gantry rotation."""
+
     # === Source Offsets (detector FOLLOWS when source moves) ===
 
     source_offset_x: float = 0.0
@@ -285,5 +288,11 @@ def load_geometry_from_txt(txt_path: Path) -> ProjectionGeometry:
     # Map helical
     if "pitch" in data:
         kwargs["pitch"] = data["pitch"]
+
+    # Map projections per rotation
+    if "number of projections per rotation" in data:
+        kwargs["projections_per_rotation"] = int(
+            data["number of projections per rotation"]
+        )
 
     return ProjectionGeometry(**kwargs)

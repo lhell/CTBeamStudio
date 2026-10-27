@@ -213,7 +213,7 @@
   - `requirements-dev.txt`: pytest, flake8, black, isort
   - Dockerfile verwendet `requirements.txt`
 
-### `[ ]` T-44 — Deployment
+### `[x]` T-44 — Deployment
 - **Ziel:** App veröffentlichen.
 - **Optionen:** GHCR, Streamlit Cloud, HuggingFace Spaces
 - **Dateien:** `.github/workflows/deploy.yml` (optional)
@@ -221,6 +221,7 @@
 - **Akzeptanz:** 
   - Docker-Image wird nach GHCR gepusht (bei Push auf main)
   - ODER: Link zu deployed Streamlit Cloud App im README
+- **Status:** ✅ Done (local), ⚠️ Docker deferred (T-71)
 
 ## Phase 5 — Projection Geometry (Oct 26, 2026)
 

@@ -107,7 +107,7 @@ docs/
   - T-41: CI ✅
   - T-42: README ✅
   - T-43: Requirements ✅
-  - T-44: Deployment ❌
+  - T-44: Deployment ✅ (local), Docker deferred
 
 - **Phase 6:** Forward Projection (T-61 to T-70) 🔄 In Progress
 

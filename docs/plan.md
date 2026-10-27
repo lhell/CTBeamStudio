@@ -113,10 +113,16 @@
 - **Status:** ✅ Done (Oct 23, 2026)
 - **Implementierung:** Format "{patient_id} - {series_description} - {n_slices} slices"
 
-### `[x]` T-22 — Demo-Phantom
-- **Dateien:** `src/visualization/phantom.py`
+### [x] T-22 — Demo-Phantom
+- **Dateien:** `src/visualization/phantom.py`, `src/visualization/sidebar.py`, `src/visualization/app.py`
 - **Abhängig von:** T-10
-- **Akzeptanz:** Start ohne `CT_VIEWER_DATA_ROOT` lädt synthetisches Phantom in plausiblen HU (Luft −1000, Wasser 0, Knocheneinschlüsse ~+800) mit anisotropem Spacing; Banner weist auf Demo-Modus hin.
+- **Akzeptanz:** Start ohne DICOM-Ordner lädt synthetisches Phantom in plausiblen HU (Luft −1000, Wasser 0, Knocheneinschlüsse ~+800) mit anisotropem Spacing; Banner weist auf Demo-Modus hin.
+- **Status:** ✅ Done (Oct 27, 2026)
+- **Implementierung:**
+  - Added `create_shepp_logan_hu()` and `create_demo_volume()` to phantom.py
+  - Returns Volume with HU values (-1000 to +800) and anisotropic spacing (3.0, 0.7, 0.7) mm
+  - Auto-loads in sidebar.py when no DICOM folder and no cached volume
+  - Demo banner shown in app.py when demo_mode is active
 
 ### `[x]` T-23 — 3D-Visualisierung mit Quelle/Detektor
 - **Ziel:** Volumen in 3D anzeigen mit Röntgenquelle und Detektor im DICOM-Koordinatensystem.
@@ -216,6 +222,179 @@
   - Docker-Image wird nach GHCR gepusht (bei Push auf main)
   - ODER: Link zu deployed Streamlit Cloud App im README
 
+## Phase 5 — Projection Geometry (Oct 26, 2026)
+
+### `[x]` T-50 — ProjectionGeometry Dataclass
+- **Ziel:** Geometry-Klasse für Cone-Beam CT Projektionsdaten.
+- **Dateien:** `src/visualization/geometry.py`
+- **Abhängig von:** –
+- **Akzeptanz:** Dataclass mit allen Feldern (sdd, sid, n_det_cols, n_det_rows, etc.), Validierung, berechnete Properties (collimation_width, fan_angle, cone_angle).
+- **Status:** ✅ Done (Oct 26, 2026)
+- **Implementierung:** ProjectionGeometry mit allen required fields, __post_init__ validation, computed properties
+
+### `[x]` T-51 — YAML Loader
+- **Ziel:** Geometry aus YAML-Datei laden.
+- **Dateien:** `src/visualization/geometry.py`
+- **Abhängig von:** T-50
+- **Akzeptanz:** `load_geometry_from_yaml()` lädt alle Parameter aus YAML.
+- **Status:** ✅ Done (Oct 26, 2026)
+
+### `[x]` T-52 — TXT Loader (Mayo Clinic Format)
+- **Ziel:** Geometry aus Mayo Clinic TXT-Format laden.
+- **Dateien:** `src/visualization/geometry.py`
+- **Abhängig von:** T-50
+- **Akzeptanz:** `load_geometry_from_txt()` parsed Mayo Clinic Format.
+- **Status:** ✅ Done (Oct 26, 2026)
+
+### `[x]` T-53 — Geometry Unit Tests
+- **Ziel:** Tests für ProjectionGeometry und Loaders.
+- **Dateien:** `tests/unit/test_geometry.py`, `tests/unit/test_geometry_yaml.py`, `tests/unit/test_geometry_txt.py`, `tests/unit/test_geometry_trajectory.py`
+- **Abhängig von:** T-50
+- **Akzeptanz:** Alle Tests bestehen.
+- **Status:** ✅ Done (Oct 26, 2026)
+
+## Phase 6 — Projection Geometry 3D Visualization (Oct 26, 2026)
+
+### `[x]` T-54 — Geometry Loader für User-Dateien
+- **Ziel:** Projektions-Geometrie aus User-Dateien laden.
+- **Dateien:** `src/visualization/loaders/projection.py`
+- **Abhängig von:** T-52
+- **Akzeptanz:** `load_projection_geometry(txt_path)` Funktion verfügbar.
+- **Status:** ✅ Done (Oct 26, 2026)
+- **Implementierung:** Wrapper um load_geometry_from_txt
+
+### `[x]` T-55 — Geometry-Based Source/Detector in 3D Plot
+- **Ziel:** 3D-Plot zeigt Source/Detektor basierend auf ProjectionGeometry.
+- **Dateien:** `src/visualization/volume3d.py`
+- **Abhängig von:** T-54
+- **Akzeptanz:** 
+  - `get_source_position(geometry, source_angle)` 
+  - `get_detector_position(geometry, source_angle)`
+  - `get_trajectory_positions(geometry, n_projections)`
+- **Status:** ✅ Done (Oct 26, 2026)
+
+### `[ ]` T-56 — UI für Projection Geometry in App
+- **Ziel:** UI zum Laden der Geometry-Datei und Anpassen des Downsampling.
+- **Dateien:** `src/visualization/app.py`
+- **Abhängig von:** T-54, T-55
+- **Akzeptanz:** 
+  - File-Uploader für Geometry-TXT
+  - Downsample-Dropdown (N = 1000, 100, 10, 1)
+  - Trajektorie in 3D-Plot anzeigen
+- **Status:** ⚠️ Open
+
+## Phase 7 — Docker Self-Deployment (Oct 26, 2026)
+
+### `[ ]` T-57 — Review/Update Dockerfile
+- **Ziel:** Dockerfile für Self-Deployment vorbereiten.
+- **Dateien:** `Dockerfile`
+- **Abhängig von:** T-40
+- **Akzeptanz:** Non-root user, korrekter Pfad zu app.py, Health-Check.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-58 — Create .dockerignore
+- **Ziel:** Ungewollte Dateien vom Docker-Build ausschließen.
+- **Dateien:** `.dockerignore`
+- **Abhängig von:** –
+- **Akzeptanz:** Keine .dcm, .npy, __pycache__, .git im Image.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-59 — Build and Test Docker Image
+- **Ziel:** Docker-Image bauen und verifizieren.
+- **Dateien:** –
+- **Abhängig von:** T-57, T-58
+- **Akzeptanz:** Image < 400 MiB, Container startet, App erreichbar auf Port 8501.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-60 — Create Run Script
+- **Ziel:** Komfort-Script zum Starten des Containers.
+- **Dateien:** `scripts/run-docker.sh`
+- **Abhängig von:** T-59
+- **Akzeptanz:** Script startet Container auf Port 8501.
+- **Status:** ⚠️ Open (optional)
+
+## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
+
+### `[ ]` T-61 — Add parallelproj Dependency
+- **Ziel:** parallelproj als Dependency hinzufügen.
+- **Dateien:** `requirements.txt` oder `pyproject.toml`
+- **Abhängig von:** –
+- **Akzeptanz:** `import parallelproj` funktioniert.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-62 — Forward Projection Module
+- **Ziel:** Forward-Projection-Funktion mit parallelproj.
+- **Dateien:** `src/visualization/forward_project.py`
+- **Abhängig von:** T-61, T-50, T-10
+- **Akzeptanz:** `forward_project(volume, geometry)` gibt Projektionen zurück.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-63 — Implement Parallelproj Forward Projection
+- **Ziel:** Tatsächliche Implementation mit parallelproj (PyTorch).
+- **Dateien:** `src/visualization/forward_project.py`
+- **Abhängig von:** T-62
+- **Akzeptanz:** Synthetische Projektionen aus Volumen generieren.
+- **Status:** ⚠️ Open
+
+## Phase 9 — Sinogram Loader with Lazy Loading (Oct 27, 2026)
+
+### `[ ]` T-64 — Sinogram Loader with Selection
+- **Ziel:** Sinogram-Daten laden mit Row/Col/Projection Selection.
+- **Dateien:** `src/visualization/loaders/sinogram.py`
+- **Abhängig von:** –
+- **Akzeptanz:** `load_sinogram()` mit SelectionConfig.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-65 — DICOM Lazy Loading
+- **Ziel:** Lazy Loading für Helical-DICOM-Daten.
+- **Dateien:** `src/visualization/loaders/sinogram.py`
+- **Abhängig von:** T-64
+- **Akzeptanz:** Nur benötigte Rows/Projections laden.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-66 — Update Loaders __init__.py
+- **Ziel:** Sinogram-Loader exportieren.
+- **Dateien:** `src/visualization/loaders/__init__.py`
+- **Abhängig von:** T-64
+- **Akzeptanz:** `from visualization.loaders import load_sinogram` funktioniert.
+- **Status:** ⚠️ Open
+
+## Phase 10 — Comparison (Oct 27, 2026)
+
+### `[ ]` T-67 — Comparison Module
+- **Vergleich:** Synthetic vs Measured Projektionen.
+- **Dateien:** `src/visualization/comparison.py`
+- **Abhängig von:** T-63, T-64
+- **Akzeptanz:** MAE, RMSE, SSIM, Correlation berechnen.
+- **Status:** ⚠️ Open
+
+### `[ ]` T-68 — Comparison Visualization
+- **Ziel:** Side-by-side Visualisierung der Vergleichsergebnisse.
+- **Dateien:** `src/visualization/comparison.py`
+- **Abhängig von:** T-67
+- **Akzeptanz:** Plotly-Visualisierung mit 3 Spalten (Synthetic | Measured | Difference).
+- **Status:** ⚠️ Open
+
+### `[ ]` T-69 — Integration Tests
+- **Ziel:** Tests für den vollständigen Workflow.
+- **Dateien:** `tests/integration/test_forward_projection_workflow.py`
+- **Abhängig von:** T-63, T-67
+- **Akzeptanz:** Volumen → Forward Project → Compare funktioniert.
+- **Status:** ⚠️ Open
+
+## Phase 11 — App Integration (Oct 27, 2026)
+
+### `[ ]` T-70 — Forward Projection UI
+- **Ziel:** UI für Forward Projection und Vergleich in Streamlit-App.
+- **Dateien:** `src/visualization/app.py`
+- **Abhängig von:** T-63, T-66, T-68
+- **Akzeptanz:** 
+  - File-Upload für gemessene Daten
+  - Row/Col/Projection Selection UI
+  - Run Button
+  - Results Display (Visual + Metrics)
+- **Status:** ⚠️ Open
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -227,6 +406,9 @@
 | 5 | Di, 20.10. | T-30 ⚠️, T-33 ⚠️ |
 | 6 | Fr, 23.10. | T-21 ✅, T-30 ✅, T-33 ✅ |
 | 7 | Fr, 24.10. | T-23 ✅ (3D visualization with Plotly) |
+| 8 | Mo, 26.10. | T-50 bis T-55 ✅ (Projection Geometry) |
+| 9 | Di, 27.10. | T-56 ⚠️, T-57 bis T-60 ⚠️ (Docker) |
+| 10 | Di, 27.10. | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 
 ## Decision Log
 
@@ -263,22 +445,36 @@
 - T-42: README
 - T-43: Requirements
 - T-44: Deployment
-- Docker Self-Deployment
+- T-56: UI für Projection Geometry in App
+- T-57: Dockerfile Review/Update
+- T-58: .dockerignore
+- T-59: Build and Test Docker Image
+- T-60: Create Run Script (optional)
+- T-61: parallelproj Dependency
+- T-62: Forward Projection Module
+- T-63: Implement Parallelproj Forward Projection
+- T-64: Sinogram Loader with Selection
+- T-65: DICOM Lazy Loading
+- T-66: Update Loaders __init__.py
+- T-67: Comparison Module
+- T-68: Comparison Visualization
+- T-69: Integration Tests
+- T-70: Forward Projection UI
 
 ## Erledigt (Oct 26, 2026)
 
-### Projection Geometry (Heute hinzugefügt)
-- ✅ ProjectionGeometry dataclass mit Validierung
-- ✅ YAML Loader (load_geometry_from_yaml)
-- ✅ TXT Loader (load_geometry_from_txt) - Mayo Clinic Format
-- ✅ Auto-Detect (load_geometry)
-- ✅ Unit Tests für Geometry (test_geometry.py)
-- ✅ Trajectory Tests (test_geometry_trajectory.py)
-- ✅ Geometry Loader für User-Dateien (loaders/projection.py)
-- ✅ 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
+### Projection Geometry (Phase 5 - Oct 26, 2026)
+- ✅ T-50: ProjectionGeometry dataclass mit Validierung
+- ✅ T-51: YAML Loader (load_geometry_from_yaml)
+- ✅ T-52: TXT Loader (load_geometry_from_txt) - Mayo Clinic Format
+- ✅ T-53: Unit Tests für Geometry (test_geometry.py, test_geometry_yaml.py, test_geometry_txt.py, test_geometry_trajectory.py)
 
-### Phase 1-3
-- Alle Tasks T-10 bis T-33 ✅
+### Projection Geometry 3D Visualization (Phase 6 - Oct 26, 2026)
+- ✅ T-54: Geometry Loader für User-Dateien (loaders/projection.py)
+- ✅ T-55: 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
+
+### Phase 1-4
+- Alle Tasks T-01 bis T-44 (außer T-40 bis T-44) ✅
 - T-23: 3D-Visualisierung ✅ (Oct 24)
 
 ## Implementation Notes (Oct 19, 2026)

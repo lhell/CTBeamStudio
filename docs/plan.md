@@ -281,7 +281,18 @@
   - File-Uploader für Geometry-TXT
   - Downsample-Dropdown (N = 1000, 100, 10, 1)
   - Trajektorie in 3D-Plot anzeigen
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Oct 27, 2026)
+
+### `[ ]` T-56a — Directory Picker UI (Future)
+- **Ziel:** Bessere Ordner-Auswahl mit `streamlit-explorer` DirPicker.
+- **Dateien:** `src/visualization/sidebar.py`
+- **Abhängig von:** T-20
+- **Akzeptanz:** Ersetzt text_input durch grafischen Ordner-Dialog.
+- **Implementierung:**
+  ```python
+  from streamlit_explorer import DirPicker
+  # Replace st.text_input("DICOM Folder") with DirPicker
+  ```
 
 ## Phase 7 — Docker Self-Deployment (Oct 26, 2026)
 

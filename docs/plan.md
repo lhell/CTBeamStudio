@@ -294,6 +294,20 @@
   # Replace st.text_input("DICOM Folder") with DirPicker
   ```
 
+### `[ ]` T-59 — Desktop App Wrapper (Future)
+- **Ziel:** Streamlit als Desktop-App ohne Browser starten.
+- **Dateien:** `src/visualization/desktop_launcher.py`
+- **Optionen:**
+  1. **streamlit-desktop-app** (PyPI) - PyInstaller support, stabil
+  2. **streamlitrunner** (PyPI) - Einfacher wrapper
+  3. **pywebview** manuell - Mehr Kontrolle
+- **Windows Requirements:** .NET Framework > 4.0, Edge WebView2
+- **Implementierung:**
+  ```python
+  # Start streamlit in background thread, wrap in pywebview window
+  ```
+- **Status:** ⚠️ Research
+
 ## Phase 7 — Docker Self-Deployment (Oct 26, 2026)
 
 ### `[ ]` T-57 — Review/Update Dockerfile

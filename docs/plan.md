@@ -194,7 +194,7 @@
 - **Abhängig von:** T-03, T-22
 - **Akzeptanz:** Multi-Stage, kein Torch/CUDA, Non-Root-User, Image < 400 MiB, startet ohne Mount im Demo-Modus, Build-Guard aus T-03 aktiv.
 
-### `[ ]` T-41 — CI
+### `[x]` T-41 — CI
 - **Dateien:** `.github/workflows/ci.yml`
 - **Abhängig von:** T-31, T-40
 - **Akzeptanz:** Lint + Tests bei jedem PR; Daten-Guard läuft; Push nach GHCR nur auf `main` und Tags; PRs bauen ohne Push.

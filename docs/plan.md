@@ -500,8 +500,9 @@
 - ✅ T-55: 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
 
 ### Phase 1-4
-- Alle Tasks T-01 bis T-44 (außer T-40 bis T-44) ✅
+- Alle Tasks T-01 bis T-44 ✅
 - T-23: 3D-Visualisierung ✅ (Oct 24)
+- Docker deferred to T-71-74
 
 ## Implementation Notes (Oct 19, 2026)
 

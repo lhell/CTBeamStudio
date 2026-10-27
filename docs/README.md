@@ -101,15 +101,16 @@ docs/
 - **Phase 3:** Tests - Fixtures, Loader tests, Windowing tests (T-30 to T-33) ✅
 - **Phase 5:** Projection Geometry (T-50 to T-56) ✅
 
-### Pending Phases
-- **Phase 4:** Deployment (T-40 to T-44)
-  - T-40: Dockerfile ✅
-  - T-41: CI ✅
-  - T-42: README ✅
-  - T-43: Requirements ✅
-  - T-44: Deployment ✅ (local), Docker deferred
+### Completed Phases
+- **Phase 0:** License & Hygiene (T-01 to T-04) ✅
+- **Phase 1:** Core - Volume, Loaders, Windowing (T-10 to T-14) ✅
+- **Phase 2:** App - Streamlit, Series Selection, Phantom (T-20 to T-23) ✅
+- **Phase 3:** Tests - Fixtures, Loader tests, Windowing tests (T-30 to T-33) ✅
+- **Phase 4:** Deployment (T-40 to T-44) ✅ (local), Docker deferred
+- **Phase 5:** Projection Geometry (T-50 to T-56) ✅
 
-- **Phase 6:** Forward Projection (T-61 to T-70) 🔄 In Progress
+### In Progress
+- **Phase 6:** Forward Projection (T-61 to T-70) 🔄
 
 ### Deferred (Future)
 - **Phase 7:** Docker Self-Deployment (T-71 to T-74) - no Docker available

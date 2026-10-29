@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     zlib1g-dev \
     libpng-dev \
+    libgl1 \
+    libxrender1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy packaging metadata and source required for the editable install.
@@ -24,8 +27,10 @@ RUN apt-get update && apt-get install -y \
 COPY pyproject.toml README.md /app/
 COPY src /app/src
 
-# Install Python dependencies and the package itself
-RUN pip install --no-cache-dir -e /app/
+# Install Python dependencies and the package itself.
+# pyvista is not declared in pyproject.toml (it is optional at import time),
+# but it is installed here so the PyVista render mode works in the container.
+RUN pip install --no-cache-dir -e /app/ pyvista
 
 # Copy remaining application code (data/docs/tests are excluded via .dockerignore)
 COPY . /app/

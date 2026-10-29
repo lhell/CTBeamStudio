@@ -309,35 +309,36 @@
   ```
 - **Status:** ⚠️ Research
 
-## Phase 7 — Docker Self-Deployment (Deferred - requires Docker)
+## Phase 7 — Docker Self-Deployment (Build blocked - no Docker installed)
 
-### `[ ]` T-71 — Review/Update Dockerfile
+### `[x]` T-71 — Review/Update Dockerfile
 - **Ziel:** Dockerfile für Self-Deployment vorbereiten.
 - **Dateien:** `Dockerfile`
 - **Abhängig von:** T-40
 - **Akzeptanz:** Non-root user, korrekter Pfad zu app.py, Health-Check.
-- **Status:** ⚠️ Deferred (no Docker available)
+- **Status:** ✅ Done (Oct 29, 2026) — install order fixed (README + src before pip install)
+- **Offen:** Build-Verifikation (siehe T-73)
 
-### `[ ]` T-72 — Create .dockerignore
+### `[x]` T-72 — Create .dockerignore
 - **Ziel:** Ungewollte Dateien vom Docker-Build ausschließen.
 - **Dateien:** `.dockerignore`
 - **Abhängig von:** –
 - **Akzeptanz:** Keine .dcm, .npy, __pycache__, .git im Image.
-- **Status:** ⚠️ Deferred
+- **Status:** ✅ Done (Oct 29, 2026) — zusätzlich docs, tests, scripts, IDE/Cloud-Ordner ausgeschlossen
 
 ### `[ ]` T-73 — Build and Test Docker Image
 - **Ziel:** Docker-Image bauen und verifizieren.
 - **Dateien:** –
 - **Abhängig von:** T-71, T-72
 - **Akzeptanz:** Image < 400 MiB, Container startet, App erreichbar auf Port 8501.
-- **Status:** ⚠️ Deferred
+- **Status:** ⚠️ Blocked (Docker nicht installiert; Build/Health-Check nicht ausgeführt)
 
-### `[ ]` T-74 — Create Run Script
+### `[x]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
 - **Dateien:** `scripts/run-docker.sh`
 - **Abhängig von:** T-73
 - **Akzeptanz:** Script startet Container auf Port 8501.
-- **Status:** ⚠️ Deferred (optional)
+- **Status:** ✅ Done (Oct 29, 2026) — vorhanden; Ausführung setzt T-73 voraus
 
 ## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
 

@@ -13,6 +13,11 @@ venv
 env
 .git
 .gitignore
+.github
+.superpowers
+.worktrees
+.idea
+.vscode
 .pytest_cache
 .coverage
 htmlcov
@@ -22,3 +27,10 @@ htmlcov
 *.ima
 *.npy
 *.npz
+
+# Not needed at runtime
+docs
+tests
+scripts
+environment.yml
+INSTALLATION.md

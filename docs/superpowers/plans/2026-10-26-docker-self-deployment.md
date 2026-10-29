@@ -39,12 +39,14 @@
 **Interfaces:**
 - Produces: Updated Dockerfile ready for self-deployment
 
-- [ ] **Step 1: Review current Dockerfile**
+**Status:** ✅ Done (Oct 29, 2026) — install order fixed; non-root user, CMD path and health check verified statically.
+
+- [x] **Step 1: Review current Dockerfile**
 
 Run: `cat Dockerfile`
 Check: Base image, non-root user, port, health check
 
-- [ ] **Step 2: Add non-root user (if missing)**
+- [x] **Step 2: Add non-root user (if missing)**
 
 If Dockerfile doesn't create/run as non-root user, add:
 ```dockerfile
@@ -54,11 +56,11 @@ RUN useradd -m -s /bin/bash appuser && \
 USER appuser
 ```
 
-- [ ] **Step 3: Verify path to app.py in CMD**
+- [x] **Step 3: Verify path to app.py in CMD**
 
 The CMD should reference: `src/visualization/app.py` (not `app.py`)
 
-- [ ] **Step 4: Commit Dockerfile changes**
+- [x] **Step 4: Commit Dockerfile changes**
 
 ```bash
 git add Dockerfile
@@ -75,7 +77,9 @@ git commit -m "fix: update Dockerfile for self-deployment"
 **Interfaces:**
 - Produces: Prevents unwanted files in Docker context
 
-- [ ] **Step 1: Create .dockerignore**
+**Status:** ✅ Done (Oct 29, 2026) — extended to exclude docs, tests, scripts and IDE/cloud folders.
+
+- [x] **Step 1: Create .dockerignore**
 
 ```gitignore
 __pycache__
@@ -104,7 +108,7 @@ htmlcov
 *.npz
 ```
 
-- [ ] **Step 2: Commit .dockerignore**
+- [x] **Step 2: Commit .dockerignore**
 
 ```bash
 git add .dockerignore
@@ -120,6 +124,8 @@ git commit -m "feat: add .dockerignore"
 
 **Interfaces:**
 - Produces: Working Docker image locally
+
+**Status:** ⚠️ Blocked (Oct 29, 2026) — Docker is not installed on this machine; none of the steps below were executed.
 
 - [ ] **Step 1: Build the Docker image**
 
@@ -155,7 +161,9 @@ Run: `docker stop ct-viewer && docker rm ct-viewer`
 **Interfaces:**
 - Produces: Convenience script for running the container
 
-- [ ] **Step 1: Create run-docker.sh**
+**Status:** ✅ Done (Oct 29, 2026) — script exists; running it requires T-73.
+
+- [x] **Step 1: Create run-docker.sh**
 
 ```bash
 #!/bin/bash
@@ -179,11 +187,11 @@ docker run -d -p 8501:8501 --name $CONTAINER_NAME ct-viewer:latest
 echo "CT-Viewer running at http://localhost:8501"
 ```
 
-- [ ] **Step 2: Make script executable**
+- [x] **Step 2: Make script executable**
 
 Run: `chmod +x scripts/run-docker.sh`
 
-- [ ] **Step 3: Commit script**
+- [x] **Step 3: Commit script**
 
 ```bash
 git add scripts/run-docker.sh
@@ -196,10 +204,10 @@ git commit -m "feat: add docker run script"
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 1 | Review/update Dockerfile | Pending |
-| 2 | Create .dockerignore | Pending |
-| 3 | Build and verify image runs | Pending |
-| 4 | Create run script | Pending (optional) |
+| 1 | Review/update Dockerfile | ✅ Done |
+| 2 | Create .dockerignore | ✅ Done |
+| 3 | Build and verify image runs | ⚠️ Blocked (no Docker installed) |
+| 4 | Create run script | ✅ Done |
 
 ---
 

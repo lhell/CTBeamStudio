@@ -19,13 +19,15 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml first (for better caching)
-COPY pyproject.toml /app/
+# Copy packaging metadata and source required for the editable install.
+# README.md is referenced by pyproject.toml, src/ is needed for package discovery.
+COPY pyproject.toml README.md /app/
+COPY src /app/src
 
-# Install Python dependencies from pyproject.toml
+# Install Python dependencies and the package itself
 RUN pip install --no-cache-dir -e /app/
 
-# Copy application code
+# Copy remaining application code (data/docs/tests are excluded via .dockerignore)
 COPY . /app/
 
 # Build Guard: Fail if data files exist in repository

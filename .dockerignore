@@ -25,8 +25,23 @@ htmlcov
 .DS_Store
 *.dcm
 *.ima
+*.dicom
 *.npy
 *.npz
+*.h5
+*.hdf5
+*.ckpt
+*.pth
+*.pt
+*.onnx
+data/
+datasets/
+CT_DATA/
+patient_data/
+.env
+.env.local
+*.pem
+*.key
 
 # Not needed at runtime
 docs

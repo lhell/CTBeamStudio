@@ -161,7 +161,7 @@ Run: `docker stop ct-viewer && docker rm ct-viewer`
 **Interfaces:**
 - Produces: Convenience script for running the container
 
-**Status:** ✅ Done (Oct 29, 2026) — script exists; running it requires T-73.
+**Status:** ⚠️ Script created and marked executable (Oct 29, 2026); running it requires T-73.
 
 - [x] **Step 1: Create run-docker.sh**
 
@@ -207,7 +207,7 @@ git commit -m "feat: add docker run script"
 | 1 | Review/update Dockerfile | ✅ Done |
 | 2 | Create .dockerignore | ✅ Done |
 | 3 | Build and verify image runs | ⚠️ Blocked (no Docker installed) |
-| 4 | Create run script | ✅ Done |
+| 4 | Create run script | ⚠️ Script prepared; execution blocked by T-73 |
 
 ---
 

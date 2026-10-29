@@ -333,12 +333,12 @@
 - **Akzeptanz:** Image < 400 MiB, Container startet, App erreichbar auf Port 8501.
 - **Status:** ⚠️ Blocked (Docker nicht installiert; Build/Health-Check nicht ausgeführt)
 
-### `[x]` T-74 — Create Run Script
+### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
 - **Dateien:** `scripts/run-docker.sh`
 - **Abhängig von:** T-73
 - **Akzeptanz:** Script startet Container auf Port 8501.
-- **Status:** ✅ Done (Oct 29, 2026) — vorhanden; Ausführung setzt T-73 voraus
+- **Status:** ⚠️ Script erstellt und ausführbar (Oct 29, 2026), aber Inbetriebnahme unverifiziert (T-73 blocked)
 
 ## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
 

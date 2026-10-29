@@ -9,6 +9,7 @@ docs/
 ├── data.md                      ← Data documentation (AAPM challenge, etc.)
 ├── geometry.md                  ← Projection geometry definition
 ├── testing-setup-hint.md       ← Testing setup hints
+├── versioning.md               ← Git + Docker release versioning
 │
 ├── progress/                    ← Daily protocols and plans
 │   ├── plan_day01.md           ← Phase 0 detailed plan (T-01 to T-04)
@@ -68,6 +69,7 @@ docs/
 | `data.md` | AAPM Challenge data documentation, citation requirements |
 | `geometry.md` | Projection geometry parameters, coordinate system |
 | `testing-setup-hint.md` | Testing setup hints |
+| `versioning.md` | Git and Docker tag conventions, release procedure, registry immutability |
 
 ### Superpowers Workflows
 | File | Description | Status |

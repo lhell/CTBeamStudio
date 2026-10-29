@@ -12,6 +12,8 @@ This guide covers all installation options for CT-Viewer.
 
 ### Option 1: Docker (Recommended for quick setup)
 
+> Release tagging and registry conventions: see [docs/versioning.md](docs/versioning.md).
+
 ```bash
 # Build the image
 docker build -t ct-viewer .

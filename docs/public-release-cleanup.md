@@ -3,23 +3,23 @@
 ## Completed
 - ✅ Add FDA/CE disclaimer to README
 
-## Pending
-
 ### 1. Remove Debug Print Statements
-Remove 14 print statements from 3 files:
+Removed debug prints from the loader code paths:
 
-| File | Count | Lines |
-|------|-------|-------|
-| `src/visualization/loaders/npy.py` | 6 | 89, 92, 158, 159, 160 |
-| `src/visualization/loaders/dicom.py` | 3 | 352, 356, 357 |
-| `src/visualization/phantom.py` | 5 | 178, 179, 183, 184, 185, 186 |
+| File | Removed | Note |
+|------|---------|------|
+| `src/visualization/loaders/npy.py` | 5 | `load_npy`, `load_npy_series` |
+| `src/visualization/loaders/dicom.py` | 3 | `load_dicom_series` |
+
+The `print()` calls in `src/visualization/phantom.py` were **kept**: they live in
+the `if __name__ == "__main__":` demo block and are intentional CLI output, not
+debug logging in the library path.
 
 ### 2. Clean Up Log Files
-- Remove `app.log` from git tracking and delete file
-- Delete `src/app.log`
+- ✅ Removed `app.log` and `src/app.log` from git tracking and deleted them
 
 ### 3. Add *.log to .gitignore
-Add log file pattern to prevent future commits of debug logs.
+- ✅ Added `*.log` under a new `# Logs` section
 
 ## Notes
 - No hardcoded paths found (✅ clean)

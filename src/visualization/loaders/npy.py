@@ -86,10 +86,6 @@ def load_npy_series(
         detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
             array
         )
-        print(
-            f"[load_npy_series] Detected unit: {detected_unit} (confidence: {confidence})"
-        )
-        print(f"  Data range: [{array.min()}, {array.max()}], dtype: {array.dtype}")
         unit = detected_unit
         rescale_slope = detected_slope
         rescale_intercept = detected_intercept
@@ -155,9 +151,6 @@ def load_npy(
         detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
             array
         )
-        print(f"[load_npy] Detected unit: {detected_unit} (confidence: {confidence})")
-        print(f"  Using: slope={detected_slope}, intercept={detected_intercept}")
-        print(f"  Data range: [{array.min()}, {array.max()}], dtype: {array.dtype}")
         unit = detected_unit
         rescale_slope = detected_slope
         rescale_intercept = detected_intercept

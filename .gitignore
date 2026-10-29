@@ -45,6 +45,9 @@ venv/
 # Streamlit
 .streamlit/secrets.toml
 
+# Logs
+*.log
+
 # Superpowers (auto-generated)
 .superpowers/
 

@@ -83,7 +83,7 @@ def load_npy_series(
 
     # Detect or use forced unit
     if unit is None:
-        detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
+        detected_unit, detected_slope, detected_intercept, _confidence = _detect_unit(
             array
         )
         unit = detected_unit
@@ -148,7 +148,7 @@ def load_npy(
 
     # Detect or use forced unit
     if unit is None:
-        detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
+        detected_unit, detected_slope, detected_intercept, _confidence = _detect_unit(
             array
         )
         unit = detected_unit

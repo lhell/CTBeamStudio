@@ -346,7 +346,7 @@ def load_dicom_series(
 
     # Detect or use forced unit
     if unit is None:
-        detected_unit, detected_slope, detected_intercept, confidence = _detect_unit(
+        detected_unit, detected_slope, detected_intercept, _confidence = _detect_unit(
             array
         )
         unit = detected_unit

@@ -25,7 +25,7 @@ def render_sidebar():
     # DICOM folder path
     data_path = st.sidebar.text_input(
         "DICOM Folder",
-        placeholder=r"O:\imageDataCT\projects\...",
+        placeholder=r"Your DICOM folder...",
         key="data_path",
     )
 

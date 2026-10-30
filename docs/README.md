@@ -119,8 +119,9 @@ docs/
 
 ### Deferred (Future)
 - **Phase 7:** Docker Self-Deployment (T-71 to T-74) - no Docker available
-- **T-56a:** Directory Picker UI
-- **T-75:** Desktop App Wrapper
+- **Phase 8:** Forward Projection (T-61 to T-70) 🔄
+- **T-76:** FDK / Analytische Rekonstruktion
+- **T-77:** Phantomlose Geometrie-Kalibrierung (Research)
 
 ---
 

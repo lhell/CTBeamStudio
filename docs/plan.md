@@ -422,6 +422,30 @@
   - Results Display (Visual + Metrics)
 - **Status:** ⚠️ Open
 
+### `[ ]` T-76 — FDK / Analytische Rekonstruktion
+- **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
+- **Dateien:** `src/reconstruction/fdk.py`
+- **Abhängig von:** T-61
+- **Implementierung:**
+  1. Pre-Weighting (FDK weight)
+  2. FFT-basierte Filterung (Ram-Lak, Shepp-Logan)
+  3. Parker weighting für short-scan
+  4. Cone-beam backprojection
+- **Optionen:** ASTRA (bestehend), TomoPy, oder eigene Implementierung
+- **Status:** ⚠️ Open (Future)
+
+### `[ ]` T-77 — Phantomlose Geometrie-Kalibrierung
+- **Ziel:** Geometrie aus Projektionsdaten schätzen ohne Kalibrierphantom.
+- **Dateien:** `src/calibration/geometry_calibration.py`
+- **Abhängig von:** T-63, T-76
+- **Implementierung:**
+  1. Merkmalsextraktion (Kanten, Features)
+  2. Feature-Tracking über Projektionen
+  3. Bundle Adjustment: Geometrie + 3D-Punkte optimieren
+  4. DCC-basierte Regularisierung
+- **Status:** ⚠️ Open (Research)
+- **Siehe auch:** `docs/research/phantomless-geometry-calibration-helix-cbct.md`
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |

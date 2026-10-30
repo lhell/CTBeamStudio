@@ -161,6 +161,85 @@ Ein wichtiger methodischer Punkt: Wenn Objekt und Geometrie gleichzeitig optimie
 - Stayman et al. 2024: https://pmc.ncbi.nlm.nih.gov/articles/PMC11963847/
 - Phantom-Free Geometric Refinement 2026: https://pmc.ncbi.nlm.nih.gov/articles/PMC13517192/
 - Shim et al. 2026: https://eurekamag.com/research/104/262/104262982.php
+- parallelproj FBP example: https://parallelproj.readthedocs.io/en/v1.9.1/auto_examples/05_algorithms/05_run_fbp.html
+- ASTRA FDK CUDA: https://github.com/astra-toolbox/astra-toolbox/blob/master/cuda/3d/fdk.cu
+
+## 11. Implementierungsdetails (FDK/Rekonstruktion)
+
+### Ver verfügbare Bibliotheken
+
+| Bibliothek | FDK | FBP | GPU | CT-Fokus |
+|------------|-----|-----|-----|----------|
+| **parallelproj** | ❌ (nur 2D) | ✅ (2D) | ✅ CUDA (25-68x) | PET/SPECT |
+| **ASTRA** | ✅ (CUDA) | ✅ | ✅ | CBCT |
+| **TomoPy** | ✅ | ✅ | ✅ | Synchrotron-CT |
+
+### ASTRA FDK Schritte (aus fdk.cu)
+
+```c++
+// 1. PRE-WEIGHTING
+float fW = fCentralRayLength * (M_PI / 2.0f) / n_angles;
+float weight = fW / fRayLength;  // cos(θ) / r
+
+// Parker weighting für short-scan (< 360°)
+if (fBeta <= 2.0f*(fCentralFanAngle + fGamma)) {
+    weight = sin²(π/4 * β / (fan_angle + γ));
+}
+
+// 2. FILTER (FFT-basiert)
+cufftPlan1d(planF, padded_det, CUFFT_R2C, n_angles);
+cufftExecR2C(forward FFT);
+apply_filter_in_frequency_domain();  // Ram-Lak, Shepp-Logan, etc.
+cufftExecC2R(inverse FFT);
+
+// 3. BACKPROJECTION
+ConeBP(volume, projections);
+```
+
+### Filter-Typen (ASTRA)
+
+- `ram-lak` (Ramp filter)
+- `shepp-logan`
+- `cosine`
+- `hamming`
+- `hann`
+
+### Für Helix-FDK zusätzlich
+
+- Tam-Danielsson windowing
+- z-Filtering für redundante Daten
+
+## 12. Implementation-Planung
+
+### Phase A: Grundlagen
+
+1. [ ] Projektionsdaten laden (DICOM, Raw)
+2. [ ] Geometrie-Modell definieren (Source, Detector, Winkel)
+3. [ ] Forward-Projection mit parallelproj/ASTRA testen
+
+### Phase B: FDK Implementierung
+
+4. [ ] Pre-Weighting implementieren
+5. [ ] FFT-basierte Filter (Ram-Lak)
+6. [ ] Back-Projection (Cone-beam)
+7. [ ] Short-scan Parker weighting
+
+### Phase C: Geometrie-Kalibrierung
+
+8. [ ] Merkmalsextraktion (Kanten, Features)
+9. [ ] Feature-Tracking über Projektionen
+10. [ ] Bundle Adjustment: Geometrie + 3D-Punkte
+11. [ ] Optimierung mit scipy.optimize
+
+### Phase D: Validierung
+
+12. [ ] Reprojektionsfehler messen
+13. [ ] Rekonstruktion mit geschätzter vs. nominaler Geometrie vergleichen
+14. [ ] Optional: iterative Refinement
+- Mouchet et al. 2023: https://pubmed.ncbi.nlm.nih.gov/37053055/
+- Stayman et al. 2024: https://pmc.ncbi.nlm.nih.gov/articles/PMC11963847/
+- Phantom-Free Geometric Refinement 2026: https://pmc.ncbi.nlm.nih.gov/articles/PMC13517192/
+- Shim et al. 2026: https://eurekamag.com/research/104/262/104262982.php
 
 ## 8. Forschungsansatz und mögliche Forschungslücke
 

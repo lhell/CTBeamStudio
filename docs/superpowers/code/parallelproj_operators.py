@@ -10,9 +10,15 @@ from array_api_compat import device
 
 
 class ReshapeLayer(torch.nn.Module):
-    def __init__(self, new_shape, swap_axis_before=None, swap_axis_after=None, move_axis_before=None):
+    def __init__(
+        self,
+        new_shape,
+        swap_axis_before=None,
+        swap_axis_after=None,
+        move_axis_before=None,
+    ):
         """Reshape layer for tensor manipulation.
-        
+
         Args:
             new_shape: Target shape for reshaping
             swap_axis_before: list, gives indices of two axes that are swapped before reshaping
@@ -28,52 +34,64 @@ class ReshapeLayer(torch.nn.Module):
 
     def forward(self, data, batch_size):
         """Forward pass of reshape layer.
-        
+
         Args:
             data: tensor to be reshaped
             batch_size: current data processing batch size
-        
+
         Returns:
             Reshaped tensor
         """
         self.old_shape = data.shape  # store previous shape in class attribute
 
         if self.swap_axis_before is not None:
-            data = torch.swapaxes(data, self.swap_axis_before[0], self.swap_axis_before[1])
+            data = torch.swapaxes(
+                data, self.swap_axis_before[0], self.swap_axis_before[1]
+            )
 
         if self.move_axis_before is not None:
-            data = torch.moveaxis(data, self.move_axis_before[0], self.move_axis_before[1])
+            data = torch.moveaxis(
+                data, self.move_axis_before[0], self.move_axis_before[1]
+            )
 
         new_shape = [batch_size]
         new_shape.extend(self.new_shape)
         data = torch.reshape(data, shape=new_shape)
 
         if self.swap_axis_after is not None:
-            data = torch.swapaxes(data, self.swap_axis_after[0], self.swap_axis_after[1])
+            data = torch.swapaxes(
+                data, self.swap_axis_after[0], self.swap_axis_after[1]
+            )
 
         return data
 
     def backward(self, grad):
         """Backward pass of reshape layer."""
         if self.swap_axis_after is not None:
-            grad = torch.swapaxes(grad, self.swap_axis_after[1], self.swap_axis_after[0])
+            grad = torch.swapaxes(
+                grad, self.swap_axis_after[1], self.swap_axis_after[0]
+            )
         if self.old_shape is not None:
             grad = torch.reshape(grad, shape=self.old_shape)
 
         if self.swap_axis_before is not None:
-            grad = torch.swapaxes(grad, self.swap_axis_before[1], self.swap_axis_before[0])
+            grad = torch.swapaxes(
+                grad, self.swap_axis_before[1], self.swap_axis_before[0]
+            )
         return grad
 
 
 class LinearSingleChannelOperator(torch.autograd.Function):
     """
     Function representing a linear operator acting on a mini batch of single channel images.
-    
+
     This is the forward projection operator - maps 3D volume to 2D projections.
     """
 
     @staticmethod
-    def forward(ctx, img: torch.Tensor, operator: parallelproj.LinearOperator) -> torch.Tensor:
+    def forward(
+        ctx, img: torch.Tensor, operator: parallelproj.LinearOperator
+    ) -> torch.Tensor:
         """Forward pass of the linear operator.
 
         Parameters
@@ -151,12 +169,14 @@ class LinearSingleChannelOperator(torch.autograd.Function):
 class AdjointLinearSingleChannelOperator(torch.autograd.Function):
     """
     Function representing the adjoint of a linear operator acting on a mini batch of single channel images.
-    
+
     This is the back projection operator - maps 2D projections back to 3D volume.
     """
 
     @staticmethod
-    def forward(ctx, proj: torch.Tensor, operator: parallelproj.LinearOperator) -> torch.Tensor:
+    def forward(
+        ctx, proj: torch.Tensor, operator: parallelproj.LinearOperator
+    ) -> torch.Tensor:
         """Forward pass of the adjoint of the linear operator.
 
         Parameters
@@ -230,26 +250,30 @@ class AdjointLinearSingleChannelOperator(torch.autograd.Function):
 
 
 # Wrapper functions for easy usage
-def forward_project_torch(volume: torch.Tensor, operator: parallelproj.LinearOperator) -> torch.Tensor:
+def forward_project_torch(
+    volume: torch.Tensor, operator: parallelproj.LinearOperator
+) -> torch.Tensor:
     """Project a 3D volume to projections using parallelproj operator.
-    
+
     Args:
         volume: 3D volume tensor of shape (batch_size, 1, nx, ny, nz)
         operator: parallelproj LinearOperator
-    
+
     Returns:
         Projections tensor of shape (batch_size, *operator.out_shape)
     """
     return LinearSingleChannelOperator.apply(volume, operator)
 
 
-def back_project_torch(projections: torch.Tensor, operator: parallelproj.LinearOperator) -> torch.Tensor:
+def back_project_torch(
+    projections: torch.Tensor, operator: parallelproj.LinearOperator
+) -> torch.Tensor:
     """Back-project projections to 3D volume using parallelproj operator.
-    
+
     Args:
         projections: Projections tensor of shape (batch_size, 1, *operator.out_shape)
         operator: parallelproj LinearOperator
-    
+
     Returns:
         3D volume tensor of shape (batch_size, 1, *operator.in_shape)
     """

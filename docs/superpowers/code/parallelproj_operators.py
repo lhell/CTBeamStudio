@@ -4,8 +4,8 @@ This code is adapted from parallelproj documentation:
 https://parallelproj.readthedocs.io/en/stable/auto_examples/07_torch/01_run_projection_layer.html
 """
 
-import torch
 import parallelproj
+import torch
 from array_api_compat import device
 
 

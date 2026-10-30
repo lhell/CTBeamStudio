@@ -20,6 +20,9 @@ docs/
 │   ├── protocol_day05.md       ← Oct 26, 2026
 │   └── protocol_day06.md       ← Oct 27, 2026
 │
+├── research/                    ← Research notes and papers
+│   └── phantomless-geometry-calibration-helix-cbct.md
+│
 ├── issues/                     ← Issue tracking
 │   └── 4-streamlit-progress-bar.md
 │

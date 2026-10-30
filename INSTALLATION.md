@@ -141,6 +141,28 @@ pip install -e ".[dev]"
 
 Includes: pytest, black, isort, flake8, mypy
 
+### For Forward Projection (parallelproj + PyTorch)
+
+**CPU-only (keine GPU erforderlich):**
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -e ".[cpu]"
+```
+
+**GPU (CUDA 12.1):**
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install -e ".[gpu]"
+```
+
+**Verify installation:**
+```python
+import parallelproj
+import torch
+print(f"parallelproj: {parallelproj.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+```
+
 ### For documentation
 
 ```bash

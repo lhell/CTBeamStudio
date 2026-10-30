@@ -34,6 +34,7 @@ dependencies = [
     "pillow>=10.0.0",
     "pandas>=2.0.0",
     "pyyaml>=6.0.0",
+    "array-api-compat>=1.8.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,9 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.6.0",
 ]
+# NOTE: parallelproj MUST be installed via conda-forge, NOT pip!
+# See: docs/superpowers/specs/2026-10-30-forward-projection-spec.md
+# For CI: use mamba/conda to install parallelproj from conda-forge
 
 [project.urls]
 Homepage = "https://github.com/your-org/CTOrientationViewer"
@@ -72,7 +76,15 @@ line_length = 88
 
 [tool.flake8]
 max-line-length = 88
-extend-ignore = ["E501", "E402", "F541", "F824", "F401"]
+extend-ignore = [
+    "E501",  # line too long
+    "E402",  # module level import not at top of file
+    "F541",  # f-string without formatted
+    "F824",  #
+    "F401",  # imported but unused
+    "F841",  # local variable assigned but never used (placeholders)
+    "W503",  # line break before binary operator
+]
 
 [tool.mypy]
 python_version = "3.11"

@@ -159,3 +159,40 @@ def test_load_nifti_4d_raises(tmp_path):
     from backend.loaders.sinogram import _load_nifti, SelectionConfig
     with pytest.raises(ValueError):
         _load_nifti(p, SelectionConfig(), ("proj", "row", "col"))
+
+
+# --- Task 4: load_sinogram dispatch + axis_order re-derivation ---
+
+def test_load_sinogram_dispatch_numpy(tmp_path):
+    arr = np.zeros((3, 4, 5)); p = tmp_path / "s.npy"; np.save(p, arr)
+    s = load_sinogram(p)
+    assert s.format == "numpy"
+    assert s.data.shape == (3, 4, 5)
+
+def test_load_sinogram_unknown(tmp_path):
+    p = tmp_path / "a.xyz"; p.touch()
+    with pytest.raises(ValueError):
+        load_sinogram(p)
+
+def test_axis_order_change_after_full_load(tmp_path):
+    # file stored (row, proj, col); axis_order flips AFTER load -> in-memory re-derive
+    arr = np.arange(24).reshape(2, 3, 4)  # (row, proj, col)
+    p = tmp_path / "s.npy"; np.save(p, arr)
+    s = load_sinogram(p)               # default canonical, misread -> data (2,3,4)
+    s.axis_order = ("row", "proj", "col")
+    assert s.data.shape == (3, 2, 4)
+    assert s.source_axis_order == ("row", "proj", "col")
+
+def test_axis_order_change_reloads_after_partial(tmp_path):
+    # partial selection -> no raw held -> axis flip re-reads from disk with new order
+    arr = np.arange(24).reshape(2, 3, 4)  # (row, proj, col)
+    p = tmp_path / "s.npy"; np.save(p, arr)
+    sel = SelectionConfig(proj_mode="range", proj_range=(0, 2))
+    s = load_sinogram(p, selection=sel)
+    s.axis_order = ("row", "proj", "col")
+    assert s.data.shape == (2, 2, 4)  # re-read with new order + canonical proj selection
+    assert s.format == "numpy"
+
+def test_exports():
+    from backend.loaders import load_sinogram, SelectionConfig, SinogramData, resolve_indices
+    assert callable(load_sinogram)

@@ -38,6 +38,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+nifti = ["nibabel>=5.0.0"]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",

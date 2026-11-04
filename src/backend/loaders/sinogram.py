@@ -126,16 +126,21 @@ class SinogramData:
 
     @axis_order.setter
     def axis_order(self, value: tuple[str, str, str]) -> None:
-        """Change the axis mapping; marks data stale and re-derives."""
+        """Change the axis mapping; re-derives data for the new order."""
         if not _is_permutation(value):
             raise ValueError(
                 f"axis_order must be a permutation of ('proj', 'row', 'col'), got {value!r}"
             )
         self._axis_order = value
-        # Data is now stale w.r.t. the new axis mapping; clear it and the
-        # loader so materialize() re-reads / re-derives.
-        self.data = None
-        self._loader = None
+        self.source_axis_order = value
+        if self._raw_file_order is not None:
+            # full in-memory load: re-derive via transpose + re-select (no disk read)
+            self.data = _apply_selection(self._raw_file_order, self.selection, value)
+            self._loader = None
+        else:
+            # partial / lazy subset (no raw held): re-read from path with new order
+            self.data = load_sinogram(self.path, self.selection, self.geometry, value).data
+            self._loader = None
 
     def materialize(self) -> np.ndarray:
         """Load and cache canonical `data`, then return it."""
@@ -173,6 +178,19 @@ def _detect_format(path: Path) -> str:
     return "unknown"
 
 
+def _apply_selection(raw, selection, axis_order):
+    """Transpose raw to canonical (proj,row,col) and apply canonical selection."""
+    canonical_tuple = tuple(axis_order.index(label) for label in ("proj", "row", "col"))
+    transposed = raw.transpose(canonical_tuple)
+    proj_idx = resolve_indices(selection.proj_mode, transposed.shape[0],
+        selection.proj_range, selection.proj_downsample, selection.proj_custom)
+    row_idx = resolve_indices(selection.row_mode, transposed.shape[1],
+        selection.row_range, selection.row_downsample, selection.row_custom)
+    col_idx = resolve_indices(selection.col_mode, transposed.shape[2],
+        selection.col_range, selection.col_downsample, selection.col_custom)
+    return transposed[np.ix_(proj_idx, row_idx, col_idx)]
+
+
 def _finish_sinogram(
     raw: np.ndarray,
     original_shape: tuple[int, int, int],
@@ -182,31 +200,17 @@ def _finish_sinogram(
     fmt: str,
 ) -> SinogramData:
     """Transpose ``raw`` to canonical (proj, row, col), apply selection."""
-    canonical_tuple = tuple(axis_order.index(label) for label in ("proj", "row", "col"))
-    transposed = raw.transpose(canonical_tuple)
+    data = _apply_selection(raw, selection, axis_order)
 
-    proj_idx = resolve_indices(
-        selection.proj_mode,
-        transposed.shape[0],
-        selection.proj_range,
-        selection.proj_downsample,
-        selection.proj_custom,
+    # A selection is "full" iff all three modes are "all". When full, hold the
+    # raw file-order array so an axis_order change re-derives in memory; else
+    # leave it as None so the change re-reads from `path`.
+    is_full = (
+        selection.row_mode == "all"
+        and selection.col_mode == "all"
+        and selection.proj_mode == "all"
     )
-    row_idx = resolve_indices(
-        selection.row_mode,
-        transposed.shape[1],
-        selection.row_range,
-        selection.row_downsample,
-        selection.row_custom,
-    )
-    col_idx = resolve_indices(
-        selection.col_mode,
-        transposed.shape[2],
-        selection.col_range,
-        selection.col_downsample,
-        selection.col_custom,
-    )
-    data = transposed[np.ix_(proj_idx, row_idx, col_idx)]
+    raw_file_order = raw if is_full else None
 
     return SinogramData(
         data=data,
@@ -217,6 +221,7 @@ def _finish_sinogram(
         path=path,
         format=fmt,
         lazy=False,
+        _raw_file_order=raw_file_order,
     )
 
 

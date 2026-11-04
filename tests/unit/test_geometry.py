@@ -2,7 +2,7 @@
 
 import pytest
 
-from visualization.geometry import (
+from backend.geometry import (
     ProjectionGeometry,
     load_geometry,
     load_geometry_from_txt,

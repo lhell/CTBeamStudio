@@ -200,7 +200,7 @@ def geometry_from_projection_geometry(geometry) -> ConeBeamGeometry:
     used by the projector.
 
     Args:
-        geometry: A ``visualization.geometry.ProjectionGeometry`` instance.
+        geometry: A ``backend.geometry.ProjectionGeometry`` instance.
 
     Returns:
         A :class:`ConeBeamGeometry` with matching parameters.

@@ -10,7 +10,7 @@ Note:
 
 Example:
     >>> from pathlib import Path
-    >>> from src.visualization.loaders import scan_series, load_dicom_series
+    >>> from backend.loaders import scan_series, load_dicom_series
     >>>
     >>> # Scan directory for series
     >>> series_list = scan_series(Path("path/to/dicom/dir"))
@@ -31,7 +31,7 @@ import numpy as np
 import pydicom
 from pydicom.dataset import Dataset
 
-from visualization.volume import Volume
+from backend.volume import Volume
 
 
 @dataclass

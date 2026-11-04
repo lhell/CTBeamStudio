@@ -28,7 +28,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
-from visualization.loaders.dicom import load_dicom_series, scan_series
+from backend.loaders.dicom import load_dicom_series, scan_series
 from visualization.mpr import extract_slice
 from visualization.volume3d import (
     add_source_detector_figure,

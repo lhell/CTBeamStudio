@@ -33,9 +33,9 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from visualization.forward_project import PARALLELPROJ_AVAILABLE, forward_project
-from visualization.geometry import ProjectionGeometry
-from visualization.volume import Volume
+from backend.forward_project import PARALLELPROJ_AVAILABLE, forward_project
+from backend.geometry import ProjectionGeometry
+from backend.volume import Volume
 
 
 def make_volume(n: int = 16) -> Volume:

@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from visualization.geometry import ProjectionGeometry
-from visualization.volume import Volume
+from backend.geometry import ProjectionGeometry
+from backend.volume import Volume
 
 
 def test_forward_projection_result_dataclass():
     """Test ForwardProjectionResult can be created."""
-    from visualization.forward_project import ForwardProjectionResult
+    from backend.forward_project import ForwardProjectionResult
 
     projections = np.zeros((10, 64, 512))
     geometry = ProjectionGeometry()
@@ -28,7 +28,7 @@ def test_forward_projection_result_dataclass():
 
 def test_forward_project_returns_correct_shape():
     """Test forward_project returns projections with correct shape."""
-    from visualization.forward_project import forward_project
+    from backend.forward_project import forward_project
 
     # Create simple volume (air = 0 HU)
     volume = Volume(
@@ -52,7 +52,7 @@ def test_forward_project_returns_correct_shape():
 
 def test_forward_project_with_selection():
     """Test forward_project with row/col/projection selection."""
-    from visualization.forward_project import forward_project
+    from backend.forward_project import forward_project
 
     volume = Volume(
         array=np.ones((20, 20, 20), dtype=np.int16) * 0,
@@ -80,7 +80,7 @@ def test_forward_project_with_selection():
 
 def test_parallelproj_availability():
     """Test that parallelproj availability flag works."""
-    from visualization.forward_project import PARALLELPROJ_AVAILABLE
+    from backend.forward_project import PARALLELPROJ_AVAILABLE
 
     # Just check the flag exists and is a boolean
     assert isinstance(PARALLELPROJ_AVAILABLE, bool)

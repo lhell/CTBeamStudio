@@ -1,6 +1,6 @@
 """Tests for projection geometry loader."""
 
-from visualization.loaders.projection import load_projection_geometry
+from backend.loaders.projection import load_projection_geometry
 
 
 def test_load_projection_geometry_from_txt(tmp_path):

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from visualization.mpr import extract_slice
-from visualization.volume import Volume
+from backend.volume import Volume
 from visualization.windowing import WINDOW_PRESETS, apply_window
 
 

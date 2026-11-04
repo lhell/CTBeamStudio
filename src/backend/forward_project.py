@@ -21,8 +21,8 @@ except ImportError:
     parallelproj = None
 
 
-from visualization.geometry import ProjectionGeometry
-from visualization.volume import Volume
+from backend.geometry import ProjectionGeometry
+from backend.volume import Volume
 
 
 @dataclass

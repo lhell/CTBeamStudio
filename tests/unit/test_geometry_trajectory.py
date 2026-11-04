@@ -3,7 +3,7 @@
 import plotly.graph_objects as go
 import pytest
 
-from visualization.geometry import ProjectionGeometry
+from backend.geometry import ProjectionGeometry
 from visualization.volume3d import (
     add_trajectory_to_figure,
     get_detector_position,

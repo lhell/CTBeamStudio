@@ -6,8 +6,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from visualization.loaders.dicom import scan_series
-from visualization.loaders.projection import load_projection_geometry
+from backend.loaders.dicom import scan_series
+from backend.loaders.projection import load_projection_geometry
 
 logger = logging.getLogger(__name__)
 

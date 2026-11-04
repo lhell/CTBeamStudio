@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 
-from visualization.volume import Volume
+from backend.volume import Volume
 
 
 def create_shepp_logan_phantom(size: int = 256) -> np.ndarray:

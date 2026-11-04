@@ -5,7 +5,7 @@ their axis ordering between the project's internal convention (**World A**) and
 the parallelproj convention (**World B**).
 
 World A (project-internal volume)
-    - Volume array shape: ``(z, y, x)``  (see :class:`visualization.volume.Volume`)
+    - Volume array shape: ``(z, y, x)``  (see :class:`backend.volume.Volume`)
     - Spacing: ``(dz, dy, dx)`` in mm
     - Origin:  ``(ox, oy, oz)`` in mm
 

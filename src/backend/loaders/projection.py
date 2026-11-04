@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from visualization.geometry import ProjectionGeometry, load_geometry_from_txt
+from backend.geometry import ProjectionGeometry, load_geometry_from_txt
 
 
 def load_projection_geometry(txt_path: Path) -> ProjectionGeometry:

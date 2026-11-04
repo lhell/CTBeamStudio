@@ -5,8 +5,8 @@ from typing import Optional
 
 import numpy as np
 
-from visualization.loaders.dicom import _detect_unit
-from visualization.volume import Volume
+from backend.loaders.dicom import _detect_unit
+from backend.volume import Volume
 
 
 def scan_npy_folder(root: Path) -> list[Path]:

@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from visualization.loaders.npy import load_npy, load_npy_series, scan_npy_folder
+from backend.loaders.npy import load_npy, load_npy_series, scan_npy_folder
 
 
 class TestLoadNpy:

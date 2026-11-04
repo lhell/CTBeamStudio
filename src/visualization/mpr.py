@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from visualization.volume import Volume
+from backend.volume import Volume
 
 AXIS = {"axial": 0, "coronal": 1, "sagittal": 2}
 

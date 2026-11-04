@@ -15,7 +15,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from visualization.loaders.dicom import scan_series
+from backend.loaders.dicom import scan_series
 
 
 def main():

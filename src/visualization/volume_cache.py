@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from visualization.loaders.dicom import load_dicom_series
+from backend.loaders.dicom import load_dicom_series
 
 CACHE_FILE = Path("data/.last_loaded.json")
 

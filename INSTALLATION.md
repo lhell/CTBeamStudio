@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all installation options for CT-Viewer.
+This guide covers all installation options for BeamStudio.
 
 ## Prerequisites
 

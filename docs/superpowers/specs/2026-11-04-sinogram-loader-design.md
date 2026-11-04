@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-04
 **Status:** Draft
-**Author:** CT-Viewer Team
+**Author:** BeamStudio Team
 **Epoch:** Phase 9 (T-64, T-65, T-66)
 
 ## 1. Overview

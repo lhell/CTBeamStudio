@@ -1,4 +1,4 @@
-# CT-Viewer conda environment with parallelproj GPU support
+# BeamStudio conda environment with parallelproj GPU support
 #
 # Usage:
 #   conda env create -f environment.yml

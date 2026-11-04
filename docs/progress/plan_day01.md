@@ -34,7 +34,7 @@ Projekt ist rechtlich veröffentlichbar.
 ```
 MIT License
 
-Copyright (c) 2026 CT-Viewer Project
+Copyright (c) 2026 BeamStudio Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +57,7 @@ SOFTWARE.
 
 #### 2. NOTICE
 ```
-CT-Viewer Notice
+BeamStudio Notice
 ================
 
 This project includes the following third-party components:
@@ -74,7 +74,7 @@ This project includes the following third-party components:
 - pylibjpeg: https://github.com/pydicom/pylibjpeg
   License: BSD 3-Clause "New" or "Revised" License
 
-The CT-Viewer project itself is licensed under the MIT License.
+The BeamStudio project itself is licensed under the MIT License.
 See the LICENSE file for details.
 
 AAPM LDCT Challenge 2016 Data
@@ -412,10 +412,10 @@ Sie können Ihre eigenen DICOM-Daten verwenden:
 #### 2. `CITATION.cff` erstellen
 ```yaml
 cff-version: "1.2.0"
-title: "CT-Viewer"
+title: "BeamStudio"
 message: "If you use this software, please cite it as below."
 authors:
-  - name: "CT-Viewer Project"
+  - name: "BeamStudio Project"
     email: "contact@example.com"
 version: "1.0.0"
 date-released: "2026-10-14"
@@ -423,9 +423,9 @@ license: "MIT"
 
 preferred-citation:
   type: article
-  title: "CT-Viewer: A visualization tool for CT orientation"
+  title: "BeamStudio: A visualization tool for CT orientation"
   authors:
-    - name: "CT-Viewer Project"
+    - name: "BeamStudio Project"
   journal: "SoftwareX"
   year: 2026
 

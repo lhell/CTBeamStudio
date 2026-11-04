@@ -85,7 +85,7 @@ git commit -m "chore(release): 1.0.0"
 ### Step 2 - annotated git tag
 
 ```powershell
-git tag -a v1.0.0 -m "CT-Viewer 1.0.0"
+git tag -a v1.0.0 -m "BeamStudio 1.0.0"
 git push origin main --follow-tags
 ```
 
@@ -203,7 +203,7 @@ Until that exists, the manual procedure in section 5 is the contract.
 
 ```powershell
 git status                                  # must be clean before tagging
-git tag -a v1.0.0 -m "CT-Viewer 1.0.0"
+git tag -a v1.0.0 -m "BeamStudio 1.0.0"
 git push origin main --follow-tags
 
 docker build -t ct-viewer:1.0.0 -t ct-viewer:latest .

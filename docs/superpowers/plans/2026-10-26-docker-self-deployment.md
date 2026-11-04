@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build and run CT-Viewer v1.0.0 as a Docker container for self-hosted deployment.
+**Goal:** Build and run BeamStudio v1.0.0 as a Docker container for self-hosted deployment.
 
 **Architecture:** Single-stage Dockerfile using Python 3.11-slim, runs Streamlit on port 8501, starts in demo phantom mode by default.
 
@@ -167,7 +167,7 @@ Run: `docker stop ct-viewer && docker rm ct-viewer`
 
 ```bash
 #!/bin/bash
-# Run CT-Viewer Docker container
+# Run BeamStudio Docker container
 CONTAINER_NAME="ct-viewer"
 
 # Stop existing if running
@@ -184,7 +184,7 @@ docker build -t ct-viewer:latest .
 echo "Starting container on port 8501..."
 docker run -d -p 8501:8501 --name $CONTAINER_NAME ct-viewer:latest
 
-echo "CT-Viewer running at http://localhost:8501"
+echo "BeamStudio running at http://localhost:8501"
 ```
 
 - [x] **Step 2: Make script executable**

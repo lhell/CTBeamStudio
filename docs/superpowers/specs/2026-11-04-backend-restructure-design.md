@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-04
 **Status:** Draft
-**Author:** CT-Viewer Team
+**Author:** BeamStudio Team
 
 ## 1. Overview
 

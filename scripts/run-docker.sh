@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run CT-Viewer Docker container
+# Run BeamStudio Docker container
 CONTAINER_NAME="ct-viewer"
 
 # Stop existing if running
@@ -16,4 +16,4 @@ docker build -t ct-viewer:latest .
 echo "Starting container on port 8501..."
 docker run -d -p 8501:8501 --name $CONTAINER_NAME ct-viewer:latest
 
-echo "CT-Viewer running at http://localhost:8501"
+echo "BeamStudio running at http://localhost:8501"

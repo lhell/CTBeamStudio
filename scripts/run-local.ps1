@@ -1,6 +1,6 @@
-# Run CT-Viewer locally and open browser automatically
+# Run BeamStudio locally and open browser automatically
 
-Write-Host "Starting CT-Viewer..." -ForegroundColor Green
+Write-Host "Starting BeamStudio..." -ForegroundColor Green
 Write-Host ""
 
 # Start Streamlit in background
@@ -14,7 +14,7 @@ Start-Sleep -Seconds 4
 # Open browser
 Start-Process "http://localhost:8501"
 
-Write-Host "CT-Viewer should open in your browser at http://localhost:8501" -ForegroundColor Green
+Write-Host "BeamStudio should open in your browser at http://localhost:8501" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server..." -ForegroundColor Yellow
 
@@ -26,5 +26,5 @@ finally {
     Stop-Job -Job $streamlitJob -ErrorAction SilentlyContinue
     Remove-Job -Job $streamlitJob -Force -ErrorAction SilentlyContinue
     Write-Host ""
-    Write-Host "CT-Viewer stopped." -ForegroundColor Red
+    Write-Host "BeamStudio stopped." -ForegroundColor Red
 }

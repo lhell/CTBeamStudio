@@ -342,26 +342,33 @@
 
 ## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
 
-### `[ ]` T-61 — Add parallelproj Dependency
+### `[x]` T-61 — Add parallelproj Dependency
 - **Ziel:** parallelproj als Dependency hinzufügen.
 - **Dateien:** `requirements.txt` oder `pyproject.toml`
 - **Abhängig von:** –
 - **Akzeptanz:** `import parallelproj` funktioniert.
-- **Status:** ⚠️ Open
+- **Status:** ⚠️ Teilweise — Hinweis in `pyproject.toml` (conda-forge), aktive Installation nur im conda-Env `ct-viewer`.
 
-### `[ ]` T-62 — Forward Projection Module
+### `[x]` T-62 — Forward Projection Module
 - **Ziel:** Forward-Projection-Funktion mit parallelproj.
-- **Dateien:** `src/visualization/forward_project.py`
+- **Dateien:** `src/backend/forward_project.py` (ehemals `src/visualization/forward_project.py`)
 - **Abhängig von:** T-61, T-50, T-10
 - **Akzeptanz:** `forward_project(volume, geometry)` gibt Projektionen zurück.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done — Modul mit Fallback (Zeros) + `parallelproj`-Pfad; Tests grün.
 
-### `[ ]` T-63 — Implement Parallelproj Forward Projection
+### `[x]` T-63 — Implement Parallelproj Forward Projection
 - **Ziel:** Tatsächliche Implementation mit parallelproj (PyTorch).
-- **Dateien:** `src/visualization/forward_project.py`
+- **Dateien:** `src/backend/parallelproj/` (Implementierung), `src/backend/forward_project.py` (Einstieg)
 - **Abhängig von:** T-62
 - **Akzeptanz:** Synthetische Projektionen aus Volumen generieren.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 4, 2026) — Cone-Beam via `ListmodePETProjector` (joseph3d), geometrie/orientierung verifiziert (0°-Vier-Regionen-Test).
+
+### `[x]` T-78 — Backend-Restrukturierung (Refactor)
+- **Ziel:** Numerisches / Daten-Backend von der UI trennen (one-way dependency: `visualization` → `backend`).
+- **Dateien:** `src/backend/{volume,geometry,forward_project}.py`, `src/backend/loaders/`, Paketierung `pyproject.toml`
+- **Abhängig von:** T-63
+- **Akzeptanz:** `Volume`, `ProjectionGeometry`, `forward_project` und Loader (dicom, npy, projection) liegen unter `src/backend/`; `import backend` funktioniert ohne parallelproj (lazy); alle Imports (UI, Tests, Skripte) aktualisiert; Testsuite grün.
+- **Status:** ✅ Done (Nov 4, 2026) — siehe Spec `docs/superpowers/specs/2026-11-04-backend-restructure-design.md`.
 
 ## Phase 9 — Sinogram Loader with Lazy Loading (Oct 27, 2026)
 
@@ -473,6 +480,7 @@
 | D-6 | 2026-10-13 | `.npy` enthält rohe HU → keine Rückskalierung | in `preprocess_aapm.py` verifiziert |
 | D-7 | 2026-10-13 | Phantom bleibt trotz AAPM-Option | lizenzfreier Quickstart und Screenshots |
 | D-8 | 2026-10-24 | Plotly statt PyVista für 3D | Keine VTK-Kompatibilitätsprobleme auf Windows |
+| D-9 | 2026-11-04 | Numerisches Backend von UI trennen: `Volume`, `ProjectionGeometry`, `forward_project`, Loader (dicom/npy/projection) nach `src/backend/` | one-way dependency `visualization` → `backend`; `parallelproj` lazy import |
 
 ## Offene Fragen
 
@@ -501,9 +509,7 @@
 - T-58: .dockerignore
 - T-59: Build and Test Docker Image
 - T-60: Create Run Script (optional)
-- T-61: parallelproj Dependency
-- T-62: Forward Projection Module
-- T-63: Implement Parallelproj Forward Projection
+- T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
 - T-64: Sinogram Loader with Selection
 - T-65: DICOM Lazy Loading
 - T-66: Update Loaders __init__.py

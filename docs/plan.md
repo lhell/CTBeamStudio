@@ -372,26 +372,26 @@
 
 ## Phase 9 — Sinogram Loader with Lazy Loading (Oct 27, 2026)
 
-### `[ ]` T-64 — Sinogram Loader with Selection
+### `[x]` T-64 — Sinogram Loader with Selection
 - **Ziel:** Sinogram-Daten laden mit Row/Col/Projection Selection.
-- **Dateien:** `src/visualization/loaders/sinogram.py`
+- **Dateien:** `src/backend/loaders/sinogram.py`
 - **Abhängig von:** –
 - **Akzeptanz:** `load_sinogram()` mit SelectionConfig.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 4, 2026) — Node `src/backend/loaders/sinogram.py`; Format-Support numpy (.npy/.npz), NIfTI, DICOM; Selektion all/central/range/downsample/custom; `axis_order` nach dem Laden änderbar (In-Memory Transpose bzw. Disk-Re-Read). Siehe Spec `docs/superpowers/specs/2026-11-04-sinogram-loader-design.md`.
 
-### `[ ]` T-65 — DICOM Lazy Loading
+### `[x]` T-65 — DICOM Lazy Loading
 - **Ziel:** Lazy Loading für Helical-DICOM-Daten.
-- **Dateien:** `src/visualization/loaders/sinogram.py`
+- **Dateien:** `src/backend/loaders/sinogram.py`
 - **Abhängig von:** T-64
 - **Akzeptanz:** Nur benötigte Rows/Projections laden.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 4, 2026) — `scan_dicom_sinogram()` (Header-Only-Scan) + `_load_dicom`; nur die selektierten Projektionen werden gelesen (Pixel-Arrays der nicht-selektierten Frames nie geladen). Siehe Spec `docs/superpowers/specs/2026-11-04-sinogram-loader-design.md`.
 
-### `[ ]` T-66 — Update Loaders __init__.py
+### `[x]` T-66 — Update Loaders __init__.py
 - **Ziel:** Sinogram-Loader exportieren.
-- **Dateien:** `src/visualization/loaders/__init__.py`
+- **Dateien:** `src/backend/loaders/__init__.py`
 - **Abhängig von:** T-64
-- **Akzeptanz:** `from visualization.loaders import load_sinogram` funktioniert.
-- **Status:** ⚠️ Open
+- **Akzeptanz:** `from backend.loaders import load_sinogram` funktioniert.
+- **Status:** ✅ Done (Nov 4, 2026) — Exportiert `SelectionConfig`, `SinogramData`, `load_sinogram`, `resolve_indices`, `scan_dicom_sinogram`.
 
 ## Phase 10 — Comparison (Oct 27, 2026)
 

@@ -1,22 +1,61 @@
 # Linting Guide
 
-## Vor jedem Commit ausführen:
+This file is read by both humans and AI agents. **Follow the tool order below
+exactly** — it matches the project's tooling and avoids reformat churn.
+
+## Run order (MUST follow)
+
+1. **flake8** — static lint check (reports issues; do not auto-fix)
+2. **black** — auto-format (code style, line length 88)
+3. **isort** — sort imports
+
+Run on the files you changed (or `.` for the whole repo). Example:
 
 ```bash
-# Formatierung
-python -m black .
-python -m isort .
+# 1. Lint check (read-only) — use the project's ignore set
+#    (repo ignores: E501, E402, F541, F401, F841, W503)
+#    NOTE: E203 is black's slice-spacing style and is a known black/flake8
+#    false positive — also ignore it.
+python -m flake8 . --ignore=F841,E501,E402,F541,F401,W503,E203
 
-# Linting
-python -m flake8 . --ignore=F841
+# 2. Format
+python -m black .
+
+# 3. Sort imports
+python -m isort .
 ```
 
-## CI/CD Checks (GitHub Actions)
+## Why this order
 
-Siehe `.github/workflows/ci.yml` (falls vorhanden).
+- Run **flake8 first** so the unformatted file's real errors surface before
+  black rewrites it.
+- Run **black before isort** because black is the style authority for the
+  project (line length 88). isort's `profile = "black"` is configured in
+  `pyproject.toml` to stay consistent with it.
+- black may reformat multi-line calls back onto fewer lines (it collapses to
+  88 chars) — that is expected and correct.
 
-## Hinweise
+## Tool availability
 
-- `flake8 --ignore=F841` ignoriert ungenutzte Variablen (placeholder Variablen in T-63)
-- `black` formatiert Code automatisch auf Zeilenlänge 88
-- `isort` sortiert Imports alphabetisch
+- `black`, `isort`, `flake8` are installed at the system level (Python 3.13),
+  NOT inside the `ct-viewer` conda env. Run them from the system Python or the
+  project venv, not from `ct-viewer`.
+- These tools are used for formatting even though the conda env is used for
+  running parallelproj-based tests.
+
+## Known flake8 findings (all acceptable)
+
+| Code | Meaning | Why it's fine |
+|------|---------|---------------|
+| `E501` | line too long (>79) | Repo max line length is 88 (black config); ignored in pyproject |
+| `E402` | module import not at top | `sys.path` setup in scripts / `importorskip` in tests |
+| `F401` | imported but unused | Placeholder / re-exported names |
+| `F841` | local var assigned, unused | Placeholder variables |
+| `E203` | whitespace before `:` | black's slice syntax; false positive vs. black |
+
+If flake8 reports anything *other* than the above (e.g. `F401` for a genuinely
+dead import, undefined names, real logic errors), fix it.
+
+## CI/CD Checks
+
+See `.github/workflows/ci.yml` (if present).

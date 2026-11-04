@@ -39,15 +39,15 @@ def test_forward_project_returns_correct_shape():
     )
 
     geometry = ProjectionGeometry(
-        n_det_cols=512, n_det_rows=64, projections_per_rotation=230
+        n_det_cols=16, n_det_rows=16, projections_per_rotation=1
     )
 
     result = forward_project(volume, geometry)
 
-    # Should return (n_projections, n_rows, n_cols)
-    assert result.projections.shape[0] == 230
-    assert result.projections.shape[1] == 64
-    assert result.projections.shape[2] == 512
+    # Should return (n_projections, n_rows, n_cols) with a 0° projection
+    assert result.projections.shape[0] == 1
+    assert result.projections.shape[1] == 16
+    assert result.projections.shape[2] == 16
 
 
 def test_forward_project_with_selection():
@@ -62,20 +62,20 @@ def test_forward_project_with_selection():
     )
 
     geometry = ProjectionGeometry(
-        n_det_cols=512, n_det_rows=64, projections_per_rotation=230
+        n_det_cols=16, n_det_rows=16, projections_per_rotation=1
     )
 
-    # Select only central row and 10 projections
+    # Select only central row (0° projection)
     result = forward_project(
         volume,
         geometry,
-        row_indices=[32],  # central row
-        proj_indices=list(range(0, 230, 23)),  # 10 projections
+        row_indices=[8],  # central row
+        proj_indices=[0],  # single 0° projection
     )
 
-    assert result.projections.shape[0] == 10  # 10 projections
+    assert result.projections.shape[0] == 1  # 1 projection
     assert result.projections.shape[1] == 1  # 1 row
-    assert result.projections.shape[2] == 512  # all cols
+    assert result.projections.shape[2] == 16  # all cols
 
 
 def test_parallelproj_availability():

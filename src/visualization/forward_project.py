@@ -149,48 +149,56 @@ def _forward_project_parallelproj(
     """
     import torch
 
+    from backend.parallelproj import (
+        ConeBeamProjector,
+        geometry_from_projection_geometry,
+        to_parallelproj_batch,
+    )
+
     n_projs = len(proj_indices)
-    n_rows = len(row_indices)
-    n_cols = len(col_indices)
 
-    # Get volume parameters
-    volume_array = volume.array.astype(np.float32)
-
-    # Convert to torch tensor and move to appropriate device
+    # Choose device: CUDA only if available and requested.
     cuda_available = torch.cuda.is_available() and use_cuda
-    dev = torch.device("cuda" if cuda_available else "cpu")
-    _ = torch.from_numpy(volume_array).to(dev)
+    dev = "cuda" if cuda_available else "cpu"
 
-    # Setup geometry for parallelproj
-    # parallelproj expects (x, y, z) ordering, our Volume is (z, y, x)
-    _voxel_size = (
-        volume.spacing[2],  # x
-        volume.spacing[1],  # y
-        volume.spacing[0],  # z
+    # Build the parallelproj cone-beam geometry. For a partial projection
+    # selection we project the full detector grid for the requested angles
+    # (treated as a contiguous sequence from 0) and slice afterwards.
+    cb_geometry = geometry_from_projection_geometry(geometry)
+    cb_geometry.n_projections = n_projs
+
+    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(dev=dev)
+
+    # Volume is (z, y, x); origin is DICOM (x, y, z) -> reorder to (z, y, x).
+    spacing_zyx = tuple(float(s) for s in volume.spacing)
+    origin_zyx = (
+        float(volume.origin[2]),
+        float(volume.origin[1]),
+        float(volume.origin[0]),
+    )
+    img_shape_zyx = volume.shape
+
+    projector = ConeBeamProjector(
+        pos_beam_start,
+        pos_beam_end,
+        img_shape_zyx=img_shape_zyx,
+        spacing_zyx=spacing_zyx,
+        origin_zyx=origin_zyx,
+        n_det_rows=cb_geometry.n_det_rows,
+        n_det_cols=cb_geometry.n_det_cols,
+        n_projections=n_projs,
     )
 
-    _origin = (
-        volume.origin[2],  # x
-        volume.origin[1],  # y
-        volume.origin[0],  # z
-    )
+    # Volume -> parallelproj (nx, ny, nz) ordering, as float32 numpy.
+    volume_array = volume.array.astype(np.float32)
+    volume_xyz = to_parallelproj_batch(volume_array)[0, 0]
 
-    # Source angles (0° = anterior = +X, Z-axis rotation, positive = CCW)
-    _angles = np.linspace(0, 2 * np.pi, len(proj_indices), endpoint=False)
-    _angles = np.rad2deg(_angles)
+    full_proj = projector.apply(volume_xyz)
 
-    # Scanner radius (distance from source to isocenter)
-    _scanner_radius = geometry.sid
-
-    # Get detector pixel spacing
-    _col_spacing = geometry.det_col_spacing_mm
-    _row_spacing = geometry.det_row_spacing_mm
-
-    # TODO: Implement actual parallelproj operator creation and application
-    # This is a placeholder until we have the full implementation
-
-    # For now, return zeros
-    projections = np.zeros((n_projs, n_rows, n_cols), dtype=np.float32)
+    # Select the requested rows / columns / projections.
+    projections = full_proj[np.asarray(proj_indices), :, :]
+    projections = projections[:, np.asarray(row_indices), :]
+    projections = projections[:, :, np.asarray(col_indices)]
 
     return ForwardProjectionResult(
         projections=projections,

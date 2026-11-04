@@ -89,9 +89,7 @@ def resolve_indices(
         raise ValueError("Selection resolved to an empty result")
 
     if min(indices) < 0 or max(indices) >= size:
-        raise IndexError(
-            f"Selection indices {indices} out of range for size {size}"
-        )
+        raise IndexError(f"Selection indices {indices} out of range for size {size}")
 
     return indices
 
@@ -140,7 +138,9 @@ class SinogramData:
             self._loader = None
         else:
             # partial / lazy subset (no raw held): re-read from path with new order
-            self.data = load_sinogram(self.path, self.selection, self.geometry, value).data
+            self.data = load_sinogram(
+                self.path, self.selection, self.geometry, value
+            ).data
             self._loader = None
 
     def materialize(self) -> np.ndarray:
@@ -183,12 +183,27 @@ def _apply_selection(raw, selection, axis_order):
     """Transpose raw to canonical (proj,row,col) and apply canonical selection."""
     canonical_tuple = tuple(axis_order.index(label) for label in ("proj", "row", "col"))
     transposed = raw.transpose(canonical_tuple)
-    proj_idx = resolve_indices(selection.proj_mode, transposed.shape[0],
-        selection.proj_range, selection.proj_downsample, selection.proj_custom)
-    row_idx = resolve_indices(selection.row_mode, transposed.shape[1],
-        selection.row_range, selection.row_downsample, selection.row_custom)
-    col_idx = resolve_indices(selection.col_mode, transposed.shape[2],
-        selection.col_range, selection.col_downsample, selection.col_custom)
+    proj_idx = resolve_indices(
+        selection.proj_mode,
+        transposed.shape[0],
+        selection.proj_range,
+        selection.proj_downsample,
+        selection.proj_custom,
+    )
+    row_idx = resolve_indices(
+        selection.row_mode,
+        transposed.shape[1],
+        selection.row_range,
+        selection.row_downsample,
+        selection.row_custom,
+    )
+    col_idx = resolve_indices(
+        selection.col_mode,
+        transposed.shape[2],
+        selection.col_range,
+        selection.col_downsample,
+        selection.col_custom,
+    )
     return transposed[np.ix_(proj_idx, row_idx, col_idx)]
 
 
@@ -255,7 +270,9 @@ def _load_nifti(path, selection, axis_order, _on_read=None):
     try:
         import nibabel as nib
     except ImportError:
-        raise ImportError("nibabel is required for NIfTI loading. Install with: pip install nibabel")
+        raise ImportError(
+            "nibabel is required for NIfTI loading. Install with: pip install nibabel"
+        )
     img = nib.load(path)
     raw_shape = img.shape
     if len(raw_shape) != 3:
@@ -301,17 +318,26 @@ def _load_dicom(path, selection, geometry, axis_order):
     # Resolve proj selection in canonical space first (cheap, header-only) and
     # read ONLY the selected projections' pixel arrays (lazy per-request).
     proj_canonical = resolve_indices(
-        selection.proj_mode, n_proj,
-        selection.proj_range, selection.proj_downsample, selection.proj_custom,
+        selection.proj_mode,
+        n_proj,
+        selection.proj_range,
+        selection.proj_downsample,
+        selection.proj_custom,
     )
     # Resolve row/col selection once (same per frame).
     row_idx = resolve_indices(
-        selection.row_mode, n_rows,
-        selection.row_range, selection.row_downsample, selection.row_custom,
+        selection.row_mode,
+        n_rows,
+        selection.row_range,
+        selection.row_downsample,
+        selection.row_custom,
     )
     col_idx = resolve_indices(
-        selection.col_mode, n_cols,
-        selection.col_range, selection.col_downsample, selection.col_custom,
+        selection.col_mode,
+        n_cols,
+        selection.col_range,
+        selection.col_downsample,
+        selection.col_custom,
     )
     frames = []
     for idx in proj_canonical:

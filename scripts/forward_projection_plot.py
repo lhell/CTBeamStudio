@@ -26,6 +26,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (activates 3D projection)
 
 # Make sure the project's src/ is importable when running from PyCharm.
 SRC = Path(__file__).resolve().parent.parent / "src"
@@ -93,7 +94,13 @@ def main() -> None:
     y_extent = (n - 1) / 2.0  # half-width of the volume in world mm
 
     # --- Plot ---------------------------------------------------------------
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5.5))
+    fig = plt.figure(figsize=(16, 5.5))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 1])
+    axes = [
+        fig.add_subplot(gs[0]),
+        fig.add_subplot(gs[1]),
+        fig.add_subplot(gs[2], projection="3d"),
+    ]
 
     # Left: axial slice (y, x plane) at mid-z, in world orientation.
     ax = axes[0]
@@ -136,6 +143,30 @@ def main() -> None:
     ax.set_xticklabels([f"-{y_extent:.0f}", f"+{y_extent:.0f}"])
     ax.set_yticklabels([f"-{y_extent:.0f}", f"+{y_extent:.0f}"])
     fig.colorbar(im, ax=ax, fraction=0.046)
+
+    # Right-center: 3D view of the volume in world orientation.
+    ax = axes[2]
+    # volume.array is (z, y, x); transpose to (x, y, z) so the 3D axes are the
+    # world axes. Downsample for a lighter render. Each of the four labelled
+    # regions (values 1..4) is coloured via the viridis colormap.
+    vol3 = volume.array.transpose(2, 1, 0)[::2, ::2, ::2]
+    occupied = vol3 > 0
+    cmap = plt.get_cmap("viridis")
+    facecolors = np.empty(occupied.shape + (4,))
+    for idx in np.ndindex(occupied.shape):
+        v = vol3[idx]
+        facecolors[idx] = cmap((v - 1.0) / 3.0 if v > 0 else 0.0)
+    ax.voxels(
+        occupied,
+        facecolors=facecolors,
+        edgecolor="k",
+        linewidth=0.1,
+        alpha=0.85,
+    )
+    ax.set_title("Volume — 3D view (world axes)")
+    ax.set_xlabel("x (anterior/posterior)")
+    ax.set_ylabel("y (left/right)")
+    ax.set_zlabel("z (axial, head +)")
 
     fig.tight_layout()
     plt.show()

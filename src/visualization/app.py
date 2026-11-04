@@ -70,9 +70,7 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
 
 
 def main():
-    st.set_page_config(
-        page_title="CTBeamStudio", page_icon="🏥", layout="wide"
-    )
+    st.set_page_config(page_title="CTBeamStudio", page_icon="🏥", layout="wide")
 
     # Show demo mode banner if applicable
     if st.session_state.get("demo_mode"):

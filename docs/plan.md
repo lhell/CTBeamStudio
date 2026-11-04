@@ -370,7 +370,7 @@
 - **Akzeptanz:** `Volume`, `ProjectionGeometry`, `forward_project` und Loader (dicom, npy, projection) liegen unter `src/backend/`; `import backend` funktioniert ohne parallelproj (lazy); alle Imports (UI, Tests, Skripte) aktualisiert; Testsuite grün.
 - **Status:** ✅ Done (Nov 4, 2026) — siehe Spec `docs/superpowers/specs/2026-11-04-backend-restructure-design.md`.
 
-## Phase 9 — Sinogram Loader with Lazy Loading (Oct 27, 2026)
+## Phase 9 — Sinogram Loader with Lazy Loading
 
 ### `[ ]` T-64 — Sinogram Loader with Selection
 - **Ziel:** Sinogram-Daten laden mit Row/Col/Projection Selection.
@@ -393,7 +393,7 @@
 - **Akzeptanz:** `from visualization.loaders import load_sinogram` funktioniert.
 - **Status:** ⚠️ Open
 
-## Phase 10 — Comparison (Oct 27, 2026)
+## Phase 10 — Comparison
 
 ### `[ ]` T-67 — Comparison Module
 - **Vergleich:** Synthetic vs Measured Projektionen.
@@ -416,7 +416,7 @@
 - **Akzeptanz:** Volumen → Forward Project → Compare funktioniert.
 - **Status:** ⚠️ Open
 
-## Phase 11 — App Integration (Oct 27, 2026)
+## Phase 11 — App Integration
 
 ### `[ ]` T-70 — Forward Projection UI
 - **Ziel:** UI für Forward Projection und Vergleich in Streamlit-App.
@@ -465,8 +465,8 @@
 | 6 | Fr, 23.10. | T-21 ✅, T-30 ✅, T-33 ✅ |
 | 7 | Fr, 24.10. | T-23 ✅ (3D visualization with Plotly) |
 | 8 | Mo, 26.10. | T-50 bis T-55 ✅ (Projection Geometry) |
-| 9 | Di, 27.10. | T-56 ⚠️, T-57 bis T-60 ⚠️ (Docker) |
-| 10 | Di, 27.10. | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
+| 9 | | T-56 ⚠️, T-57 bis T-60 ⚠️ (Docker) |
+| 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 
 ## Decision Log
 
@@ -499,16 +499,6 @@
 ### Noch offen
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
-- T-40: Dockerfile
-- T-41: CI
-- T-42: README
-- T-43: Requirements
-- T-44: Deployment
-- T-56: UI für Projection Geometry in App
-- T-57: Dockerfile Review/Update
-- T-58: .dockerignore
-- T-59: Build and Test Docker Image
-- T-60: Create Run Script (optional)
 - T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
 - T-64: Sinogram Loader with Selection
 - T-65: DICOM Lazy Loading
@@ -518,26 +508,26 @@
 - T-69: Integration Tests
 - T-70: Forward Projection UI
 
-## Erledigt (Oct 26, 2026)
+## Erledigt
 
-### Projection Geometry (Phase 5 - Oct 26, 2026)
+### Projection Geometry (Phase 5)
 - ✅ T-50: ProjectionGeometry dataclass mit Validierung
 - ✅ T-51: YAML Loader (load_geometry_from_yaml)
 - ✅ T-52: TXT Loader (load_geometry_from_txt) - Mayo Clinic Format
 - ✅ T-53: Unit Tests für Geometry (test_geometry.py, test_geometry_yaml.py, test_geometry_txt.py, test_geometry_trajectory.py)
 
-### Projection Geometry 3D Visualization (Phase 6 - Oct 26, 2026)
+### Projection Geometry 3D Visualization (Phase 6)
 - ✅ T-54: Geometry Loader für User-Dateien (loaders/projection.py)
 - ✅ T-55: 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
 
 ### Phase 1-4
 - Alle Tasks T-01 bis T-44 ✅
 - T-23: 3D-Visualisierung ✅ (Oct 24)
-- Docker deferred to T-71-74
+- Docker deferred to T-71-74 (T-71, T-72 ✅ done; T-73 ⚠️ blocked; T-74 script ⚠️ started)
 
-## Implementation Notes (Oct 19, 2026)
+## Implementation Notes
 
-### 3D Visualization Features (Oct 24, 2026)
+### 3D Visualization Features
 
 | Feature | Description |
 |---------|-------------|

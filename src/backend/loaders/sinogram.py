@@ -152,3 +152,113 @@ def _is_permutation(value: tuple[str, str, str]) -> bool:
     if not isinstance(value, tuple) or len(value) != 3:
         return False
     return set(value) == {"proj", "row", "col"}
+
+
+def _detect_format(path: Path) -> str:
+    """Detect the sinogram file format from ``path``.
+
+    Returns one of "dicom", "nifti", "numpy", or "unknown".
+    """
+    if path.is_dir():
+        return "dicom"
+    name = path.name
+    if name.endswith(".nii.gz"):
+        return "nifti"
+    if name.endswith((".npy", ".npz")):
+        return "numpy"
+    if name.endswith(".nii"):
+        return "nifti"
+    if name.endswith((".dcm", ".dicom")):
+        return "dicom"
+    return "unknown"
+
+
+def _finish_sinogram(
+    raw: np.ndarray,
+    original_shape: tuple[int, int, int],
+    path: Path,
+    selection: SelectionConfig,
+    axis_order: tuple[str, str, str],
+    fmt: str,
+) -> SinogramData:
+    """Transpose ``raw`` to canonical (proj, row, col), apply selection."""
+    canonical_tuple = tuple(axis_order.index(label) for label in ("proj", "row", "col"))
+    transposed = raw.transpose(canonical_tuple)
+
+    proj_idx = resolve_indices(
+        selection.proj_mode,
+        transposed.shape[0],
+        selection.proj_range,
+        selection.proj_downsample,
+        selection.proj_custom,
+    )
+    row_idx = resolve_indices(
+        selection.row_mode,
+        transposed.shape[1],
+        selection.row_range,
+        selection.row_downsample,
+        selection.row_custom,
+    )
+    col_idx = resolve_indices(
+        selection.col_mode,
+        transposed.shape[2],
+        selection.col_range,
+        selection.col_downsample,
+        selection.col_custom,
+    )
+    data = transposed[np.ix_(proj_idx, row_idx, col_idx)]
+
+    return SinogramData(
+        data=data,
+        geometry=None,
+        selection=selection,
+        original_shape=original_shape,
+        source_axis_order=axis_order,
+        path=path,
+        format=fmt,
+        lazy=False,
+    )
+
+
+def _load_numpy(
+    path: Path,
+    selection: SelectionConfig,
+    axis_order: tuple[str, str, str],
+) -> SinogramData:
+    """Load a ``.npy``/``.npz`` sine file into a canonical SinogramData."""
+    if path.suffix == ".npz":
+        with np.load(path) as zf:
+            if "arr_0" in zf:
+                raw = zf["arr_0"]
+            else:
+                raw = zf[zf.files[0]]
+    else:
+        raw = np.load(path)
+
+    if raw.ndim != 3:
+        raise ValueError(
+            f"Expected a 3D sinogram array, got {raw.ndim}D array with shape "
+            f"{raw.shape} from {path}"
+        )
+
+    original_shape = raw.shape
+    return _finish_sinogram(raw, original_shape, path, selection, axis_order, "numpy")
+
+
+def load_sinogram(
+    path,
+    selection: Optional[SelectionConfig] = None,
+    geometry: Optional[object] = None,
+    axis_order: tuple[str, str, str] = ("proj", "row", "col"),
+) -> SinogramData:
+    """Load a sinogram from ``path``, dispatching on the detected format."""
+    path = Path(path)
+    fmt = _detect_format(path)
+
+    if fmt == "numpy":
+        return _load_numpy(path, selection or SelectionConfig(), axis_order)
+    if fmt == "nifti":
+        raise NotImplementedError("NIFTI sinogram loading is not yet implemented")
+    if fmt == "dicom":
+        raise NotImplementedError("DICOM sinogram loading is not yet implemented")
+    raise ValueError(f"Unknown sinogram format for {path}")

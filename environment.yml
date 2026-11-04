@@ -1,4 +1,4 @@
-# BeamStudio conda environment with parallelproj GPU support
+# CTBeamStudio conda environment with parallelproj GPU support
 #
 # Usage:
 #   conda env create -f environment.yml

@@ -1,4 +1,4 @@
-# BeamStudio
+# CTBeamStudio
 
 A web-based tool for exploring CT scanner geometry and generating **simulated projections** from 3D volume data — for the purpose of comparing them against **measured** projections.
 
@@ -90,6 +90,6 @@ See [SECURITY.md](SECURITY.md) for our security policy and best practices.
 
 If you use this software in your research, please cite:
 
-> BeamStudio: A visualization tool for CT orientation. 2026.
+> CTBeamStudio: A visualization tool for CT orientation. 2026.
 
 If you use AAPM Challenge data, please also cite the original challenge.

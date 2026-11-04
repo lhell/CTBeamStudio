@@ -1,6 +1,6 @@
 # Projection Geometry Definition
 
-This document defines the coordinate system and geometry parameters used in BeamStudio for cone-beam CT projection data.
+This document defines the coordinate system and geometry parameters used in CTBeamStudio for cone-beam CT projection data.
 
 ## Coordinate System
 

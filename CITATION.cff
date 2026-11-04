@@ -1,8 +1,8 @@
 cff-version: "1.2.0"
-title: "BeamStudio"
+title: "CTBeamStudio"
 message: "If you use this software, please cite it as below."
 authors:
-  - name: "BeamStudio Project"
+  - name: "CTBeamStudio Project"
     email: "contact@example.com"
 version: "1.0.0"
 date-released: "2026-10-14"
@@ -10,9 +10,9 @@ license: "MIT"
 
 preferred-citation:
   type: article
-  title: "BeamStudio: A visualization tool for CT orientation"
+  title: "CTBeamStudio: A visualization tool for CT orientation"
   authors:
-    - name: "BeamStudio Project"
+    - name: "CTBeamStudio Project"
   journal: "SoftwareX"
   year: 2026
 

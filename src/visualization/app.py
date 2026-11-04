@@ -1,4 +1,4 @@
-"""Streamlit app for BeamStudio."""
+"""Streamlit app for CTBeamStudio."""
 
 import logging
 import sys
@@ -71,7 +71,7 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
 
 def main():
     st.set_page_config(
-        page_title="BeamStudio", page_icon="🏥", layout="wide"
+        page_title="CTBeamStudio", page_icon="🏥", layout="wide"
     )
 
     # Show demo mode banner if applicable

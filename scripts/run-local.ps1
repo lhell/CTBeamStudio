@@ -1,6 +1,6 @@
-# Run BeamStudio locally and open browser automatically
+# Run CTBeamStudio locally and open browser automatically
 
-Write-Host "Starting BeamStudio..." -ForegroundColor Green
+Write-Host "Starting CTBeamStudio..." -ForegroundColor Green
 Write-Host ""
 
 # Start Streamlit in background
@@ -14,7 +14,7 @@ Start-Sleep -Seconds 4
 # Open browser
 Start-Process "http://localhost:8501"
 
-Write-Host "BeamStudio should open in your browser at http://localhost:8501" -ForegroundColor Green
+Write-Host "CTBeamStudio should open in your browser at http://localhost:8501" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server..." -ForegroundColor Yellow
 
@@ -26,5 +26,5 @@ finally {
     Stop-Job -Job $streamlitJob -ErrorAction SilentlyContinue
     Remove-Job -Job $streamlitJob -Force -ErrorAction SilentlyContinue
     Write-Host ""
-    Write-Host "BeamStudio stopped." -ForegroundColor Red
+    Write-Host "CTBeamStudio stopped." -ForegroundColor Red
 }

@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all installation options for BeamStudio.
+This guide covers all installation options for CTBeamStudio.
 
 ## Prerequisites
 

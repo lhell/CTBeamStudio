@@ -1,6 +1,6 @@
 
 
-# BeamStudio — Implementierungsplan
+# CTBeamStudio — Implementierungsplan
 
 **Projekt:** `Res_Indep_CTO` / `src/visualization/`
 **Stand:** 2026-10-14

@@ -1,5 +1,5 @@
-BeamStudio Notice
-===============
+CTBeamStudio Notice
+===================
 
 This project includes the following third-party components:
 
@@ -15,7 +15,7 @@ This project includes the following third-party components:
 - pylibjpeg: https://github.com/pydicom/pylibjpeg
   License: BSD 3-Clause "New" or "Revised" License
 
-The BeamStudio project itself is licensed under the MIT License.
+The CTBeamStudio project itself is licensed under the MIT License.
 See the LICENSE file for details.
 
 AAPM LDCT Challenge 2016 Data

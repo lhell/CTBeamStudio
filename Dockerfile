@@ -1,4 +1,4 @@
-# BeamStudio Dockerfile
+# CTBeamStudio Dockerfile
 # Python 3.11 + Streamlit
 
 FROM python:3.11-slim

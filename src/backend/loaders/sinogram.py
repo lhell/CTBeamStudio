@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable, Literal, Optional
 
 import numpy as np
+import pydicom
 
 
 @dataclass
@@ -265,6 +266,75 @@ def _load_nifti(path, selection, axis_order, _on_read=None):
     return _finish_sinogram(data, raw_shape, path, selection, axis_order, "nifti")
 
 
+def scan_dicom_sinogram(dir_path: Path) -> dict:
+    """Scan a DICOM projection-series directory (header-only, no pixel data).
+
+    Returns a dict with ``n_proj``, ``n_rows``, ``n_cols`` and ``files``
+    (sorted list of ``Path``). Raises ``ValueError`` if no DICOM files are
+    found.
+    """
+    dir_path = Path(dir_path)
+    # find .dcm/.dicom files in dir (top level)
+    dicom_files = sorted(
+        [f for f in dir_path.iterdir() if f.suffix.lower() in (".dcm", ".dicom")]
+    )
+    if not dicom_files:
+        raise ValueError(f"No DICOM files found in {dir_path}")
+    # read first header for rows/cols
+    first = pydicom.dcmread(dicom_files[0], stop_before_pixels=True)
+    n_rows = int(first.Rows)
+    n_cols = int(first.Columns)
+    n_proj = len(dicom_files)
+    return {
+        "n_proj": n_proj,
+        "n_rows": n_rows,
+        "n_cols": n_cols,
+        "files": dicom_files,
+    }
+
+
+def _load_dicom(path, selection, geometry, axis_order):
+    path = Path(path)
+    info = scan_dicom_sinogram(path)
+    files = info["files"]
+    n_proj, n_rows, n_cols = info["n_proj"], info["n_rows"], info["n_cols"]
+    # Resolve proj selection in canonical space first (cheap, header-only) and
+    # read ONLY the selected projections' pixel arrays (lazy per-request).
+    proj_canonical = resolve_indices(
+        selection.proj_mode, n_proj,
+        selection.proj_range, selection.proj_downsample, selection.proj_custom,
+    )
+    # Resolve row/col selection once (same per frame).
+    row_idx = resolve_indices(
+        selection.row_mode, n_rows,
+        selection.row_range, selection.row_downsample, selection.row_custom,
+    )
+    col_idx = resolve_indices(
+        selection.col_mode, n_cols,
+        selection.col_range, selection.col_downsample, selection.col_custom,
+    )
+    frames = []
+    for idx in proj_canonical:
+        ds = pydicom.dcmread(files[idx])
+        frame = np.asarray(ds.pixel_array).astype(np.float32)
+        # Apply row/col selection to the 2D frame BEFORE stacking (canonical
+        # (row, col) in each DICOM frame), then stack along axis 0.
+        frame = frame[np.ix_(row_idx, col_idx)]
+        frames.append(frame)
+    raw = np.stack(frames, axis=0)  # canonical (n_sel_proj, n_sel_row, n_sel_col)
+
+    return SinogramData(
+        data=raw,
+        geometry=geometry,
+        selection=selection,
+        original_shape=(n_proj, n_rows, n_cols),
+        source_axis_order=("proj", "row", "col"),
+        path=path,
+        format="dicom",
+        lazy=False,
+    )
+
+
 def load_sinogram(
     path,
     selection: Optional[SelectionConfig] = None,
@@ -280,5 +350,5 @@ def load_sinogram(
     if fmt == "nifti":
         return _load_nifti(path, selection or SelectionConfig(), axis_order)
     if fmt == "dicom":
-        raise NotImplementedError("DICOM sinogram loading is not yet implemented")
+        return _load_dicom(path, selection or SelectionConfig(), geometry, axis_order)
     raise ValueError(f"Unknown sinogram format for {path}")

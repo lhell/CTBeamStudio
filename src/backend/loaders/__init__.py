@@ -13,6 +13,7 @@ from backend.loaders.sinogram import (
     SinogramData,
     load_sinogram,
     resolve_indices,
+    scan_dicom_sinogram,
 )
 from backend.volume import Volume
 
@@ -28,6 +29,7 @@ __all__ = [
     "load_npy_series",
     "load_sinogram",
     "resolve_indices",
+    "scan_dicom_sinogram",
     "scan_npy_folder",
     "scan_series",
 ]

@@ -9,6 +9,7 @@ from backend.loaders.sinogram import (
     _load_numpy,
     load_sinogram,
     resolve_indices,
+    scan_dicom_sinogram,
 )
 
 
@@ -196,3 +197,34 @@ def test_axis_order_change_reloads_after_partial(tmp_path):
 def test_exports():
     from backend.loaders import load_sinogram, SelectionConfig, SinogramData, resolve_indices
     assert callable(load_sinogram)
+
+
+# --- Task 5: DICOM lazy sinogram loader + scan_dicom_sinogram ---
+
+def test_scan_dicom_sinogram(tmp_path, create_projection_dicom):
+    d = create_projection_dicom(tmp_path)
+    info = scan_dicom_sinogram(d)
+    assert info["n_proj"] == 3
+    assert info["n_rows"] == 4
+    assert info["n_cols"] == 5
+
+
+def test_load_dicom_full(tmp_path, create_projection_dicom):
+    d = create_projection_dicom(tmp_path)
+    s = load_sinogram(d)
+    assert s.format == "dicom"
+    assert s.data.shape == (3, 4, 5)
+
+
+def test_load_dicom_lazy_selection(tmp_path, create_projection_dicom):
+    d = create_projection_dicom(tmp_path)
+    sel = SelectionConfig(proj_mode="range", proj_range=(0, 2))
+    s = load_sinogram(d, selection=sel)
+    assert s.format == "dicom"
+    assert s.data.shape == (2, 4, 5)
+
+
+def test_load_dicom_no_series(tmp_path):
+    d = tmp_path / "empty_dir"; d.mkdir()
+    with pytest.raises(ValueError):
+        scan_dicom_sinogram(d)

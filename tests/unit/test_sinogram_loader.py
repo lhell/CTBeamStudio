@@ -115,3 +115,47 @@ def test_load_sinogram_numpy(tmp_path):
     s = load_sinogram(p)
     assert s.data.shape == (3, 4, 5)
     assert s.format == "numpy"
+
+
+# --- NIfTI via nibabel (optional dependency; skip if absent) ---
+
+nib = pytest.importorskip("nibabel")  # skip if nibabel not installed
+
+
+def test_load_nifti_full(tmp_path):
+    arr = np.zeros((3, 4, 5))
+    img = nib.Nifti1Image(arr, np.eye(4))
+    p = tmp_path / "s.nii.gz"; nib.save(img, p)
+    from backend.loaders.sinogram import _load_nifti, SelectionConfig
+    s = _load_nifti(p, SelectionConfig(), ("proj", "row", "col"))
+    assert s.data.shape == (3, 4, 5)
+    assert s.format == "nifti"
+
+
+def test_load_nifti_axis_normalizes(tmp_path):
+    # file stored (row, proj, col) -> canonical (proj, row, col)
+    arr = np.arange(24).reshape(2, 3, 4)  # (row, proj, col)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"; nib.save(img, p)
+    from backend.loaders.sinogram import _load_nifti, SelectionConfig
+    s = _load_nifti(p, SelectionConfig(), ("row", "proj", "col"))
+    assert s.data.shape == (3, 2, 4)
+
+
+def test_load_nifti_subset_shape(tmp_path):
+    arr = np.arange(60).reshape(3, 4, 5)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"; nib.save(img, p)
+    from backend.loaders.sinogram import _load_nifti, SelectionConfig
+    sel = SelectionConfig(proj_mode="range", proj_range=(1, 3))
+    s = _load_nifti(p, sel, ("proj", "row", "col"))
+    assert s.data.shape == (2, 4, 5)
+
+
+def test_load_nifti_4d_raises(tmp_path):
+    arr = np.zeros((3, 4, 5, 6))
+    img = nib.Nifti1Image(arr, np.eye(4))
+    p = tmp_path / "s4d.nii.gz"; nib.save(img, p)
+    from backend.loaders.sinogram import _load_nifti, SelectionConfig
+    with pytest.raises(ValueError):
+        _load_nifti(p, SelectionConfig(), ("proj", "row", "col"))

@@ -245,6 +245,21 @@ def _load_numpy(
     return _finish_sinogram(raw, original_shape, path, selection, axis_order, "numpy")
 
 
+def _load_nifti(path, selection, axis_order, _on_read=None):
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError("nibabel is required for NIfTI loading. Install with: pip install nibabel")
+    img = nib.load(path)
+    raw_shape = img.shape
+    if len(raw_shape) != 3:
+        raise ValueError(f"NIfTI sinogram must be 3D, got {len(raw_shape)}D")
+    data = np.asarray(img.dataobj)
+    if _on_read is not None:
+        _on_read()
+    return _finish_sinogram(data, raw_shape, path, selection, axis_order, "nifti")
+
+
 def load_sinogram(
     path,
     selection: Optional[SelectionConfig] = None,
@@ -258,7 +273,7 @@ def load_sinogram(
     if fmt == "numpy":
         return _load_numpy(path, selection or SelectionConfig(), axis_order)
     if fmt == "nifti":
-        raise NotImplementedError("NIFTI sinogram loading is not yet implemented")
+        return _load_nifti(path, selection or SelectionConfig(), axis_order)
     if fmt == "dicom":
         raise NotImplementedError("DICOM sinogram loading is not yet implemented")
     raise ValueError(f"Unknown sinogram format for {path}")

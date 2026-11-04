@@ -108,8 +108,26 @@ def _forward_project_placeholder(
 ) -> ForwardProjectionResult:
     """Placeholder implementation that returns zeros.
 
-    This is used when parallelproj is not available.
+    This is used when parallelproj is not available. A warning is emitted the
+    first time it is exercised (not at import time), so ``import backend``
+    stays silent while callers still learn why they get zeros.
+
+    Args:
+        volume: 3D volume to forward project.
+        geometry: ProjectionGeometry with scanner parameters.
+        row_indices: Which detector rows to project.
+        col_indices: Which detector columns to project.
+        proj_indices: Which projections to generate.
     """
+    if not _placeholder_warned[0]:
+        warnings.warn(
+            "parallelproj not available. Forward projection will return zeros. "
+            "Install with: conda install -c conda-forge parallelproj",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        _placeholder_warned[0] = True
+
     n_projs = len(proj_indices)
     n_rows = len(row_indices)
     n_cols = len(col_indices)
@@ -209,11 +227,8 @@ def _forward_project_parallelproj(
     )
 
 
-# Module-level warning on import if parallelproj not available
-if not PARALLELPROJ_AVAILABLE:
-    warnings.warn(
-        "parallelproj not available. Forward projection will return zeros. "
-        "Install with: conda install -c conda-forge parallelproj",
-        RuntimeWarning,
-        stacklevel=2,
-    )
+# On the first fallback to the zero-placeholder (parallelproj missing), a
+# RuntimeWarning is emitted so callers learn why they received zeros. This is
+# deliberately lazy so ``import backend`` stays silent when parallelproj is not
+# installed; the warning only appears when forward projection is actually used.
+_placeholder_warned = [False]

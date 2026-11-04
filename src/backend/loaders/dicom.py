@@ -320,7 +320,7 @@ def load_dicom_series(
 
             if relative_error > 0.01:
                 raise ValueError(
-                    f"Slice spacing inconsistent: {relative_error*100:.2f}% variance "
+                    f"Slice spacing inconsistent: {relative_error * 100:.2f}% variance "
                     f"(mean={mean_spacing:.3f}mm). Maximum allowed is 1%."
                 )
 

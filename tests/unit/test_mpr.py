@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from visualization.mpr import extract_slice
 from backend.volume import Volume
+from visualization.mpr import extract_slice
 
 
 class TestExtractSlice:

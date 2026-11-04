@@ -57,7 +57,6 @@ def _create_ct_dicom(
         rows: Number of rows.
         cols: Number of columns.
     """
-    import pydicom
     from pydicom.uid import ImplicitVRLittleEndian, generate_uid
 
     ds = Dataset()

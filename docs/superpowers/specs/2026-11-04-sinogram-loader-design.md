@@ -45,6 +45,26 @@ rows/cols, not the projection axis. Therefore the projection axis is defined
 Users must store NIfTI sinograms per this convention (documented in the
 loader docstring and this spec).
 
+### Mutable `axis_order` override
+
+The fixed convention is the **default**, but a user's file may not follow it.
+Because the user only discovers a mismatched order by *looking at the loaded
+result*, the order must be **changeable after loading**, without re-entering
+the selection.
+
+- `axis_order` is a mutable field on `SinogramData` (and an optional initial
+  parameter of `load_sinogram()`).
+- It is a permutation of the labels `("proj", "row", "col")` describing the
+  **file's native axis order**.
+- `selection` is **always expressed in canonical `(proj, row, col)` order and
+  never changes** when the order is flipped — the user does not re-enter it.
+- Changing `axis_order` means the same selection now points at the correct
+  canonical directions, so current data is marked stale and re-derived:
+  - **Full load in memory** (raw file-order array held) → re-derive in memory
+    via transpose + re-select (no disk read).
+  - **Lazy / partial subset** → **re-read from `path`** with the new order and
+    re-apply the selection. This is the required reload.
+
 ## 3. Data Model
 
 ### SelectionConfig
@@ -91,19 +111,32 @@ normalisation.
 class SinogramData:
     """Loaded (or lazily-loadable) sinogram / projection data."""
 
-    data: Optional[np.ndarray]      # shape (n_proj, n_rows, n_cols); None if lazy
+    data: Optional[np.ndarray]      # canonical (n_proj, n_rows, n_cols); None if lazy
     geometry: Optional[ProjectionGeometry]
-    selection: SelectionConfig
-    original_shape: tuple[int, int, int]
-    source_axis_order: tuple[str, str, str]  # e.g. ("proj", "row", "col")
-    format: str                     # "numpy" | "nifti" | "dicom"
+    selection: SelectionConfig      # always canonical (proj, row, col)
+    original_shape: tuple[int, int, int]   # file's native shape
+    source_axis_order: tuple[str, str, str]  # native order, e.g. ("proj", "row", "col")
     path: Optional[Path] = None
-    lazy: bool = False              # True when `data` is not yet materialised
-    # Lazily materialises `data` from `_loader` when called.
+    format: str = "unknown"         # "numpy" | "nifti" | "dicom"
+    lazy: bool = False
     _loader: Optional[Callable[[], np.ndarray]] = None
+    # Raw array in the FILE's native order. Held only on a full load so the
+    # axis_order change can re-derive in memory; else re-read from `path`.
+    _raw_file_order: Optional[np.ndarray] = None
+
+    @property
+    def axis_order(self) -> tuple[str, str, str]:
+        """File axis order mapping raw array axes to (proj, row, col)."""
+
+    @axis_order.setter
+    def axis_order(self, value: tuple[str, str, str]) -> None:
+        """Change the axis mapping; marks data stale and re-derives."""
+        # validate permutation of ("proj","row","col")
+        # if _raw_file_order is present: transpose + re-apply selection
+        # else: re-read from self.path with the new order, re-apply selection
 
     def materialize(self) -> np.ndarray:
-        """Load and cache `data`, then return it."""
+        """Load and cache canonical `data`, then return it."""
 ```
 
 `materialize()` (and a `.data` accessor path) triggers the underlying loader
@@ -116,6 +149,7 @@ def load_sinogram(
     path: Path,
     selection: Optional[SelectionConfig] = None,
     geometry: Optional[ProjectionGeometry] = None,
+    axis_order: tuple[str, str, str] = ("proj", "row", "col"),
 ) -> SinogramData:
     """Load measured projection data with optional selection.
 
@@ -124,6 +158,10 @@ def load_sinogram(
             DICOM image series directory.
         selection: Which rows/columns/projections to load (None = all).
         geometry: Optional geometry; stored and used for DICOM validation.
+        axis_order: File's native axis order as a permutation of
+            ("proj", "row", "col"). Default is the documented convention.
+            Can be changed later via ``SinogramData.axis_order`` (which
+            re-reads as needed).
 
     Returns:
         SinogramData (possibly lazy) with the selected subset.
@@ -190,6 +228,7 @@ for out-of-range indices.
 | Inconsistent DICOM geometry across frames | `ValueError` |
 | nibabel required but missing | `ImportError` (with hint) |
 | 4D NIfTI sinogram | `ValueError` (out of scope) |
+| Invalid `axis_order` (not a permutation of `proj/row/col`) | `ValueError` |
 
 ## 8. Testing (TDD)
 
@@ -204,7 +243,11 @@ for out-of-range indices.
 - DICOM: synthetic projection-series fixture in `conftest`; lazy subset reads;
   geometry inference.
 - `resolve_indices`: all modes, bounds, errors.
-- Error cases: unknown format, bad mode, out-of-range.
+- **`axis_order` override**: load with a non-default order; change
+  `axis_order` after a full load (in-memory re-derive, no re-read) and after
+  a partial/lazy load (re-read) — verify selection stays canonical and the
+  result is re-derived correctly in both paths.
+- Error cases: unknown format, bad mode, out-of-range, invalid `axis_order`.
 
 All DICOM / NIfTI fixtures are synthetic and created on the fly — no binary
 data added to the repository (consistent with the repo's data policy).
@@ -237,6 +280,8 @@ so `from backend.loaders import load_sinogram, SelectionConfig, ...` works.
 | Task | Criterion |
 |------|-----------|
 | T-64 | `load_sinogram()` loads `.npy`/`.npz`/`.nii`/`.nii.gz` with `SelectionConfig`; output is canonical `(n_proj, n_rows, n_cols)` |
+| T-64 | Non-default `axis_order` parameter normalises correctly |
 | T-65 | DICOM image series directory support with lazy per-request pixel reads; NIfTI lazy subsets |
+| T-65 | Changing `SinogramData.axis_order` after load re-derives correctly (in-memory for full load, re-read for lazy/partial), selection stays canonical |
 | T-66 | `from backend.loaders import load_sinogram, SelectionConfig, SinogramData` works |
 | — | Full test suite passes (both plain and conda `ct-viewer` env) |

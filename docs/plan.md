@@ -123,6 +123,15 @@
   - Returns Volume with HU values (-1000 to +800) and anisotropic spacing (3.0, 0.7, 0.7) mm
   - Auto-loads in sidebar.py when no DICOM folder and no cached volume
   - Demo banner shown in app.py when demo_mode is active
+- **Update (Nov 6, 2026):** `create_shepp_logan_3d()` now builds a true 3D
+  phantom from ellipsoids instead of stacking the 2D slice. Ellipsoid geometry
+  follows Kak & Slaney (1 phantom unit = 100 mm), painted outside-in with
+  anatomical HU values: air −1000, skull +1000, brain 40, white matter 30,
+  ventricles 10, lesions 60. Defaults are `size=256, num_slices=64,
+  spacing=(3.0, 0.75, 0.75)` → 192 × 192 × 192 mm FOV. The returned array is
+  `int16` HU; `create_shepp_logan_hu()`/`create_demo_volume()` wrap it in a
+  `Volume`. Tests now assert differing axial slices and a real coronal/sagittal
+  head profile instead of identical extruded slices.
 
 ### `[x]` T-23 — 3D-Visualisierung mit Quelle/Detektor
 - **Ziel:** Volumen in 3D anzeigen mit Röntgenquelle und Detektor im DICOM-Koordinatensystem.
@@ -395,39 +404,68 @@
 
 ## Phase 10 — Comparison
 
-### `[ ]` T-67 — Comparison Module
+### `[x]` T-67 — Comparison Module
 - **Vergleich:** Synthetic vs Measured Projektionen.
 - **Dateien:** `src/visualization/comparison.py`
 - **Abhängig von:** T-63, T-64
 - **Akzeptanz:** MAE, RMSE, SSIM, Correlation berechnen.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 6, 2026) — `compute_metrics()` + `difference_image()`; konstante Bilder liefern Korrelation 0 statt NaN, kleine Bilder nutzen einen SSIM-Fallback.
 
-### `[ ]` T-68 — Comparison Visualization
+### `[x]` T-68 — Comparison Visualization
 - **Ziel:** Side-by-side Visualisierung der Vergleichsergebnisse.
-- **Dateien:** `src/visualization/comparison.py`
+- **Dateien:** `src/visualization/projection_panel.py`
 - **Abhängig von:** T-67
 - **Akzeptanz:** Plotly-Visualisierung mit 3 Spalten (Synthetic | Measured | Difference).
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 6, 2026) — 3-Spalten-Ansicht (Real | Simulated | Difference) plus Metrik-Kacheln im Tab „Real vs Simulated“.
 
-### `[ ]` T-69 — Integration Tests
+### `[x]` T-69 — Integration Tests
 - **Ziel:** Tests für den vollständigen Workflow.
-- **Dateien:** `tests/integration/test_forward_projection_workflow.py`
+- **Dateien:** `tests/integration/test_projection_workflow.py`
 - **Abhängig von:** T-63, T-67
 - **Akzeptanz:** Volumen → Forward Project → Compare funktioniert.
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 6, 2026) — End-to-End mit echter parallelproj-Projektion, Sinogramm-Load und Metriken; läuft im `ct-viewer`-Env, wird sonst sauber geskippt.
 
 ## Phase 11 — App Integration
 
-### `[ ]` T-70 — Forward Projection UI
+### `[x]` T-70 — Forward Projection UI
 - **Ziel:** UI für Forward Projection und Vergleich in Streamlit-App.
-- **Dateien:** `src/visualization/app.py`
+- **Dateien:** `src/visualization/app.py`, `src/visualization/sidebar.py`, `src/visualization/projection_panel.py`
 - **Abhängig von:** T-63, T-66, T-68
-- **Akzeptanz:** 
+- **Akzeptanz:**
   - File-Upload für gemessene Daten
   - Row/Col/Projection Selection UI
   - Run Button
   - Results Display (Visual + Metrics)
-- **Status:** ⚠️ Open
+- **Status:** ✅ Done (Nov 6, 2026) — umgesetzt als drei flache Tabs: `Viewer | Geometry | Real vs Simulated`.
+
+#### T-70 Detailplan (Nov 6, 2026)
+
+| Subtask | Beschreibung | Status |
+|---------|--------------|--------|
+| T-70a | Messdaten-Auswahl in der Sidebar (Pfad/Ordner, Achsen-Selektion, Axis-Order, Load-Button) | ✅ Done |
+| T-70b | Tab „Geometry“: Parameter aus Datei anzeigen + editieren (Apply/Reset) | ✅ Done |
+| T-70c | Tab „Real vs Simulated“: Forward-Projection-Controls, Run-Button, 3-Spalten-Vergleich + Metriken | ✅ Done |
+| T-70d | Headless-UI-Tests (Tabs, Sidebar-Controls, Messdaten-Load via `AppTest`) | ✅ Done |
+
+### `[x]` T-79 — Non-contiguous Projection Selection Fix
+- **Ziel:** `forward_project` muss beliebige `proj_indices` (z. B. Downsample `[0, 10, 20]`) korrekt auf die passenden Gantry-Winkel abbilden.
+- **Dateien:** `src/backend/forward_project.py`, `src/backend/parallelproj/geometry.py`
+- **Abhängig von:** T-63
+- **Akzeptanz:** `calculate_xray_beam_list(projection_indices=...)` berechnet nur die gewählten Winkel; Ergebnis entspricht der entsprechenden Auswahl aus der vollen Projektion.
+- **Status:** ✅ Done (Nov 6, 2026) — Test `test_forward_project_selected_projection_indices_match_full`; Downsample/range-Auswahlen funktionieren jetzt ohne `IndexError`.
+
+### `[x]` T-80 — HU ↔ Attenuation mit Energieauswahl (FP-Grundlage)
+- **Ziel:** CT-Darstellung flexibel zwischen HU und linearer Schwächung umschaltbar machen, mit monoenergetischer Energieauswahl. Grundlage der Forward Projection ist die Schwächung, nicht HU.
+- **Dateien:** `src/backend/attenuation.py`, `src/visualization/display_units.py`, `src/visualization/app.py`, `src/visualization/projection_panel.py`
+- **Abhängig von:** T-63, T-70
+- **Modell:** wasseräquivalent, monoenergetisch — `μ(E) = μ_Wasser(E) · (1 + HU/1000)`. `μ_Wasser(E)` aus NIST-Tabellen (flüssiges Wasser, 30–150 keV, log-log interpoliert). Keine Beam-Hardening-Korrektur.
+- **Akzeptanz:**
+  - Umschalter **Display Unit: HU / Attenuation (1/cm)** in „Slice Options“, Energie-Slider 30–150 keV (Default 70)
+  - Fenster-Presets und Slider-Grenzen rechnen mit um
+  - `hu_to_mu` / `mu_to_hu` / `hu_window_to_mu` / `volume_to_mu` / `volume_for_projection`
+  - Forward Projection akzeptiert **nur** Attentuation (`1/mm`/`1/cm`) und lehnt HU mit `ValueError` ab
+  - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
+- **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
 
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
@@ -467,6 +505,7 @@
 | 8 | Mo, 26.10. | T-50 bis T-55 ✅ (Projection Geometry) |
 | 9 | | T-56 ⚠️, T-57 bis T-60 ⚠️ (Docker) |
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
+| 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 
 ## Decision Log
 
@@ -500,13 +539,17 @@
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
 - T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
-- T-64: Sinogram Loader with Selection
-- T-65: DICOM Lazy Loading
-- T-66: Update Loaders __init__.py
-- T-67: Comparison Module
-- T-68: Comparison Visualization
-- T-69: Integration Tests
-- T-70: Forward Projection UI
+
+## Erledigt (2026-11-06)
+
+- ✅ T-67: Comparison Module (`visualization/comparison.py`)
+- ✅ T-68: Real-vs-Simulated-Ansicht mit Differenzbild
+- ✅ T-69: End-to-End-Integrationstest mit echtem parallelproj
+- ✅ T-70a: Messdaten-Auswahl/‑Load in der Sidebar
+- ✅ T-70b: Geometry-Tab (Parameter lesen + anpassen)
+- ✅ T-70c: Real-vs-Simulated-Tab (Forward Projection + Metriken)
+- ✅ T-70d: Headless-UI-Tests via Streamlit `AppTest`
+- ✅ T-79: Non-contiguous Projection-Selection-Fix
 
 ## Erledigt
 

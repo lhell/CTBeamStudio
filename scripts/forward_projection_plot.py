@@ -47,17 +47,18 @@ def make_volume(n: int = 16) -> Volume:
         3 -> high z, low y     (front-top-left)
         4 -> high z, high y    (front-top-right)
 
-    The volume is centred around the isocenter.
+    The volume is centred around the isocenter. Values are attenuation-like
+    (1/mm) because forward projection integrates attenuation along each ray.
     """
     vol = np.zeros((n, n, n), dtype=np.float32)
-    vol[0 : n // 2, 0 : n // 2, :] = 1.0
-    vol[0 : n // 2, n // 2 : n, :] = 2.0
-    vol[n // 2 : n, 0 : n // 2, :] = 3.0
-    vol[n // 2 : n, n // 2 : n, :] = 4.0
+    vol[0 : n // 2, 0 : n // 2, :] = 0.01
+    vol[0 : n // 2, n // 2 : n, :] = 0.02
+    vol[n // 2 : n, 0 : n // 2, :] = 0.03
+    vol[n // 2 : n, n // 2 : n, :] = 0.04
 
     spacing = (1.0, 1.0, 1.0)  # (dz, dy, dx)
     origin = tuple(-(n - 1) / 2.0 * s for s in spacing)  # DICOM (x, y, z)
-    return Volume(array=vol, spacing=spacing, origin=origin, meta={})
+    return Volume(array=vol, spacing=spacing, origin=origin, meta={"unit": "1/mm"})
 
 
 def main() -> None:

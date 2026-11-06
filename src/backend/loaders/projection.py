@@ -1,17 +1,21 @@
-"""Projection data loader for geometry from text files."""
+"""Projection data loader for geometry files."""
 
 from pathlib import Path
 
-from backend.geometry import ProjectionGeometry, load_geometry_from_txt
+from backend.geometry import ProjectionGeometry, load_geometry
 
 
-def load_projection_geometry(txt_path: Path) -> ProjectionGeometry:
-    """Load projection geometry from text file.
+def load_projection_geometry(path: Path | str) -> ProjectionGeometry:
+    """Load projection geometry from a TXT, YAML, or YML file.
 
     Args:
-        txt_path: Path to geometry text file
+        path: Path to a geometry file. The format is detected from the
+            file suffix.
 
     Returns:
         ProjectionGeometry object
+
+    Raises:
+        ValueError: If the file format is not supported.
     """
-    return load_geometry_from_txt(txt_path)
+    return load_geometry(Path(path))

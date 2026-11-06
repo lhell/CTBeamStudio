@@ -1,5 +1,7 @@
 """Tests for projection geometry loader."""
 
+import pytest
+
 from backend.loaders.projection import load_projection_geometry
 
 
@@ -33,3 +35,48 @@ ACQUISITION -----------------------------------------------------
     assert geo.det_row_spacing_mm == 1.0947
     assert geo.det_col_spacing_mm == 1.2858
     assert geo.pitch == 0.8
+
+
+def test_load_projection_geometry_from_yaml(tmp_path):
+    """YAML files are auto-detected and loaded."""
+    yaml_file = tmp_path / "geometry.yaml"
+    yaml_file.write_text(
+        "sdd: 1200.0\n"
+        "sid: 600.0\n"
+        "n_det_cols: 128\n"
+        "n_det_rows: 32\n"
+        "det_col_spacing_mm: 0.8\n"
+        "det_row_spacing_mm: 0.9\n"
+        "geometry_type: cone_beam\n"
+        "source: Test Scanner\n"
+    )
+
+    geo = load_projection_geometry(yaml_file)
+
+    assert geo.sdd == 1200.0
+    assert geo.sid == 600.0
+    assert geo.n_det_cols == 128
+    assert geo.n_det_rows == 32
+    assert geo.det_col_spacing_mm == 0.8
+    assert geo.det_row_spacing_mm == 0.9
+    assert geo.source == "Test Scanner"
+
+
+def test_load_projection_geometry_from_yml(tmp_path):
+    """The short .yml suffix is supported too."""
+    yml_file = tmp_path / "geometry.yml"
+    yml_file.write_text("sdd: 900.0\nsid: 450.0\n")
+
+    geo = load_projection_geometry(yml_file)
+
+    assert geo.sdd == 900.0
+    assert geo.sid == 450.0
+
+
+def test_load_projection_geometry_rejects_unsupported_format(tmp_path):
+    """Unknown suffixes fail with a clear error."""
+    path = tmp_path / "geometry.json"
+    path.write_text("{}")
+
+    with pytest.raises(ValueError, match="Unsupported geometry file format"):
+        load_projection_geometry(path)

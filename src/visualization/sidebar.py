@@ -1,4 +1,4 @@
-"""Sidebar controls for CT Orientation Viewer."""
+"""Sidebar controls for CTBeamStudio."""
 
 import logging
 import tempfile
@@ -8,8 +8,30 @@ import streamlit as st
 
 from backend.loaders.dicom import scan_series
 from backend.loaders.projection import load_projection_geometry
+from visualization.geometry_cache import (
+    clear_cached_geometry,
+    default_geometry,
+    save_cached_geometry,
+)
+from visualization.projection_panel import (
+    clear_geometry_edit_state,
+    render_measurement_sidebar,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _series_stub(description: str, patient_id: str, n_slices: int):
+    """Minimal stand-in for a DICOM series description."""
+    return type(
+        "S",
+        (),
+        {
+            "series_description": description,
+            "patient_id": patient_id,
+            "n_slices": n_slices,
+        },
+    )()
 
 
 def render_sidebar():
@@ -18,7 +40,7 @@ def render_sidebar():
     Returns:
         tuple: (volume, projection_geometry, n_projections, downsample)
     """
-    st.sidebar.title("🏥 CT Orientation Viewer")
+    st.sidebar.title("🏥 CTBeamStudio")
 
     st.sidebar.header("Data")
 
@@ -40,54 +62,8 @@ def render_sidebar():
     downsample = st.session_state.get("sidebar_downsample", 10)
     volume = st.session_state.get("volume")
 
-    # Auto-load from cache file on page refresh (if no volume in session)
-    auto_load_cache = st.session_state.get("auto_load_cache", True)
-
-    if volume is None and auto_load_cache:
-        from visualization.volume_cache import load_last_loaded, load_volume_cached
-
-        cached_files = load_last_loaded()
-        if cached_files:
-            # Use a placeholder that persists during load
-            status_placeholder = st.sidebar.empty()
-            status_placeholder.info("📂 Loading cached volume...")
-
-            file_paths_str = [str(f) for f in cached_files]
-            volume = load_volume_cached(file_paths_str)
-            st.session_state["volume"] = volume
-            st.session_state["loaded_files"] = cached_files
-            st.session_state["series"] = type(
-                "S",
-                (),
-                {
-                    "series_description": "Cached Volume",
-                    "patient_id": "Unknown",
-                    "n_slices": len(cached_files),
-                },
-            )()
-
-            # Clear the status message
-            status_placeholder.empty()
-            st.toast(f"Loaded {len(cached_files)} slices from cache!", icon="✅")
-
-    # Load demo phantom if no volume available
-    if volume is None and not data_path:
-        from visualization.phantom import create_demo_volume
-
-        with st.spinner("Loading demo phantom..."):
-            volume = create_demo_volume()
-            st.session_state["volume"] = volume
-            st.session_state["demo_mode"] = True
-            st.session_state["series"] = type(
-                "S",
-                (),
-                {
-                    "series_description": "Demo Phantom (Shepp-Logan)",
-                    "patient_id": "Demo",
-                    "n_slices": volume.n_slices,
-                },
-            )()
-        st.toast("Loaded demo phantom!")
+    # Initial data loading happens in load_initial_volume(), after the app
+    # shell has been rendered. Loading it here would block the first paint.
 
     if data_path and Path(data_path).exists():
         # Auto-scan when path changes (Enter key)
@@ -198,36 +174,56 @@ def render_sidebar():
     st.sidebar.markdown("---")
     st.sidebar.subheader("Projection Geometry")
     geometry_file = st.sidebar.file_uploader(
-        "Geometry TXT file", type=["txt"], key="sidebar_geometry_file"
+        "Geometry file (.txt / .yaml)",
+        type=["txt", "yaml", "yml"],
+        key="sidebar_geometry_file",
     )
 
-    # Load projection geometry (cache in session state)
-    cached_geo_key = st.session_state.get("sidebar_geometry_file")
-    if (
-        geometry_file is not None
-        and st.session_state.get("projection_geometry") is None
-    ):
-        # Save uploaded file to temporary path
-        content = geometry_file.read().decode("utf-8")
+    # Load projection geometry (cache in session state, reload on new upload)
+    if geometry_file is not None:
+        upload_key = (
+            getattr(geometry_file, "name", None),
+            getattr(geometry_file, "size", None),
+        )
+        if st.session_state.get("last_loaded_geometry_key") != upload_key:
+            content = geometry_file.read().decode("utf-8")
+            suffix = Path(geometry_file.name).suffix.lower() or ".txt"
 
-        # Create temp file for loader
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
+            # Create temp file with the original suffix so the loader can
+            # auto-detect TXT vs YAML.
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=suffix, delete=False
+            ) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
 
-        try:
-            projection_geometry = load_projection_geometry(tmp_path)
-            st.session_state["projection_geometry"] = projection_geometry
-            st.sidebar.success("Geometry loaded!")
-        except Exception as e:
-            st.sidebar.error(f"Failed to load geometry: {e}")
-        finally:
-            import os
+            try:
+                projection_geometry = load_projection_geometry(tmp_path)
+                st.session_state["projection_geometry"] = projection_geometry
+                st.session_state["geometry_loaded_original"] = projection_geometry
+                st.session_state["last_loaded_geometry_key"] = upload_key
+                st.session_state["geometry_is_default"] = False
+                save_cached_geometry(projection_geometry)
+                clear_geometry_edit_state()
+                st.sidebar.success("Geometry loaded!")
+            except Exception as e:
+                st.sidebar.error(f"Failed to load geometry: {e}")
+            finally:
+                import os
 
-            os.unlink(tmp_path)
-    elif cached_geo_key is not None:
-        # Reuse cached geometry
+                os.unlink(tmp_path)
+        else:
+            projection_geometry = st.session_state.get("projection_geometry")
+    else:
         projection_geometry = st.session_state.get("projection_geometry")
+
+    # Always show a geometry: restore the cached one or use the defaults.
+    if projection_geometry is None:
+        projection_geometry = default_geometry()
+        st.session_state["projection_geometry"] = projection_geometry
+        st.session_state["geometry_loaded_original"] = projection_geometry
+        st.session_state["geometry_is_default"] = True
+        st.sidebar.caption("No geometry file loaded — showing the default geometry.")
 
     n_projections = st.sidebar.number_input(
         "Projections",
@@ -259,10 +255,74 @@ def render_sidebar():
             del st.session_state[k]
         # Clear Streamlit cache
         st.cache_data.clear()
-        # Clear cache file
+        # Clear cache files
         from visualization.volume_cache import clear_last_loaded
 
         clear_last_loaded()
+        clear_cached_geometry()
         st.rerun()
 
+    # Measurements loader (sinogram / projection data)
+    render_measurement_sidebar()
+
     return volume, projection_geometry, n_projections, downsample
+
+
+def load_initial_volume():
+    """Load the last cached series or the demo phantom.
+
+    Called after the UI shell has been rendered so the page is visible while
+    a potentially large (or slow network) series is being read.
+    """
+    volume = st.session_state.get("volume")
+    if volume is not None:
+        return volume
+
+    # An explicit folder was entered; don't preempt the "Load Series" action.
+    if st.session_state.get("data_path"):
+        return None
+
+    from visualization.volume_cache import (
+        clear_last_loaded,
+        load_last_loaded,
+        load_volume_cached,
+    )
+
+    cached_files = None
+    if st.session_state.get("auto_load_cache", True):
+        cached_files = load_last_loaded()
+
+    if cached_files:
+        try:
+            volume = load_volume_cached([str(f) for f in cached_files])
+        except Exception as exc:  # noqa: BLE001 - fall back to the demo phantom
+            logger.warning("Could not reload cached series: %s", exc)
+            st.warning(
+                f"Could not reload the cached series ({exc}). "
+                "Loading the demo phantom instead."
+            )
+            clear_last_loaded()
+        else:
+            st.session_state["volume"] = volume
+            st.session_state["loaded_files"] = cached_files
+            st.session_state["series"] = _series_stub(
+                "Cached Volume", "Unknown", len(cached_files)
+            )
+            st.toast(f"Loaded {len(cached_files)} slices from cache!", icon="✅")
+            return volume
+
+    return load_demo_volume()
+
+
+def load_demo_volume():
+    """Load the synthetic demo phantom into session state."""
+    from visualization.phantom import create_demo_volume
+
+    volume = create_demo_volume()
+    st.session_state["volume"] = volume
+    st.session_state["demo_mode"] = True
+    st.session_state["series"] = _series_stub(
+        "Demo Phantom (Shepp-Logan)", "Demo", volume.n_slices
+    )
+    st.toast("Loaded demo phantom!")
+    return volume

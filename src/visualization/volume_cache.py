@@ -45,12 +45,17 @@ def save_last_loaded(files: list) -> None:
 
 
 def load_last_loaded() -> list | None:
-    """Load last saved file paths from cache file."""
+    """Load last saved file paths from cache file.
+
+    Only the first path is verified. Probing every slice of a large series
+    can block for a long time on slow (network) drives. Missing later files
+    surface as a load error, which callers handle with a demo fallback.
+    """
     if not CACHE_FILE.exists():
         return None
     try:
         files = [Path(f) for f in json.loads(CACHE_FILE.read_text()).get("files", [])]
-        return files if files and all(f.exists() for f in files) else None
+        return files if files and files[0].exists() else None
     except Exception:
         return None
 

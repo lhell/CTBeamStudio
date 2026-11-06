@@ -139,3 +139,37 @@ def test_shape_helper_roundtrip():
     out = from_parallelproj_batch(batch)
     assert out.shape == (5, 6, 7)
     np.testing.assert_array_equal(out, vol_zyx)
+
+
+def test_forward_project_selected_projection_indices_match_full():
+    """A non-contiguous projection selection picks the matching angles."""
+    from backend.forward_project import forward_project
+    from backend.geometry import ProjectionGeometry
+    from backend.volume import Volume
+
+    geometry = ProjectionGeometry(
+        sdd=1000.0,
+        sid=500.0,
+        n_det_rows=8,
+        n_det_cols=8,
+        det_row_spacing_mm=1.0,
+        det_col_spacing_mm=1.0,
+        projections_per_rotation=8,
+    )
+    volume = Volume(
+        array=np.full((8, 8, 8), 0.02, dtype=np.float32),
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+        meta={"unit": "1/mm"},
+    )
+
+    full = forward_project(volume, geometry, use_cuda=False)
+    selected = forward_project(volume, geometry, proj_indices=[2, 5], use_cuda=False)
+
+    assert selected.projections.shape[0] == 2
+    np.testing.assert_allclose(
+        selected.projections,
+        full.projections[[2, 5]],
+        rtol=1e-5,
+        atol=1e-5,
+    )

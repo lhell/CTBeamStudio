@@ -7,6 +7,7 @@ from backend.attenuation import (
     hu_to_mu,
     hu_window_to_mu,
     mu_to_hu,
+    volume_for_projection,
     volume_to_mu,
     water_mu,
 )
@@ -99,3 +100,38 @@ def test_volume_to_mu_preserves_geometry_and_marks_unit():
     assert result.meta["unit"] == "1/cm"
     assert result.array[0, 0, 1] == pytest.approx(water_mu(70.0), rel=1e-6)
     assert volume.array.dtype == np.int16
+
+
+def test_volume_for_projection_uses_per_mm():
+    """parallelproj traces rays in mm, so projection input must be 1/mm."""
+    array = np.array([[[-1000, 0, 1000]]], dtype=np.int16)
+    volume = Volume(array=array, spacing=(1.0, 0.5, 0.5), origin=(0.0, 1.0, 2.0))
+
+    result = volume_for_projection(volume, 70.0)
+
+    assert result.meta["unit"] == "1/mm"
+    assert result.array.dtype == np.float32
+    # One tenth of the 1/cm value: water at 70 keV is ~0.0194 1/mm.
+    assert result.array[0, 0, 1] == pytest.approx(water_mu(70.0) / 10.0, rel=1e-6)
+
+
+def test_volume_for_projection_is_linear_in_path_length():
+    """Doubling spacing must not change mu; path length is applied by the tracer."""
+    array = np.array([[[0, 0, 0]]], dtype=np.int16)
+    coarse = Volume(array=array, spacing=(2.0, 1.0, 1.0), origin=(0, 0, 0))
+    fine = Volume(array=array, spacing=(1.0, 1.0, 1.0), origin=(0, 0, 0))
+
+    np.testing.assert_allclose(
+        volume_for_projection(coarse, 70.0).array,
+        volume_for_projection(fine, 70.0).array,
+    )
+
+
+def test_volume_for_projection_accepts_hu_volume_only():
+    """A volume already in attenuation is rejected instead of double-converted."""
+    array = np.full((1, 1, 1), 0.02, dtype=np.float32)
+    volume = Volume(array=array, spacing=(1.0, 1.0, 1.0), origin=(0, 0, 0))
+    volume.meta = {"unit": "1/cm"}
+
+    with pytest.raises(ValueError, match="already"):
+        volume_for_projection(volume, 70.0)

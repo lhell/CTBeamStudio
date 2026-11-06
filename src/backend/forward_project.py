@@ -21,6 +21,7 @@ except ImportError:
     parallelproj = None
 
 
+from backend.attenuation import ATTENUATION_UNITS
 from backend.geometry import ProjectionGeometry
 from backend.volume import Volume
 
@@ -56,7 +57,11 @@ def forward_project(
     """Forward project a volume using parallelproj (or placeholder).
 
     Args:
-        volume: 3D volume with HU values
+        volume: 3D volume in linear attenuation units (``meta["unit"]``
+            ``"1/mm"`` or ``"1/cm"``). HU is rejected: the projector
+            integrates voxel values along the ray path, so the basis must be
+            attenuation, not Hounsfield units. Build one with
+            :func:`backend.attenuation.volume_for_projection`.
         geometry: ProjectionGeometry with scanner parameters
         row_indices: Which detector rows to project (None = all)
         col_indices: Which detector columns to project (None = all)
@@ -69,6 +74,9 @@ def forward_project(
     Returns:
         ForwardProjectionResult with synthetic projections
 
+    Raises:
+        ValueError: If ``volume`` is in HU rather than attenuation units.
+
     Note:
         If parallelproj is not available, returns zeros and emits a warning.
         This is useful for development and testing without conda environment.
@@ -76,6 +84,14 @@ def forward_project(
     # Determine detector dimensions
     n_rows = geometry.n_det_rows
     n_cols = geometry.n_det_cols
+
+    unit = (volume.meta or {}).get("unit")
+    if unit not in ATTENUATION_UNITS:
+        raise ValueError(
+            "forward projection requires attenuation values, but the volume "
+            f"unit is {unit!r}. Convert it first with "
+            "backend.attenuation.volume_for_projection()."
+        )
 
     # Default indices
     if row_indices is None:
@@ -179,13 +195,16 @@ def _forward_project_parallelproj(
     cuda_available = torch.cuda.is_available() and use_cuda
     dev = "cuda" if cuda_available else "cpu"
 
-    # Build the parallelproj cone-beam geometry. For a partial projection
-    # selection we project the full detector grid for the requested angles
-    # (treated as a contiguous sequence from 0) and slice afterwards.
+    # Build the parallelproj cone-beam geometry. ``n_projections`` reflects the
+    # number of selected projections; the explicit ``projection_indices`` make
+    # sure non-contiguous selections (e.g. a downsampled list) use the correct
+    # gantry angles instead of a contiguous sequence starting at 0.
     cb_geometry = geometry_from_projection_geometry(geometry)
     cb_geometry.n_projections = n_projs
 
-    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(dev=dev)
+    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
+        dev=dev, projection_indices=proj_indices
+    )
 
     # Volume is (z, y, x); origin is DICOM (x, y, z) -> reorder to (z, y, x).
     spacing_zyx = tuple(float(s) for s in volume.spacing)
@@ -213,9 +232,9 @@ def _forward_project_parallelproj(
 
     full_proj = projector.apply(volume_xyz)
 
-    # Select the requested rows / columns / projections.
-    projections = full_proj[np.asarray(proj_indices), :, :]
-    projections = projections[:, np.asarray(row_indices), :]
+    # The projection axis is already in selection order. Only rows / columns
+    # still need to be sliced.
+    projections = full_proj[:, np.asarray(row_indices), :]
     projections = projections[:, :, np.asarray(col_indices)]
 
     return ForwardProjectionResult(

@@ -1,6 +1,7 @@
 """Tests for forward projection module."""
 
 import numpy as np
+import pytest
 
 from backend.geometry import ProjectionGeometry
 from backend.volume import Volume
@@ -30,12 +31,12 @@ def test_forward_project_returns_correct_shape():
     """Test forward_project returns projections with correct shape."""
     from backend.forward_project import forward_project
 
-    # Create simple volume (air = 0 HU)
+    # Simple attenuation volume (water at ~70 keV in 1/mm).
     volume = Volume(
-        array=np.ones((10, 10, 10), dtype=np.int16) * 0,
+        array=np.ones((10, 10, 10), dtype=np.float32) * 0.0194,
         spacing=(2.5, 1.0, 1.0),
         origin=(0, 0, 0),
-        meta={},
+        meta={"unit": "1/mm"},
     )
 
     geometry = ProjectionGeometry(
@@ -55,10 +56,10 @@ def test_forward_project_with_selection():
     from backend.forward_project import forward_project
 
     volume = Volume(
-        array=np.ones((20, 20, 20), dtype=np.int16) * 0,
+        array=np.ones((20, 20, 20), dtype=np.float32) * 0.0194,
         spacing=(2.5, 1.0, 1.0),
         origin=(0, 0, 0),
-        meta={},
+        meta={"unit": "1/mm"},
     )
 
     geometry = ProjectionGeometry(
@@ -84,3 +85,39 @@ def test_parallelproj_availability():
 
     # Just check the flag exists and is a boolean
     assert isinstance(PARALLELPROJ_AVAILABLE, bool)
+
+
+def test_forward_project_rejects_hu_volume():
+    """HU is not a valid forward-projection basis; attenuation is required."""
+    from backend.forward_project import forward_project
+
+    volume = Volume(
+        array=np.full((4, 4, 4), 40, dtype=np.int16),
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+        meta={"unit": "HU"},
+    )
+    geometry = ProjectionGeometry(
+        n_det_cols=4, n_det_rows=4, projections_per_rotation=1
+    )
+
+    with pytest.raises(ValueError, match="attenuation"):
+        forward_project(volume, geometry)
+
+
+def test_forward_project_accepts_attenuation_volume():
+    """A volume in 1/mm is projected without complaint."""
+    from backend.forward_project import forward_project
+
+    volume = Volume(
+        array=np.full((4, 4, 4), 0.0194, dtype=np.float32),
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+        meta={"unit": "1/mm"},
+    )
+    geometry = ProjectionGeometry(
+        n_det_cols=4, n_det_rows=4, projections_per_rotation=1
+    )
+
+    result = forward_project(volume, geometry)
+    assert result.projections.shape == (1, 4, 4)

@@ -26,6 +26,10 @@ ENERGY_MAX_KEV = float(_WATER_ENERGIES_KEV[-1])
 # Factor that converts 1/cm to the requested unit.
 _UNIT_SCALE = {"1/cm": 1.0, "1/mm": 0.1}
 
+# Units that represent linear attenuation coefficients. HU is deliberately
+# absent: it is a relative scale, not a quantity that can be line-integrated.
+ATTENUATION_UNITS = ("1/mm", "1/cm")
+
 
 def water_mu(energy_kev: float) -> float:
     """Return the linear attenuation coefficient of water in 1/cm.
@@ -101,6 +105,42 @@ def volume_to_mu(volume: Volume, energy_kev: float) -> Volume:
     meta["unit"] = "1/cm"
     return Volume(
         array=hu_to_mu(volume.array, energy_kev).astype(np.float32),
+        spacing=volume.spacing,
+        origin=volume.origin,
+        meta=meta,
+    )
+
+
+def volume_for_projection(volume: Volume, energy_kev: float) -> Volume:
+    """Return ``volume`` in 1/mm, ready to be forward projected.
+
+    parallelproj traces each ray through the voxel grid in millimetres and
+    integrates the voxel values along that path, so the volume must carry
+    attenuation per millimetre for the result to be a dimensionless line
+    integral (-ln(I/I0)). See :mod:`backend.parallelproj.projector`, which
+    passes the spacings straight through as voxel sizes.
+
+    Args:
+        volume: Volume in HU (``meta["unit"]`` unset or ``"HU"``).
+        energy_kev: Monoenergetic beam energy in keV (30-150).
+
+    Returns:
+        New float32 ``Volume`` in ``"1/mm"`` with geometry unchanged.
+
+    Raises:
+        ValueError: If ``volume`` is already in attenuation units.
+    """
+    unit = (volume.meta or {}).get("unit")
+    if unit not in (None, "HU"):
+        raise ValueError(
+            f"volume is already in {unit!r}; expected HU — converting again "
+            "would apply the water scaling twice"
+        )
+
+    meta = dict(volume.meta or {})
+    meta["unit"] = "1/mm"
+    return Volume(
+        array=hu_to_mu(volume.array, energy_kev, unit="1/mm").astype(np.float32),
         spacing=volume.spacing,
         origin=volume.origin,
         meta=meta,

@@ -27,7 +27,7 @@ deliberately different from the reference:
 """
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -82,6 +82,7 @@ class ConeBeamGeometry:
         detector_offset_rows_mm: float = 0.0,
         detector_offset_cols_mm: float = 0.0,
         dev: str = "cpu",
+        projection_indices: Optional[Sequence[int]] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Calculate LOR start/end points for all projections.
 
@@ -106,12 +107,22 @@ class ConeBeamGeometry:
             detector_offset_cols_mm: Detector column offset (mm).
             dev: Device string (``"cpu"`` or ``"cuda"`` / ``"cuda:0"``) on which
                 the position tensors are allocated.
+            projection_indices: Optional explicit angle indices to compute, in
+                the requested order. When ``None``, all projections
+                ``0 .. n_projections - 1`` are used. This allows non-contiguous
+                selections (e.g. a downsampled projection list) without
+                projecting the intermediate angles.
 
         Returns:
             Tuple ``(pos_beam_start, pos_beam_end)``, each a float32 tensor of
-            shape ``(n_projections * n_det_rows * n_det_cols, 3)``.
+            shape ``(n_selected_projections * n_det_rows * n_det_cols, 3)``.
         """
-        n_projs = self.n_projections
+        angle_indices = (
+            list(range(self.n_projections))
+            if projection_indices is None
+            else list(projection_indices)
+        )
+        n_projs = len(angle_indices)
         n_rows = self.n_det_rows
         n_cols = self.n_det_cols
         total = n_projs * n_rows * n_cols
@@ -136,7 +147,7 @@ class ConeBeamGeometry:
             -n_rows / 2 + 0.5 + np.arange(n_rows)
         ) * self.det_row_spacing_mm + detector_offset_rows_mm
 
-        for idx_angle in range(n_projs):
+        for out_idx, idx_angle in enumerate(angle_indices):
             # Rotation angle around the z axis (CCW seen from +z).
             angle_radians = (
                 (self.first_angle + idx_angle * self.angular_inc_degree) * np.pi / 180.0
@@ -181,8 +192,10 @@ class ConeBeamGeometry:
                     dim=1,
                 )
 
-                # Determine indices where to enter the projection beams.
-                idx_start = idx_angle * n_rows * n_cols + idx_cols * n_rows
+                # Determine indices where to enter the projection beams. The
+                # output is packed in selection order (out_idx), not in the
+                # original angle index.
+                idx_start = out_idx * n_rows * n_cols + idx_cols * n_rows
                 idx_end = idx_start + n_rows
 
                 # Rotate source and detector positions and store them.

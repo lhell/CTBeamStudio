@@ -48,6 +48,15 @@ venv/
 # Logs
 *.log
 
+# Images
+*.png
+
+# Exported agent session transcripts (large, local-only)
+docs/*-session.json
+docs/ct-umschaltung-zwischen-hu-und-attenuation.json
+docs/neues-backend-einbauen-und-testen.json
+docs/shepp-logan-phantom-nicht-echt-3d.json
+
 # Superpowers (auto-generated)
 .superpowers/
 

@@ -445,7 +445,7 @@
 | T-70a | Messdaten-Auswahl in der Sidebar (Pfad/Ordner, Achsen-Selektion, Axis-Order, Load-Button) | ✅ Done |
 | T-70b | Tab „Geometry“: Parameter aus Datei anzeigen + editieren (Apply/Reset) | ✅ Done |
 | T-70c | Tab „Real vs Simulated“: Forward-Projection-Controls, Run-Button, 3-Spalten-Vergleich + Metriken | ✅ Done |
-| T-70d | Headless-UI-Tests (Tabs, Sidebar-Controls, Messdaten-Load via `AppTest`) | ✅ Done |
+| T-70d | Headless-UI-Tests (Tabs, Sidebar-Controls, Messdaten-Load via `AppTest`) | ⚠️ entfernt (`8de260b`), neu geplant als T-81 |
 
 ### `[x]` T-79 — Non-contiguous Projection Selection Fix
 - **Ziel:** `forward_project` muss beliebige `proj_indices` (z. B. Downsample `[0, 10, 20]`) korrekt auf die passenden Gantry-Winkel abbilden.
@@ -466,6 +466,20 @@
   - Forward Projection akzeptiert **nur** Attentuation (`1/mm`/`1/cm`) und lehnt HU mit `ValueError` ab
   - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
 - **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
+
+### `[ ]` T-81 — Schneller UI-Smoke-Test (ersetzt T-70d)
+- **Ziel:** Tab-/Sidebar-Layout wieder absichern, ohne die Testsuite zu verlangsamen.
+- **Hintergrund:** Die sechs `AppTest`-Tests aus T-70d dauerten **96,8 s** (~75 % der Suite), weil jeder Test einen kompletten Streamlit-Script-Run startet. Ein `AppTest.run()` kostet 10–30 s: ~8 s Import von `visualization.volume3d` (skimage/pyvista) und ~3,6 s in `load_last_loaded()` (87 KB Cache mit 560 toten Netzwerkpfaden). Entfernt in `8de260b`, Datei bleibt in der Historie (`6307a6a`).
+- **Dateien:** `tests/integration/test_ui_smoke.py` (neu)
+- **Abhängig von:** T-70
+- **Umsetzung:**
+  1. **Eine** `AppTest`-Instanz pro Modul (`scope="module"`), nicht pro Test.
+  2. Session-State vorab setzen (`demo_mode`, `volume`), damit `load_initial_volume()` und der Cache-Pfad übersprungen werden.
+  3. `auto_load_cache=False` erzwingen, um die 560 toten `O:`-Pfade nicht anzufassen.
+  4. `visualization.volume3d`-Import messen; ggf. 3D-Render lazily laden.
+  5. Optional `@pytest.mark.slow`, per Default ausgeschlossen (`-m "not slow"`).
+- **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
+- **Status:** ⚠️ Open — bewusst zurückgestellt (Nov 6, 2026).
 
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
@@ -548,7 +562,7 @@
 - ✅ T-70a: Messdaten-Auswahl/‑Load in der Sidebar
 - ✅ T-70b: Geometry-Tab (Parameter lesen + anpassen)
 - ✅ T-70c: Real-vs-Simulated-Tab (Forward Projection + Metriken)
-- ✅ T-70d: Headless-UI-Tests via Streamlit `AppTest`
+- ✅ T-70d: Headless-UI-Tests via Streamlit `AppTest` — ⚠️ entfernt (zu langsam, siehe T-81)
 - ✅ T-79: Non-contiguous Projection-Selection-Fix
 
 ## Erledigt

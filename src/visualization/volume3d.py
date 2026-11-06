@@ -8,13 +8,19 @@ import plotly.graph_objects as go
 from scipy import ndimage
 from skimage import measure
 
-# PyVista is optional - only import if rendering with PyVista
-try:
-    import pyvista as pv
+# PyVista is optional and only needed for the off-screen render mode. It is
+# imported lazily inside create_pyvista_volume() because importing it costs
+# ~5.6 s, which would otherwise be paid by every app start and UI test run.
 
-    PYVISTA_AVAILABLE = True
-except ImportError:
-    PYVISTA_AVAILABLE = False
+
+def _pyvista_available() -> bool:
+    """Return True if pyvista can be imported, without importing it eagerly."""
+    import importlib.util
+
+    return importlib.util.find_spec("pyvista") is not None
+
+
+PYVISTA_AVAILABLE = _pyvista_available()
 
 
 def get_source_position(geometry, source_angle: float = 0.0, z_offset: float = 0.0):
@@ -1021,6 +1027,8 @@ def create_pyvista_volume(
     """
     if not PYVISTA_AVAILABLE:
         raise ImportError("PyVista is not available. Install with: pip install pyvista")
+
+    import pyvista as pv
 
     # Enable off-screen rendering
     pv.OFF_SCREEN = True

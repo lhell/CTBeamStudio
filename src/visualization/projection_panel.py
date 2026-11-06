@@ -305,60 +305,60 @@ def render_measurement_sidebar() -> None:
 
     from backend.loaders.sinogram import load_sinogram
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Measurements")
+    with st.sidebar.expander("Measurements", expanded=True):
+        path_str = st.text_input(
+            "Sinogram file or DICOM folder",
+            key="sinogram_path",
+            placeholder=r"e.g. C:\data\projections",
+        )
+        axis_order = st.selectbox(
+            "File axis order",
+            AXIS_ORDERS,
+            format_func=format_axis_order,
+            key="sinogram_axis_order",
+        )
+        selection = render_selection_controls("meas", container=st)
 
-    path_str = st.sidebar.text_input(
-        "Sinogram file or DICOM folder",
-        key="sinogram_path",
-        placeholder=r"e.g. C:\data\projections",
-    )
-    axis_order = st.sidebar.selectbox(
-        "File axis order",
-        AXIS_ORDERS,
-        format_func=format_axis_order,
-        key="sinogram_axis_order",
-    )
-    selection = render_selection_controls("meas", container=st.sidebar)
+        if st.session_state.get("sinogram") is not None:
+            sinogram = st.session_state["sinogram"]
+            shape = (
+                sinogram.data.shape
+                if sinogram.data is not None
+                else sinogram.original_shape
+            )
+            st.caption(f"Loaded: {shape} ({sinogram.format})")
 
-    if st.session_state.get("sinogram") is not None:
-        sinogram = st.session_state["sinogram"]
+        if not st.button("Load Measurements", key="load_measurements"):
+            return
+        if not path_str:
+            st.warning("Enter a file or folder path first.")
+            return
+
+        path = Path(path_str)
+        if not path.exists():
+            st.error(f"Path not found: {path}")
+            return
+
+        try:
+            with st.spinner("Loading measurements..."):
+                sinogram = load_sinogram(
+                    path,
+                    selection=selection,
+                    geometry=st.session_state.get("projection_geometry"),
+                    axis_order=axis_order,
+                )
+        except Exception as exc:  # noqa: BLE001 - surface loader errors in the UI
+            st.error(f"Failed to load measurements: {exc}")
+            return
+
+        st.session_state["sinogram"] = sinogram
         shape = (
             sinogram.data.shape
             if sinogram.data is not None
             else sinogram.original_shape
         )
-        st.sidebar.caption(f"Loaded: {shape} ({sinogram.format})")
-
-    if not st.sidebar.button("Load Measurements", key="load_measurements"):
-        return
-    if not path_str:
-        st.sidebar.warning("Enter a file or folder path first.")
-        return
-
-    path = Path(path_str)
-    if not path.exists():
-        st.sidebar.error(f"Path not found: {path}")
-        return
-
-    try:
-        with st.spinner("Loading measurements..."):
-            sinogram = load_sinogram(
-                path,
-                selection=selection,
-                geometry=st.session_state.get("projection_geometry"),
-                axis_order=axis_order,
-            )
-    except Exception as exc:  # noqa: BLE001 - surface loader errors in the UI
-        st.sidebar.error(f"Failed to load measurements: {exc}")
-        return
-
-    st.session_state["sinogram"] = sinogram
-    shape = (
-        sinogram.data.shape if sinogram.data is not None else sinogram.original_shape
-    )
-    st.sidebar.success(f"Loaded measurements {shape}.")
-    st.toast("Measurements loaded!", icon="✅")
+        st.success(f"Loaded measurements {shape}.")
+        st.toast("Measurements loaded!", icon="✅")
 
 
 def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:

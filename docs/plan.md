@@ -479,7 +479,7 @@
   4. `visualization.volume3d`-Import messen; ggf. 3D-Render lazily laden.
   5. Optional `@pytest.mark.slow`, per Default ausgeschlossen (`-m "not slow"`).
 - **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
-- **Status:** ⚠️ Open — bewusst zurückgestellt (Nov 6, 2026).
+- **Status:** ⚠️ Teilweise erledigt (Nov 6, 2026, `e3e54d7`) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis und Messdaten-Load ab (9 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel nicht erreicht:** 22 s statt < 15 s, Suite 30 s statt < 20 s. `pyvista` war mit ~5,6 s der größte Einzelposten und wird jetzt lazy geladen (`test_volume3d_import.py`), der Rest ist `scipy`/`skimage` plus der 3D-Render pro Script-Run. Weitere Verkürzung würde bedeuten, den Viewer-Tab-Render zu überspringen (z. B. `render_mode` per Session-State auf einen billigen Pfad setzen) — offen.
 
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.

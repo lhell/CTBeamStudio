@@ -10,11 +10,22 @@ import pytest
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from visualization.phantom import create_shepp_logan_3d, create_shepp_logan_phantom
+from visualization.phantom import (
+    create_demo_volume,
+    create_shepp_logan_3d,
+    create_shepp_logan_hu,
+    create_shepp_logan_phantom,
+)
+
+AIR_HU = -1000
+TISSUE_THRESHOLD = -500
+
+# 192 mm FOV in all three directions, 2 mm in-plane, 8 mm slice thickness.
+SMALL_GEOMETRY = {"size": 96, "num_slices": 24, "spacing": (8.0, 2.0, 2.0)}
 
 
 class TestSheppLoganPhantom:
-    """Test cases for Shepp-Logan phantom generator."""
+    """Test cases for the 2D Shepp-Logan phantom generator."""
 
     def test_2d_phantom_shape(self):
         """Test 2D phantom has correct shape."""
@@ -38,29 +49,99 @@ class TestSheppLoganPhantom:
         assert isinstance(phantom, np.ndarray)
         assert phantom.ndim == 2
 
+
+class TestSheppLogan3D:
+    """Test cases for the true 3D Shepp-Logan phantom."""
+
     def test_3d_phantom_shape(self):
         """Test 3D phantom has correct shape."""
-        phantom = create_shepp_logan_3d(256, 50)
-        assert phantom.shape == (50, 256, 256)
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        assert phantom.shape == (24, 96, 96)
 
-    def test_3d_phantom_values_in_range(self):
-        """Test 3D phantom values are within expected range."""
-        phantom = create_shepp_logan_3d(256, 10)
-        assert phantom.min() >= -0.25
-        assert phantom.max() <= 1.05
-
-    def test_3d_phantom_is_3d_array(self):
-        """Test 3D phantom returns numpy array."""
-        phantom = create_shepp_logan_3d(256, 10)
+    def test_3d_phantom_is_int16_hu(self):
+        """Test 3D phantom returns int16 Hounsfield units."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
         assert isinstance(phantom, np.ndarray)
         assert phantom.ndim == 3
+        assert phantom.dtype == np.int16
 
-    def test_3d_slices_are_equal(self):
-        """Test all slices in 3D phantom are identical."""
-        phantom = create_shepp_logan_3d(256, 10)
-        first_slice = phantom[0]
-        for i in range(1, 10):
-            np.testing.assert_array_almost_equal(first_slice, phantom[i])
+    def test_3d_phantom_background_is_air(self):
+        """Test voxels outside the head are air (-1000 HU)."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        assert phantom[0, 0, 0] == AIR_HU
+        assert phantom[12, 0, 0] == AIR_HU
+        assert phantom[-1, -1, -1] == AIR_HU
+
+    def test_3d_phantom_contains_bone(self):
+        """Test the skull is represented with bone-like HU values."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        assert phantom.max() >= 900
+
+    def test_3d_phantom_center_voxel_is_brain_tissue(self):
+        """Test the centre of the head is soft tissue, not skull."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        center = tuple(size // 2 for size in phantom.shape)
+        assert phantom[center] == 40
+
+    def test_3d_phantom_slices_are_not_identical(self):
+        """Test slices differ along z (no extruded 2D phantom)."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        center = phantom.shape[0] // 2
+        top = 3  # still inside the head, but near the superior pole
+        assert not np.array_equal(phantom[center], phantom[top])
+
+        center_area = np.count_nonzero(phantom[center] > TISSUE_THRESHOLD)
+        top_area = np.count_nonzero(phantom[top] > TISSUE_THRESHOLD)
+        assert center_area > top_area * 1.5
+
+    def test_coronal_slice_has_air_above_and_below_head(self):
+        """Test a coronal slice has air at the top and bottom rows."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        coronal = phantom[:, :, phantom.shape[2] // 2]
+        assert np.all(coronal[0] == AIR_HU)
+        assert np.all(coronal[-1] == AIR_HU)
+        assert np.any(coronal[coronal.shape[0] // 2] > TISSUE_THRESHOLD)
+
+    def test_sagittal_slice_is_not_a_repeated_stripe(self):
+        """Test a sagittal slice shows the head profile, not a constant stripe."""
+        phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
+        sagittal = phantom[:, phantom.shape[1] // 2, :]
+        row_counts = np.count_nonzero(sagittal > TISSUE_THRESHOLD, axis=1)
+        assert row_counts[0] == 0
+        assert row_counts[-1] == 0
+        assert len(set(row_counts.tolist())) > 3
+
+    def test_hu_volume_metadata(self):
+        """Test the Volume wrapper exposes geometry and metadata."""
+        volume = create_shepp_logan_hu(**SMALL_GEOMETRY)
+        assert volume.shape == (24, 96, 96)
+        assert volume.spacing == (8.0, 2.0, 2.0)
+        assert volume.origin == (0.0, 0.0, 0.0)
+        assert volume.array.dtype == np.int16
+        assert volume.meta["unit"] == "HU"
+        assert volume.meta["phantom"] == "shepp-logan"
+
+    def test_head_dimensions_match_phantom_geometry(self):
+        """Test physical head size is anisotropic-spacing correct (in mm)."""
+        volume = create_shepp_logan_hu()
+        tissue = volume.array > TISSUE_THRESHOLD
+        z_idx, y_idx, x_idx = np.where(tissue)
+
+        x_mm = (x_idx.max() - x_idx.min() + 1) * volume.spacing[2]
+        y_mm = (y_idx.max() - y_idx.min() + 1) * volume.spacing[1]
+        z_mm = (z_idx.max() - z_idx.min() + 1) * volume.spacing[0]
+
+        assert abs(x_mm - 138) <= 4
+        assert abs(y_mm - 184) <= 4
+        assert abs(z_mm - 180) <= 4
+        assert 0.9 < z_mm / y_mm < 1.15
+
+    def test_default_demo_volume(self):
+        """Test the demo volume uses the new physical defaults."""
+        volume = create_demo_volume()
+        assert volume.shape == (64, 256, 256)
+        assert volume.spacing == (3.0, 0.75, 0.75)
+        assert volume.array.dtype == np.int16
 
 
 if __name__ == "__main__":

@@ -1,10 +1,36 @@
-"""Shepp-Logan phantom generator for testing."""
+"""Shepp-Logan phantom generators for testing.
 
-from typing import Optional
+The 2D phantom is the classic ellipse-based Shepp-Logan slice. The 3D phantom
+is built from true ellipsoids (not by stacking the 2D slice), so coronal and
+sagittal reconstructions show a realistic head profile.
+"""
 
 import numpy as np
 
 from backend.volume import Volume
+
+# 1 phantom unit = 100 mm. This maps the classical Shepp-Logan parameter
+# table onto a realistically sized head (~138 x 184 x 180 mm).
+PHANTOM_UNIT_MM = 100.0
+
+AIR_HU = -1000
+
+# 3D Shepp-Logan ellipsoids: (x0, y0, z0, a, b, c, theta_deg, hu)
+# Geometry follows Kak & Slaney; the classical densities are replaced by
+# absolute Hounsfield units. Components are painted outside-in, so inner
+# structures overwrite outer ones.
+ELLIPSOIDS_3D = (
+    (0.0, 0.0, 0.0, 0.69, 0.92, 0.90, 0.0, 1000),  # skull
+    (0.0, -0.0184, 0.0, 0.6624, 0.874, 0.88, 0.0, 40),  # brain
+    (0.22, 0.0, 0.0, 0.11, 0.31, 0.22, -18.0, 30),  # white matter (right)
+    (-0.22, 0.0, 0.0, 0.16, 0.41, 0.21, 18.0, 30),  # white matter (left)
+    (0.0, 0.35, -0.15, 0.21, 0.25, 0.35, 0.0, 25),  # large superior structure
+    (0.0, 0.1, 0.25, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (right)
+    (0.0, -0.1, 0.25, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (left)
+    (-0.08, -0.605, 0.0, 0.046, 0.023, 0.05, 0.0, 60),  # small lesion
+    (0.0, -0.606, 0.0, 0.023, 0.011, 0.05, 0.0, 60),  # small lesion
+    (0.06, -0.605, 0.0, 0.023, 0.046, 0.05, 0.0, 60),  # small lesion
+)
 
 
 def create_shepp_logan_phantom(size: int = 256) -> np.ndarray:
@@ -58,75 +84,105 @@ def create_shepp_logan_phantom(size: int = 256) -> np.ndarray:
     return phantom
 
 
-def create_shepp_logan_3d(size: int = 256, num_slices: int = 256) -> np.ndarray:
+def create_shepp_logan_3d(
+    size: int = 256,
+    num_slices: int = 64,
+    spacing: tuple[float, float, float] = (3.0, 0.75, 0.75),
+) -> np.ndarray:
     """
-    Create a 3D Shepp-Logan head phantom.
+    Create a true 3D Shepp-Logan head phantom as ellipsoids.
+
+    Unlike a stacked 2D phantom, the ellipsoids have a finite extent along the
+    z-axis, so coronal and sagittal slices show a head profile.
 
     Parameters
     ----------
     size : int
-        Size of each slice (size x size)
+        Number of rows/columns per slice (size x size)
     num_slices : int
-        Number of slices
+        Number of slices along z
+    spacing : tuple
+        (z_spacing, row_spacing, col_spacing) in mm. The generated ellipsoids
+        are scaled by these spacings so the anatomy keeps its physical
+        proportions in every plane.
 
     Returns
     -------
     np.ndarray
-        3D phantom array (num_slices, size, size)
+        3D phantom array (num_slices, size, size) in Hounsfield units (int16)
     """
-    phantom_2d = create_shepp_logan_phantom(size)
+    if size <= 0 or num_slices <= 0:
+        raise ValueError("size and num_slices must be positive")
+    if len(spacing) != 3 or any(s <= 0 for s in spacing):
+        raise ValueError("spacing must contain three positive values")
 
-    # Create 3D phantom by repeating 2D slices
-    phantom_3d = np.stack([phantom_2d] * num_slices, axis=0)
+    phantom = np.full((num_slices, size, size), AIR_HU, dtype=np.int16)
 
-    return phantom_3d
+    # In-plane grids in phantom units (1 unit = PHANTOM_UNIT_MM).
+    in_plane = (np.arange(size) - (size - 1) / 2.0) / PHANTOM_UNIT_MM
+    x = in_plane * spacing[2]
+    y = in_plane * spacing[1]
+    X, Y = np.meshgrid(x, y)
+
+    # Pre-rotate each ellipsoid once around the z-axis.
+    ellipsoids = []
+    for x0, y0, z0, a, b, c, theta_deg, hu in ELLIPSOIDS_3D:
+        theta = np.deg2rad(theta_deg)
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
+        x_rot = ((X - x0) * cos_t + (Y - y0) * sin_t) / a
+        y_rot = (-(X - x0) * sin_t + (Y - y0) * cos_t) / b
+        ellipsoids.append((x_rot**2 + y_rot**2, z0, c, hu))
+
+    z_axis = (np.arange(num_slices) - (num_slices - 1) / 2.0) * spacing[0]
+    z_axis = z_axis / PHANTOM_UNIT_MM
+
+    for z_index, z in enumerate(z_axis):
+        axial_slice = phantom[z_index]
+        for radial_sq, z0, c, hu in ellipsoids:
+            remaining = 1.0 - ((z - z0) / c) ** 2
+            if remaining <= 0.0:
+                continue
+            axial_slice[radial_sq <= remaining] = hu
+
+    return phantom
 
 
 def create_shepp_logan_hu(
     size: int = 256,
-    num_slices: int = 128,
-    spacing: tuple[float, float, float] = (3.0, 0.7, 0.7),
+    num_slices: int = 64,
+    spacing: tuple[float, float, float] = (3.0, 0.75, 0.75),
 ) -> Volume:
     """
     Create a 3D Shepp-Logan phantom scaled to Hounsfield Units.
 
-    HU mapping:
-    - Background (0): -1000 HU (air)
-    - Outer ellipse (0.8): 0 HU (water/soft tissue)
-    - Inner ellipses (0.2-0.3): varying soft tissue
-    - Bright ellipses (1.0): +800 HU (bone-like)
+    HU mapping (painted outside-in):
+    - Background: -1000 HU (air)
+    - Skull: +1000 HU
+    - Brain tissue: 40 HU, white matter 30 HU, superior structure 25 HU
+    - Ventricles: 10 HU (CSF-like)
+    - Small lesions: 60 HU
 
     Parameters
     ----------
     size : int
-        Size of each slice (size x size)
+        Number of rows/columns per slice (size x size)
     num_slices : int
-        Number of slices
+        Number of slices along z
     spacing : tuple
         (z_spacing, row_spacing, col_spacing) in mm
-        Default is anisotropic: (3.0, 0.7, 0.7)
+        Default is anisotropic: (3.0, 0.75, 0.75), giving a 192 mm FOV that
+        fits the ~180 mm tall phantom.
 
     Returns
     -------
     Volume
         Volume with HU values and spacing metadata
     """
-    # Create 2D Shepp-Logan
-    phantom_2d = create_shepp_logan_phantom(size)
-
-    # Scale to HU: min → -1000 (air), max → +800 (bone)
-    # Shepp-Logan ranges from ~-0.2 to 1.0
-    # Mapping: HU = (value - min) / (max - min) * 1800 - 1000
-    hu_2d = (phantom_2d + 0.2) / 1.2 * 1800 - 1000
-
-    # Create 3D by stacking slices
-    hu_3d = np.stack([hu_2d] * num_slices, axis=0)
-
-    # Convert to int16 (typical for CT)
-    hu_3d = hu_3d.astype(np.int16)
+    phantom = create_shepp_logan_3d(size, num_slices, spacing)
 
     return Volume(
-        array=hu_3d,
+        array=phantom,
         spacing=spacing,
         origin=(0.0, 0.0, 0.0),
         meta={"unit": "HU", "phantom": "shepp-logan"},
@@ -135,8 +191,8 @@ def create_shepp_logan_hu(
 
 def create_demo_volume(
     size: int = 256,
-    num_slices: int = 128,
-    spacing: tuple[float, float, float] = (3.0, 0.7, 0.7),
+    num_slices: int = 64,
+    spacing: tuple[float, float, float] = (3.0, 0.75, 0.75),
 ) -> Volume:
     """
     Create a demo Volume for testing without real DICOM data.
@@ -146,9 +202,9 @@ def create_demo_volume(
     Parameters
     ----------
     size : int
-        Size of each slice (size x size)
+        Number of rows/columns per slice (size x size)
     num_slices : int
-        Number of slices
+        Number of slices along z
     spacing : tuple
         (z_spacing, row_spacing, col_spacing) in mm
 
@@ -180,7 +236,7 @@ if __name__ == "__main__":
 
     # Also show HU version
     vol = create_demo_volume()
-    print(f"\nDemo Volume:")
+    print("\nDemo Volume:")
     print(f"  Shape: {vol.shape}")
     print(f"  Spacing: {vol.spacing}")
     print(f"  HU range: [{vol.array.min()}, {vol.array.max()}]")

@@ -14,7 +14,7 @@ A web-based tool for exploring CT scanner geometry and generating **simulated pr
 
 ### Visualization & Data Handling
 
-- **3D Volume Visualization** — Interactive iso-surface / PyVista volume rendering with source and detector positioning
+- **3D Volume Visualization** — Interactive iso-surface rendering with source and detector positioning; the projection-geometry overlay toggles on/off with an On/Off control inside the 3D view
 - **Multi-Planar Reconstruction (MPR)** — Axial, coronal, and sagittal slices with isotropic resampling
 - **Windowing** — Presets for lung, abdomen, bone, and brain imaging plus manual center/width control
 - **HU Values** — Native Hounsfield Unit handling

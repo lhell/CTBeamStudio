@@ -377,6 +377,79 @@ def add_trajectory_to_figure(
     return fig
 
 
+def add_geometry_toggle(
+    fig: go.Figure,
+    n_base_traces: int,
+    label: str = "Projection Geometry",
+) -> go.Figure:
+    """Attach an in-plot on/off control for the geometry overlay.
+
+    The control is a compact pair of click buttons (Plotly ``updatemenus``)
+    pinned to the bottom-right corner of the 3D canvas, with the name above
+    them. Clicking flips trace visibility in the browser, so it does not rerun
+    the Streamlit script. Traces ``[0, n_base_traces)`` stay visible in both
+    states; every trace added after them (source/detector markers, trajectory,
+    detector planes, central beams) belongs to the overlay.
+
+    Args:
+        fig: Plotly figure that already contains the geometry traces
+        n_base_traces: Number of traces to keep visible (the volume itself)
+        label: Name shown above the buttons
+
+    Returns:
+        The same figure, with the control attached (no-op if there is nothing
+        to toggle)
+    """
+    total = len(fig.data)
+    if total <= n_base_traces:
+        return fig
+
+    on_visible = [True] * total
+    off_visible = [True] * n_base_traces + [False] * (total - n_base_traces)
+
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                active=0,
+                buttons=[
+                    dict(label="On", method="update", args=[{"visible": on_visible}]),
+                    dict(label="Off", method="update", args=[{"visible": off_visible}]),
+                ],
+                x=0.99,
+                y=0.02,
+                xanchor="right",
+                yanchor="bottom",
+                pad=dict(l=2, r=2, t=2, b=2),
+                bgcolor="rgba(0,0,0,0.6)",
+                bordercolor="#666",
+                font=dict(color="white", size=11),
+            )
+        ]
+    )
+
+    # Name sits just above the buttons. Append instead of replacing so the
+    # voxel-spacing annotation from create_volume_figure() survives.
+    annotations = list(fig.layout.annotations)
+    annotations.append(
+        dict(
+            text=label,
+            x=0.99,
+            y=0.105,
+            xref="paper",
+            yref="paper",
+            xanchor="right",
+            yanchor="bottom",
+            showarrow=False,
+            font=dict(color="white", size=11),
+        )
+    )
+    fig.update_layout(annotations=annotations)
+
+    return fig
+
+
 def downsample_volume(volume_array: np.ndarray, factor: int = 4) -> np.ndarray:
     """Downsample volume by integer factor.
 

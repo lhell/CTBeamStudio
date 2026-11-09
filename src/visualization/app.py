@@ -41,6 +41,7 @@ from visualization.projection_panel import (
     render_geometry_tab,
 )
 from visualization.volume3d import (
+    add_geometry_toggle,
     add_source_detector_figure,
     create_volume_figure,
     get_volume_center,
@@ -113,10 +114,13 @@ def render_viewer_tab(
         col3d_1, col3d_2 = st.columns(2)
 
         with col3d_1:
+            # PyVista is shelved for now (see plan.md T-82): it rendered a
+            # static PNG, so it could not host the interactive geometry
+            # toggle. Only the Plotly iso-surface path remains.
             render_mode = st.selectbox(
                 "Render Mode",
-                ["iso", "pyvista"],
-                format_func=lambda x: "Iso-Surface" if x == "iso" else "PyVista",
+                ["iso"],
+                format_func=lambda x: "Iso-Surface",
                 key="3d_render_mode",
             )
 
@@ -139,13 +143,6 @@ def render_viewer_tab(
         )
         # Update session state for rendering
         st.session_state["volume_downsample"] = volume_downsample
-
-        # Trajectory toggle
-        show_trajectory = st.checkbox(
-            "Show Trajectory",
-            value=projection_geometry is not None,
-            key="3d_show_trajectory",
-        )
 
         # Single opacity slider
         opacity = st.slider(
@@ -183,9 +180,6 @@ def render_viewer_tab(
         else:
             n_iso_levels = 5
             iso_threshold = None
-
-        # Projection geometry controls (using sidebar values)
-        show_geometry = True
 
         col_sid, col_angle = st.columns(2)
         with col_sid:
@@ -254,83 +248,70 @@ def render_viewer_tab(
     # Use downsample from UI (set by selectbox above)
     volume_downsample = st.session_state.get("volume_downsample", 4)
 
-    # Handle PyVista rendering separately
-    if render_mode == "pyvista":
-        from visualization.volume3d import create_pyvista_volume
+    # PyVista rendering is shelved for now (see plan.md T-82): it produced a
+    # static PNG and could not host the interactive geometry toggle. The
+    # renderer itself stays in volume3d.create_pyvista_volume() for later.
+    fig = create_volume_figure(
+        volume.array,
+        spacing=spacing,
+        render_mode=render_mode,
+        opacity=opacity,
+        surface_opacity=opacity,
+        colormap="bone",
+        downsample=volume_downsample,
+        camera_preset=camera_preset,
+        n_iso_levels=n_iso_levels,
+        iso_threshold=iso_threshold,
+    )
 
-        pyvista_result = create_pyvista_volume(
-            volume.array,
-            spacing=spacing,
-            opacity=opacity,
-            colormap="bone",
-            downsample=volume_downsample,
-            camera_preset=camera_preset,
+    # Traces added from here on belong to the geometry overlay: the in-plot
+    # slider toggles everything after this point (see add_geometry_toggle).
+    n_base_traces = len(fig.data)
+
+    if isocenter is None:
+        isocenter = get_volume_center(volume.array, spacing)
+
+    # Add the trajectory whenever a geometry is loaded; without one there is
+    # no path to draw, so fall back to the single source/detector pair. The
+    # in-plot "Projection Geometry" control switches the overlay on and off,
+    # so no second show/hide checkbox is needed here.
+    if projection_geometry is not None:
+        from visualization.volume3d import (
+            add_trajectory_to_figure,
+            get_trajectory_positions,
         )
-        # Display the PyVista screenshot
-        st.image(
-            pyvista_result["screenshot"],
-            caption=(
-                "PyVista Volume | Voxel spacing: "
-                f"({pyvista_result['spacing'][0]:.2f}, "
-                f"{pyvista_result['spacing'][1]:.2f}, "
-                f"{pyvista_result['spacing'][2]:.2f}) mm"
-            ),
+
+        src_positions, det_positions = get_trajectory_positions(
+            projection_geometry, n_projections
+        )
+        fig = add_trajectory_to_figure(
+            fig,
+            src_positions,
+            det_positions,
+            trajectory_downsample,
+            geometry=projection_geometry,
         )
     else:
-        fig = create_volume_figure(
-            volume.array,
+        # Use legacy single source/detector
+        fig = add_source_detector_figure(
+            fig,
+            volume_array=volume.array,
             spacing=spacing,
-            render_mode=render_mode,
-            opacity=opacity,
-            surface_opacity=opacity,
-            colormap="bone",
-            downsample=volume_downsample,
-            camera_preset=camera_preset,
-            n_iso_levels=n_iso_levels,
-            iso_threshold=iso_threshold,
+            isocenter=isocenter,
+            sid=sid,
+            sdd=sid,
+            gantry_angle=gantry_angle,
+            show_source=True,
+            show_detector=True,
+            source_pos=source_pos,
+            detector_pos=detector_pos,
         )
 
-        # Add source/detector if enabled
-        if show_geometry:
-            if isocenter is None:
-                isocenter = get_volume_center(volume.array, spacing)
+    fig = add_geometry_toggle(fig, n_base_traces)
 
-            # Add trajectory if enabled and projection geometry is loaded
-            if show_trajectory and projection_geometry is not None:
-                from visualization.volume3d import (
-                    add_trajectory_to_figure,
-                    get_trajectory_positions,
-                )
-
-                src_positions, det_positions = get_trajectory_positions(
-                    projection_geometry, n_projections
-                )
-                fig = add_trajectory_to_figure(
-                    fig,
-                    src_positions,
-                    det_positions,
-                    trajectory_downsample,
-                    geometry=projection_geometry,
-                )
-            else:
-                # Use legacy single source/detector
-                fig = add_source_detector_figure(
-                    fig,
-                    volume_array=volume.array,
-                    spacing=spacing,
-                    isocenter=isocenter,
-                    sid=sid,
-                    sdd=sid,
-                    gantry_angle=gantry_angle,
-                    show_source=True,
-                    show_detector=True,
-                    source_pos=source_pos,
-                    detector_pos=detector_pos,
-                )
-
-        # Render into the reserved slot
-        with plot_slot:
-            st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
+    # Render into the reserved slot
+    with plot_slot:
+        st.plotly_chart(fig, use_container_width=True, key="plotly_3d")
 
     # Get dimensions for each plane (needed for slice sliders)
     axial_max = volume.array.shape[0] - 1
@@ -484,9 +465,16 @@ def main():
     volume, projection_geometry, n_projections, trajectory_downsample = render_sidebar()
 
     if volume is None:
-        with st.status("Lade Daten …", expanded=True) as status:
+        # The status box is only for the loading phase. A completed
+        # st.status would stay on screen for the whole session, so it is
+        # rendered into a placeholder that gets cleared afterwards. The
+        # completion notice is a toast, which dismisses itself after ~5 s.
+        status_slot = st.empty()
+        with status_slot.status("Lade Daten …", expanded=True) as status:
             volume = load_initial_volume()
             status.update(label="Daten geladen", state="complete", expanded=False)
+        status_slot.empty()
+        st.toast("Daten geladen", icon="✅")
 
     # Show demo mode banner if applicable
     if st.session_state.get("demo_mode"):

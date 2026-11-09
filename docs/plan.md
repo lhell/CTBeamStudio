@@ -481,6 +481,17 @@
 - **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
 - **Status:** ⚠️ Teilweise erledigt (Nov 6, 2026, `e3e54d7`) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis und Messdaten-Load ab (9 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel nicht erreicht:** 22 s statt < 15 s, Suite 30 s statt < 20 s. `pyvista` war mit ~5,6 s der größte Einzelposten und wird jetzt lazy geladen (`test_volume3d_import.py`), der Rest ist `scipy`/`skimage` plus der 3D-Render pro Script-Run. Weitere Verkürzung würde bedeuten, den Viewer-Tab-Render zu überspringen (z. B. `render_mode` per Session-State auf einen billigen Pfad setzen) — offen.
 
+### `[ ]` T-82 — PyVista-Render-Modus reaktivieren (verschoben)
+- **Ziel:** Den off-screen PyVista-Render-Modus wieder in der UI anbieten — mit Geometrie-Overlay und On/Off-Schalter, nicht als statisches Bild.
+- **Status:** ⚠️ Shelved (Nov 9, 2026) — Der Modus wurde aus der UI entfernt (`render_mode` bietet nur noch Iso-Surface), weil `create_pyvista_volume()` serverseitig ein PNG rendert (`plotter.screenshot()` → `st.image`). Ein statisches Bild kann keinen interaktiven Schalter tragen, und der PyVista-Zweig zeichnete gar kein Geometrie-Overlay. Der Renderer bleibt unverändert in `src/visualization/volume3d.py` (inkl. Lazy-Import-Guard `PYVISTA_AVAILABLE`) — nichts gelöscht, nur nicht mehr verdrahtet. Aus dem Dockerfile wurde `pyvista` entfernt.
+- **Dateien (bei Reaktivierung):** `src/visualization/volume3d.py` (`create_pyvista_volume`), `src/visualization/app.py` (Render-Mode-Liste + Zweig), `Dockerfile`, `tests/unit/test_volume3d_import.py`
+- **Abhängig von:** –
+- **Umsetzung (Skizze):**
+  1. Geometrie-Overlay in den PyVista-Plot aufnehmen (Source/Detector/Trajektorie analog zu `add_trajectory_to_figure`).
+  2. Schalter bereitstellen: interaktiv geht nur ein Streamlit-`st.toggle` über dem Bild (rerun + Re-Render) — oder PyVista durch `panel`/`vtk.js`/`stpyvista` ersetzen, dann ist ein echter In-Canvas-Schalter möglich.
+  3. `pyvista` wieder in `Dockerfile` installieren.
+- **Akzeptanz:** Render-Mode-Auswahl bietet PyVista wieder an, das Overlay ist sichtbar und per Schalter abschaltbar, der Lazy-Import-Guard bleibt grün.
+
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
 - **Dateien:** `src/reconstruction/fdk.py`
@@ -588,7 +599,8 @@
 
 | Feature | Description |
 |---------|-------------|
-| Render Mode | Iso-Surface (default) or Volume Rendering |
+| Render Mode | Iso-Surface (Plotly). PyVista shelved — see T-82 |
+| Geometry Overlay | In-canvas "Projection Geometry" On/Off buttons (no rerun) |
 | Opacity Controls | Volume Opacity (0.1-1.0), Surface Opacity (0.1-1.0) |
 | Camera Presets | iso, front, back, left, right, top, bottom |
 | Source/Detector | Auto or manual positioning |

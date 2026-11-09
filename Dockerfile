@@ -28,9 +28,9 @@ COPY pyproject.toml README.md /app/
 COPY src /app/src
 
 # Install Python dependencies and the package itself.
-# pyvista is not declared in pyproject.toml (it is optional at import time),
-# but it is installed here so the PyVista render mode works in the container.
-RUN pip install --no-cache-dir -e /app/ pyvista
+# pyvista is intentionally NOT installed: the PyVista render mode is shelved
+# for now (see docs/plan.md T-82). Re-add it here if that mode returns.
+RUN pip install --no-cache-dir -e /app/
 
 # Copy remaining application code (data/docs/tests are excluded via .dockerignore)
 COPY . /app/

@@ -19,7 +19,7 @@ from visualization.projection_panel import (
     clear_geometry_edit_state,
     render_measurement_sidebar,
 )
-from visualization.volume_cache import load_last_loaded, load_volume_cached
+from visualization.volume_cache import load_volume_cached
 
 logger = logging.getLogger(__name__)
 
@@ -45,22 +45,14 @@ def render_sidebar():
     """
     st.sidebar.title("🏥 CTBeamStudio")
 
-    # Cache controls first: they act on everything below, so they should be
-    # reachable without scrolling past the load sections. The checkbox writes
-    # directly to session state, which the startup load reads.
-    st.sidebar.checkbox(
-        "Auto-load cache on refresh",
-        value=st.session_state.get("auto_load_cache", True),
-        key="auto_load_cache",
-    )
-
     if st.sidebar.button("🗑️ Clear Cache"):
         # The job registry lives outside session state, so a finished or failed
         # startup job must be dropped explicitly: otherwise the next start would
         # silently no-op and the viewer would stay empty. Read the name before
         # the session-state wipe below removes its token.
         reset_job(startup_job_name())
-        # Clear session state
+        # Clear session state. The app then renders its empty state, exactly as
+        # on a fresh start: nothing is auto-loaded.
         for k in list(st.session_state.keys()):
             del st.session_state[k]
         # Clear Streamlit cache
@@ -176,10 +168,7 @@ def _render_image_section():
                             else list(Path(data_path).iterdir())
                         )
 
-                    from visualization.volume_cache import (
-                        load_volume_cached,
-                        save_last_loaded,
-                    )
+                    from visualization.volume_cache import save_last_loaded
 
                     with st.spinner("Loading DICOM series..."):
                         # Convert Path objects to strings for cache key
@@ -280,17 +269,29 @@ def _render_geometry_section(projection_geometry):
             st.session_state["geometry_is_default"] = True
             st.caption("No geometry file loaded — showing the default geometry.")
 
+        # One full rotation by default: a circular scan acquires exactly
+        # ``projections_per_rotation`` views. The widget has a key, so its
+        # value must be seeded through session state to make the geometry the
+        # default rather than a hardcoded number.
+        if "sidebar_n_projections" not in st.session_state:
+            st.session_state["sidebar_n_projections"] = int(
+                projection_geometry.projections_per_rotation
+            )
+
         n_projections = st.number_input(
             "Projections",
             min_value=1,
-            value=51326,
-            step=1000,
+            step=100,
             key="sidebar_n_projections",
         )
+        downsample_options = [10, 50, 100, 200, 500]
         downsample = st.selectbox(
             "Trajectory Downsample",
-            options=[10, 50, 100, 200, 500],
-            index=0,
+            options=downsample_options,
+            # Default 1/100: one marker and one detector plane per hundred
+            # projections. At 1/10 the ring turns into a dense band of ~230
+            # planes, which hides the volume and costs a trace per plane.
+            index=downsample_options.index(100),
             format_func=lambda x: f"1/{x}",
             key="sidebar_downsample",
         )
@@ -327,34 +328,14 @@ def create_demo_volume_job():
     return build
 
 
-def startup_loader(
-    has_data_path: bool,
-    auto_load_cache: bool,
-    cache_lookup=load_last_loaded,
-):
-    """Decide what the startup load should do, without performing any I/O.
+def should_startup_load() -> bool:
+    """Whether the app loads data automatically on start.
 
-    Args:
-        has_data_path: The user entered a DICOM folder, so the sidebar's
-            "Load Series" button owns loading.
-        auto_load_cache: The cache checkbox is enabled.
-        cache_lookup: Callable returning cached file paths, or ``None``.
-
-    Returns:
-        A zero-argument callable producing a ``Volume``, or ``None`` when the
-        sidebar owns loading.
+    Always ``False``: startup shows the empty state and the user picks image
+    data or the demo phantom. Kept as a function so the policy lives in one
+    place and has a test.
     """
-    if has_data_path:
-        return None
-
-    cached_files = cache_lookup() if auto_load_cache else None
-    if not cached_files:
-        return create_demo_volume_job()
-
-    def load_cached():
-        return load_volume_cached([str(f) for f in cached_files])
-
-    return load_cached
+    return False
 
 
 def load_demo_volume():

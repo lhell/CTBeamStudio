@@ -87,45 +87,45 @@ def to_isotropic(img: np.ndarray, spacing: tuple[float, float]) -> np.ndarray:
     return zoom(img, (scale_factor, 1.0), order=1)
 
 
+def render_empty_state() -> None:
+    """Show the "nothing loaded yet" state.
+
+    Reached on a fresh start and after Clear Cache. Nothing is loaded
+    automatically: the user either picks image data in the sidebar or asks for
+    the demo phantom.
+    """
+    st.info(
+        "Nothing to show — load image data in the sidebar, or use the demo phantom."
+    )
+
+    if st.button("Load Demo Phantom", key="empty_load_demo"):
+        from visualization.sidebar import load_demo_volume
+
+        with st.spinner("Loading demo phantom..."):
+            load_demo_volume()
+        st.rerun()
+
+
 def render_viewer_tab(
     volume, projection_geometry, n_projections: int, trajectory_downsample: int
 ) -> None:
     """Render the 3D volume and MPR views."""
     if volume is None:
         if st.session_state.get("startup_polling"):
-            # Loading in progress: the status block stands in for the 3D plot,
-            # so the layout does not jump when the volume arrives.
+            # Loading in progress: the status box stands in for the 3D plot so
+            # the layout does not jump when the volume arrives. The box is
+            # rendered here, on the normal script path, not inside the polling
+            # fragment: elements drawn by the fragment linger after polling
+            # stops (a stale "Loading data …" box stayed on screen next to the
+            # loaded volume).
+            st.status("Loading data …", expanded=True)
             render_startup_status()
             return
 
         if st.session_state.get("startup_failed"):
-            # Rendered on the normal script path, not inside the fragment, so
-            # the recovery button still exists after polling has stopped.
-            _render_startup_failure()
-            return
+            st.error(STARTUP_FAILURE_MESSAGE)
 
-        # Welcome screen / Demo mode
-        st.info("👈 Select a DICOM folder to get started")
-
-        st.markdown("""
-        ## Features
-
-        - **DICOM Loading** - Read CT scans from DICOM files
-        - **Windowing** - Presets for lung, abdomen, bone, brain + manual controls
-        - **MPR** - Multi-planar reconstruction (axial, coronal, sagittal)
-        - **3D View** - Volume visualization
-
-        ## Demo Mode
-
-        Use the demo phantom to test without real data.
-        """)
-
-        if st.button("Load Demo Phantom"):
-            from visualization.sidebar import load_demo_volume
-
-            with st.spinner("Loading demo phantom..."):
-                load_demo_volume()
-            st.rerun()
+        render_empty_state()
         return
 
     # Reserve visual slot for 3D plot FIRST
@@ -504,10 +504,15 @@ def render_startup_status() -> None:
     status = effective_status(status, started_at, time.time())
 
     if status == "running":
-        st.status("Lade Daten …", expanded=True)
         return
 
-    # Terminal state: stop the loop whatever happened below.
+    # Terminal state: stop the loop and hand over to the main script.
+    #
+    # This fragment deliberately renders no elements. Anything it drew would
+    # linger in the page after polling stops, because the fragment is not
+    # called again once `startup_polling` is false (observed in the browser:
+    # a stale loading box stayed on screen next to the loaded volume). The
+    # visible status box is rendered by the main script instead.
     st.session_state["startup_polling"] = False
     reset_job(job_name)
 
@@ -517,7 +522,7 @@ def render_startup_status() -> None:
         # volume wins, and the background result is discarded.
         if st.session_state.get("volume") is None:
             st.session_state["volume"] = result
-            st.toast("Daten geladen", icon="✅")
+            st.toast("Data loaded", icon="✅")
         st.rerun()
         return
 
@@ -529,48 +534,22 @@ def render_startup_status() -> None:
     st.rerun()
 
 
-def _render_startup_failure() -> None:
-    """Show the failure notice and its recovery button.
-
-    Rendered outside the polling branch so the button survives long enough to
-    be clicked.
-    """
-    st.error(STARTUP_FAILURE_MESSAGE)
-    if st.button("Load Demo Phantom", key="startup_load_demo"):
-        from visualization.sidebar import create_demo_volume_job
-
-        st.session_state["volume"] = create_demo_volume_job()()
-        st.session_state["demo_mode"] = True
-        st.session_state["startup_failed"] = False
-        st.rerun()
-
-
 def main():
     st.set_page_config(page_title="CTBeamStudio", page_icon="🏥", layout="wide")
 
     # Render a lightweight shell first: it is streamed to the browser before
     # the (potentially slow) data loading below, so the page appears instantly.
     shell = st.empty()
-    shell.info("⏳ Initialisiere Oberfläche …")
+    shell.info("⏳ Initialising interface …")
 
     # Render sidebar and get values
-    from visualization.sidebar import render_sidebar, startup_loader
+    from visualization.sidebar import render_sidebar
 
     volume, projection_geometry, n_projections, trajectory_downsample = render_sidebar()
 
-    if volume is None and not st.session_state.get("startup_failed"):
-        # The read happens in a worker thread so this script run does not block:
-        # sidebar expanders and tabs stay usable while data loads. The viewer
-        # area polls the job and fills itself in when the volume is ready.
-        # A failed startup is not retried automatically, or every rerun would
-        # start another attempt and the failure panel would never be seen.
-        loader = startup_loader(
-            has_data_path=bool(st.session_state.get("data_path")),
-            auto_load_cache=st.session_state.get("auto_load_cache", True),
-        )
-        if loader is not None and start_job(_startup_job_name(), loader):
-            st.session_state["startup_polling"] = True
-            st.session_state["startup_started_at"] = time.time()
+    # Nothing is loaded automatically: the viewer shows the empty state and the
+    # user picks image data or the demo phantom. Clear Cache therefore lands in
+    # exactly the same state as a fresh start.
 
     # Show demo mode banner if applicable
     if st.session_state.get("demo_mode"):

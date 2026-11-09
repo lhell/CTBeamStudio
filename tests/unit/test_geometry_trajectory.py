@@ -96,6 +96,57 @@ def test_add_trajectory_to_figure():
     assert "Source Path" in fig.data[1].name
 
 
+def test_direction_arrows_use_raw_sizing_at_the_configured_length():
+    """The direction arrows must be drawn at ARROW_LENGTH_MM.
+
+    Regression: with sizemode="absolute" and sizeref=1 the cones were one data
+    unit long, i.e. invisible at mm scale, so the trajectory had no arrows.
+    """
+    import math
+
+    from visualization.volume3d import ARROW_LENGTH_MM
+
+    geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
+    src_positions, det_positions = get_trajectory_positions(geo, n_projections=24)
+
+    fig = add_trajectory_to_figure(
+        go.Figure(), src_positions, det_positions, downsample=1, geometry=geo
+    )
+
+    cones = [trace for trace in fig.data if trace.type == "cone"]
+    assert len(cones) == 1
+
+    cone = cones[0]
+    assert cone.sizemode == "raw"
+    for u, v, w in zip(cone.u, cone.v, cone.w):
+        assert math.sqrt(u * u + v * v + w * w) == pytest.approx(
+            ARROW_LENGTH_MM, rel=1e-6
+        )
+
+
+def test_direction_is_its_own_legend_entry():
+    """The Direction entry is the cone trace itself, so the swatch is the
+    native icon; there is no marker stand-in with a different shape."""
+    geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
+    src_positions, det_positions = get_trajectory_positions(geo, n_projections=24)
+
+    fig = add_trajectory_to_figure(
+        go.Figure(), src_positions, det_positions, downsample=1, geometry=geo
+    )
+
+    named = {
+        trace.name: trace
+        for trace in fig.data
+        if getattr(trace, "name", None) is not None
+    }
+    direction = named["Direction"]
+    assert direction.type == "cone"
+    assert direction.showlegend is True
+
+    # No legend-only marker posing as the arrow.
+    assert not [t for t in fig.data if getattr(t, "visible", None) == "legendonly"]
+
+
 def test_add_trajectory_to_figure_with_downsample():
     """Test trajectory downsampling."""
     geo = ProjectionGeometry(sid=600.0, sdd=1000.0)

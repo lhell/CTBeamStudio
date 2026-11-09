@@ -305,7 +305,9 @@ def render_measurement_sidebar() -> None:
 
     from backend.loaders.sinogram import load_sinogram
 
-    with st.sidebar.expander("Measurements", expanded=True):
+    # Collapsed on startup: measured data is an optional second input, and an
+    # open section pushed the actual load controls far down the sidebar.
+    with st.sidebar.expander("Measurements", expanded=False):
         path_str = st.text_input(
             "Sinogram file or DICOM folder",
             key="sinogram_path",
@@ -379,10 +381,14 @@ def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
             "Upload a .txt or .yaml file in the sidebar to replace it."
         )
 
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Fan angle", f"{geometry.fan_angle:.2f}°")
-    col_b.metric("Cone angle", f"{geometry.cone_angle:.2f}°")
-    col_c.metric("Collimation", f"{geometry.collimation_width:.1f} mm")
+    # Derived values, kept as a compact caption: st.metric renders its value
+    # very large and bold, which made three secondary read-outs the most
+    # prominent thing on the tab, above the editable form.
+    st.caption(
+        f"Fan angle {geometry.fan_angle:.2f}° · "
+        f"Cone angle {geometry.cone_angle:.2f}° · "
+        f"Collimation {geometry.collimation_width:.1f} mm"
+    )
     st.caption(
         f"Type: {geometry.geometry_type} · Source: {geometry.source} · "
         f"Detector: {geometry.n_det_cols} × {geometry.n_det_rows} @ "

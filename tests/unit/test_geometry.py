@@ -90,7 +90,7 @@ def test_default_geometry():
     assert geo.detector_shape == "flat"
 
     # Check default helical
-    assert geo.pitch == 1.0
+    assert geo.pitch == 0.0
 
     # Check default metadata
     assert geo.geometry_type == "cone_beam"
@@ -168,8 +168,19 @@ def test_validation_zero_detector_cols():
 
 def test_validation_negative_pitch():
     """Test that negative pitch raises ValueError."""
-    with pytest.raises(ValueError, match="pitch must be positive"):
+    with pytest.raises(ValueError, match="pitch must not be negative"):
         ProjectionGeometry(pitch=-0.5)
+
+
+def test_zero_pitch_is_a_valid_circular_scan():
+    """pitch=0.0 means a circular (cone-beam) scan with no table movement.
+
+    It is the default, so the dataclass must accept it.
+    """
+    geo = ProjectionGeometry(pitch=0.0)
+
+    assert geo.pitch == 0.0
+    assert geo.projections_per_rotation == 2304
 
 
 # === Computed Properties Tests ===

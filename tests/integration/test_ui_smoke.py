@@ -4,14 +4,10 @@ One module-scoped ``AppTest`` instance is shared by all assertions: a single
 ``AppTest.run()`` costs 10-30 s (full Streamlit script run), so running it per
 test made the suite unusable (see plan.md T-81).
 
-The cache path is skipped explicitly: ``auto_load_cache=False`` stops the
-startup load from touching the 87 KB cache file with its hundreds of dead
-network paths, which alone cost ~3.6 s per run.
-
 A demo volume is seeded into session state before the first run. Startup
 loading happens in a background thread (see
 docs/superpowers/specs/2026-11-09-background-startup-load-design.md), so
-without a seed the viewer would render the loading status block instead of the
+without a seed the viewer would render the empty state instead of the
 3D plot these assertions expect. Startup behaviour is covered by
 tests/unit/test_background_load.py and test_startup_selection.py.
 """
@@ -36,7 +32,6 @@ TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "⚡ Real vs Simulated"]
 @pytest.fixture(scope="module")
 def app():
     at = AppTest.from_file(str(APP_PATH), default_timeout=90)
-    at.session_state["auto_load_cache"] = False
     # Seed a volume so the app starts in the state these assertions were
     # written against ("a volume is present"). ``at.run()`` used to block until
     # startup loading finished; now loading happens in a background thread, so
@@ -88,16 +83,17 @@ def test_sidebar_sections_are_collapsible_in_order(app):
     assert [expander.label for expander in app.sidebar.expander] == SIDEBAR_SECTIONS
 
 
-def test_image_and_measurements_start_expanded_geometry_collapsed(app):
-    """The two frequently used sections are open; the geometry section, which
-    is only needed when a geometry file exists, starts collapsed."""
+def test_image_expanded_geometry_and_measurements_collapsed(app):
+    """Only the image section is open. Geometry is only needed when a geometry
+    file exists, and measured data is an optional second input, so both start
+    collapsed to keep the actual load controls near the top."""
     expanded = {
         expander.label: expander.proto.expanded for expander in app.sidebar.expander
     }
     assert expanded == {
         "Image": True,
         "Projection Geometry": False,
-        "Measurements": True,
+        "Measurements": False,
     }
 
 
@@ -117,12 +113,10 @@ def _index_of_sidebar_child(app, predicate) -> int:
     raise AssertionError("Sidebar element not found")
 
 
-def test_cache_controls_are_above_the_image_section(app):
-    """Cache controls must come before the image section, so they are visible
-    without scrolling past the whole load section."""
-    cache_index = _index_of_sidebar_child(
-        app, lambda e: "Auto-load cache" in str(_label(e))
-    )
+def test_clear_cache_is_above_the_image_section(app):
+    """Clear Cache must come before the image section, so it is visible
+    without scrolling past the whole load section. The cache is always on, so
+    there is no Auto-load checkbox any more."""
     clear_index = _index_of_sidebar_child(
         app, lambda e: str(_label(e)).endswith("Clear Cache")
     )
@@ -130,14 +124,35 @@ def test_cache_controls_are_above_the_image_section(app):
         app, lambda e: getattr(e, "type", "") == "expander" and _label(e) == "Image"
     )
 
-    assert cache_index < image_index
     assert clear_index < image_index
+
+    labels = [str(_label(child)) for child in app.sidebar.children.values()]
+    assert not any("Auto-load cache" in label for label in labels)
+
+
+def test_startup_shows_an_empty_state_with_both_load_actions():
+    """A fresh start loads nothing automatically: the viewer shows "Nothing to
+    show" and offers the sidebar plus the demo phantom as the two ways in.
+
+    Uses its own AppTest (no seeded volume) because the shared fixture starts
+    with a volume present.
+    """
+    at = AppTest.from_file(str(APP_PATH), default_timeout=90)
+    at.run()
+
+    assert list(at.exception) == []
+
+    messages = " ".join(info.value for info in at.info).lower()
+    assert "nothing to show" in messages
+
+    labels = [button.label for button in at.button]
+    assert "Load Demo Phantom" in labels
 
 
 def test_3d_plot_has_a_projection_geometry_toggle_in_the_corner(app):
     """The geometry overlay is switched on/off from inside the Plotly canvas:
-    the spec carries the slider, and its Off step hides every overlay trace
-    while keeping the volume visible."""
+    the spec carries the button pair, and its Off button hides every overlay
+    trace while keeping the volume visible."""
     spec = None
     for key, child in app.main.children.items():
         for element in _walk(child):

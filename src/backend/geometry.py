@@ -71,8 +71,12 @@ class ProjectionGeometry:
 
     # === Helical Scan Parameters ===
 
-    pitch: float = 1.0
-    """Table feed per gantry rotation / collimation width."""
+    pitch: float = 0.0
+    """Table feed per gantry rotation / collimation width.
+
+    ``0.0`` means a circular (cone-beam) scan with no table movement, which is
+    the default. A non-zero pitch produces a helical trajectory.
+    """
 
     projections_per_rotation: int = 2304
     """Number of projections per 360° gantry rotation."""
@@ -124,9 +128,10 @@ class ProjectionGeometry:
         if self.det_row_spacing_mm <= 0:
             raise ValueError("det_row_spacing_mm must be positive")
 
-        # Validate pitch
-        if self.pitch <= 0:
-            raise ValueError("pitch must be positive")
+        # Validate pitch. Zero is a circular (cone-beam) scan with no table
+        # movement, which is the default; only negative pitch is meaningless.
+        if self.pitch < 0:
+            raise ValueError("pitch must not be negative")
 
         # Validate detector shape
         valid_shapes = ("flat", "curved")

@@ -12,6 +12,11 @@ from skimage import measure
 # imported lazily inside create_pyvista_volume() because importing it costs
 # ~5.6 s, which would otherwise be paid by every app start and UI test run.
 
+# Length of the direction arrows drawn along the source trajectory, in mm.
+# They are geometry annotations: big enough to read at a glance, small enough
+# that they do not bury the source path or the volume underneath them.
+ARROW_LENGTH_MM = 25.0
+
 
 def _pyvista_available() -> bool:
     """Return True if pyvista can be imported, without importing it eagerly."""
@@ -91,7 +96,7 @@ def get_trajectory_positions(geometry, n_projections: int):
     detector_positions = []
 
     # Calculate total angle based on number of projections
-    # Default: 2304 projections per 360° rotation (common for many scanners)
+    # Default: 2304 projections per 360° rotation.
     projections_per_rotation = getattr(geometry, "projections_per_rotation", 2304)
     total_angle = 360.0 * (n_projections / projections_per_rotation)
 
@@ -222,11 +227,20 @@ def add_trajectory_to_figure(
             dy /= length
             dz /= length
 
-        arrow_u.append(dx * 20)  # Scale for visibility
-        arrow_v.append(dy * 20)
-        arrow_w.append(dz * 20)
+        # Direction and length: with sizemode="raw" the cone length equals the
+        # u/v/w norm, so the arrows are exactly ARROW_LENGTH_MM long. The other
+        # modes scale by an internal sampling factor, which made the arrows
+        # vanish at sizeref=1.
+        arrow_u.append(dx * ARROW_LENGTH_MM)
+        arrow_v.append(dy * ARROW_LENGTH_MM)
+        arrow_w.append(dz * ARROW_LENGTH_MM)
 
     if arrow_x:
+        # The legend entry is the Cone trace itself, so the swatch is
+        # plotly.js's native "Direction" icon (three small arrows). A Cone
+        # swatch is always drawn as that fixed glyph: Plotly's 3D markers only
+        # allow circle/square/diamond/cross/x, so no single-arrow shape exists,
+        # and a marker stand-in read as the wrong symbol.
         fig.add_trace(
             go.Cone(
                 x=arrow_x,
@@ -235,7 +249,10 @@ def add_trajectory_to_figure(
                 u=arrow_u,
                 v=arrow_v,
                 w=arrow_w,
-                sizemode="absolute",
+                # "raw" draws each cone at its true u/v/w length, so the arrow
+                # size is set by ARROW_LENGTH_MM above and is not rescaled
+                # behind our back. sizeref keeps its documented default of 1.
+                sizemode="raw",
                 sizeref=1,
                 anchor="tail",
                 colorscale=[[0, "red"], [1, "red"]],

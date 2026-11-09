@@ -2,6 +2,8 @@
 
 import logging
 import sys
+import time
+import uuid
 from pathlib import Path
 
 # Configure logging
@@ -26,6 +28,14 @@ logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 import numpy as np
 import streamlit as st
 
+from visualization.background_load import (
+    STATUS_DONE,
+    STATUS_FAILED,
+    effective_status,
+    job_state,
+    reset_job,
+    start_job,
+)
 from visualization.display_units import (
     DISPLAY_UNIT_HU,
     DISPLAY_UNIT_MU,
@@ -82,6 +92,18 @@ def render_viewer_tab(
 ) -> None:
     """Render the 3D volume and MPR views."""
     if volume is None:
+        if st.session_state.get("startup_polling"):
+            # Loading in progress: the status block stands in for the 3D plot,
+            # so the layout does not jump when the volume arrives.
+            render_startup_status()
+            return
+
+        if st.session_state.get("startup_failed"):
+            # Rendered on the normal script path, not inside the fragment, so
+            # the recovery button still exists after polling has stopped.
+            _render_startup_failure()
+            return
+
         # Welcome screen / Demo mode
         st.info("👈 Select a DICOM folder to get started")
 
@@ -451,6 +473,87 @@ def render_viewer_tab(
         st.image(sagittal_resampled, clamp=True, use_column_width=True)
 
 
+STARTUP_JOB = "startup"
+STARTUP_FAILURE_MESSAGE = (
+    "No cached image data found. Select image data in the sidebar or "
+    "load the demo phantom."
+)
+
+
+def startup_job_name() -> str:
+    """Return this session's startup job name.
+
+    The registry is process-global, so a single fixed name would make every
+    session after the first observe the previous session's finished job and
+    skip loading entirely. Each session therefore gets its own job, which is
+    also what it needs: the resulting volume lives in that session's state.
+    """
+    token = st.session_state.get("startup_job_token")
+    if token is None:
+        token = uuid.uuid4().hex
+        st.session_state["startup_job_token"] = token
+    return f"{STARTUP_JOB}-{token}"
+
+
+@st.fragment(run_every="1s")
+def render_startup_status() -> None:
+    """Poll the startup job and render its progress in the viewer area.
+
+    Runs as a fragment so only this block re-executes: the rest of the page
+    stays interactive while a series is being read. ``run_every`` cannot be
+    switched off from inside the fragment, so the ``startup_polling`` flag is
+    the stop switch for the terminal states.
+    """
+    if not st.session_state.get("startup_polling"):
+        return
+
+    job_name = startup_job_name()
+    started_at = st.session_state.get("startup_started_at", time.time())
+    status, result, error = job_state(job_name)
+    status = effective_status(status, started_at, time.time())
+
+    if status == "running":
+        st.status("Lade Daten …", expanded=True)
+        return
+
+    # Terminal state: stop the loop whatever happened below.
+    st.session_state["startup_polling"] = False
+    reset_job(job_name)
+
+    if status == STATUS_DONE:
+        st.session_state["startup_failed"] = False
+        # An explicit "Load Series" may have finished while the job ran; that
+        # volume wins, and the background result is discarded.
+        if st.session_state.get("volume") is None:
+            st.session_state["volume"] = result
+            st.toast("Daten geladen", icon="✅")
+        st.rerun()
+        return
+
+    st.session_state["startup_failed"] = True
+    if error is not None:
+        logger.warning("Background startup load failed: %s", error)
+    # Rerun so the failure panel is rendered by the normal script path, where
+    # its button survives polling having stopped.
+    st.rerun()
+
+
+def _render_startup_failure() -> None:
+    """Show the failure notice and its recovery button.
+
+    Rendered outside the polling branch so the button survives long enough to
+    be clicked.
+    """
+    st.error(STARTUP_FAILURE_MESSAGE)
+    if st.button("Load Demo Phantom", key="startup_load_demo"):
+        from visualization.sidebar import create_demo_volume_job
+
+        st.session_state["volume"] = create_demo_volume_job()()
+        st.session_state["demo_mode"] = True
+        st.session_state["startup_failed"] = False
+        st.rerun()
+
+
 def main():
     st.set_page_config(page_title="CTBeamStudio", page_icon="🏥", layout="wide")
 
@@ -460,21 +563,23 @@ def main():
     shell.info("⏳ Initialisiere Oberfläche …")
 
     # Render sidebar and get values
-    from visualization.sidebar import load_initial_volume, render_sidebar
+    from visualization.sidebar import render_sidebar, startup_loader
 
     volume, projection_geometry, n_projections, trajectory_downsample = render_sidebar()
 
-    if volume is None:
-        # The status box is only for the loading phase. A completed
-        # st.status would stay on screen for the whole session, so it is
-        # rendered into a placeholder that gets cleared afterwards. The
-        # completion notice is a toast, which dismisses itself after ~5 s.
-        status_slot = st.empty()
-        with status_slot.status("Lade Daten …", expanded=True) as status:
-            volume = load_initial_volume()
-            status.update(label="Daten geladen", state="complete", expanded=False)
-        status_slot.empty()
-        st.toast("Daten geladen", icon="✅")
+    if volume is None and not st.session_state.get("startup_failed"):
+        # The read happens in a worker thread so this script run does not block:
+        # sidebar expanders and tabs stay usable while data loads. The viewer
+        # area polls the job and fills itself in when the volume is ready.
+        # A failed startup is not retried automatically, or every rerun would
+        # start another attempt and the failure panel would never be seen.
+        loader = startup_loader(
+            has_data_path=bool(st.session_state.get("data_path")),
+            auto_load_cache=st.session_state.get("auto_load_cache", True),
+        )
+        if loader is not None and start_job(startup_job_name(), loader):
+            st.session_state["startup_polling"] = True
+            st.session_state["startup_started_at"] = time.time()
 
     # Show demo mode banner if applicable
     if st.session_state.get("demo_mode"):

@@ -17,6 +17,7 @@ from visualization.projection_panel import (
     clear_geometry_edit_state,
     render_measurement_sidebar,
 )
+from visualization.volume_cache import load_last_loaded, load_volume_cached
 
 logger = logging.getLogger(__name__)
 
@@ -287,6 +288,50 @@ def _render_geometry_section(projection_geometry):
         )
 
     return projection_geometry, n_projections, downsample
+
+
+def create_demo_volume_job():
+    """Return a callable that builds the demo phantom.
+
+    Kept free of Streamlit calls so it can run in a worker thread: the caller
+    stores the returned ``Volume`` in session state from the main script.
+    """
+    from visualization.phantom import create_demo_volume
+
+    def build():
+        return create_demo_volume()
+
+    return build
+
+
+def startup_loader(
+    has_data_path: bool,
+    auto_load_cache: bool,
+    cache_lookup=load_last_loaded,
+):
+    """Decide what the startup load should do, without performing any I/O.
+
+    Args:
+        has_data_path: The user entered a DICOM folder, so the sidebar's
+            "Load Series" button owns loading.
+        auto_load_cache: The cache checkbox is enabled.
+        cache_lookup: Callable returning cached file paths, or ``None``.
+
+    Returns:
+        A zero-argument callable producing a ``Volume``, or ``None`` when the
+        sidebar owns loading.
+    """
+    if has_data_path:
+        return None
+
+    cached_files = cache_lookup() if auto_load_cache else None
+    if not cached_files:
+        return create_demo_volume_job()
+
+    def load_cached():
+        return load_volume_cached([str(f) for f in cached_files])
+
+    return load_cached
 
 
 def load_initial_volume():

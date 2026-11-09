@@ -93,3 +93,17 @@ def reset_job(name: str) -> None:
     """Forget the job called ``name``, returning it to ``idle``."""
     with _lock:
         _jobs.pop(name, None)
+
+
+def effective_status(
+    status: str, started_at: float, now: float, deadline_s: float = 600.0
+) -> str:
+    """Treat a job that overruns ``deadline_s`` as failed.
+
+    A worker that dies in a way that bypasses ``run_and_capture``'s ``finally``
+    would leave the status at ``running`` forever, and the UI would poll it
+    indefinitely. This bounds that at the point of reading.
+    """
+    if status == STATUS_RUNNING and now - started_at > deadline_s:
+        return STATUS_FAILED
+    return status

@@ -9,6 +9,7 @@ from visualization.background_load import (
     STATUS_FAILED,
     STATUS_IDLE,
     STATUS_RUNNING,
+    effective_status,
     job_state,
     reset_job,
     run_and_capture,
@@ -107,3 +108,16 @@ def test_run_and_capture_always_leaves_running_state():
     run_and_capture(state, boom)
 
     assert state["status"] == STATUS_FAILED
+
+
+def test_a_job_past_its_deadline_is_reported_failed():
+    assert effective_status(STATUS_RUNNING, 0.0, 601.0) == STATUS_FAILED
+
+
+def test_a_job_within_its_deadline_stays_running():
+    assert effective_status(STATUS_RUNNING, 0.0, 599.0) == STATUS_RUNNING
+
+
+def test_terminal_states_are_never_overridden():
+    assert effective_status(STATUS_DONE, 0.0, 10_000.0) == STATUS_DONE
+    assert effective_status(STATUS_FAILED, 0.0, 10_000.0) == STATUS_FAILED

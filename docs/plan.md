@@ -467,7 +467,7 @@
   - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
 - **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
 
-### `[ ]` T-81 — Schneller UI-Smoke-Test (ersetzt T-70d)
+### `[x]` T-81 — Schneller UI-Smoke-Test (ersetzt T-70d)
 - **Ziel:** Tab-/Sidebar-Layout wieder absichern, ohne die Testsuite zu verlangsamen.
 - **Hintergrund:** Die sechs `AppTest`-Tests aus T-70d dauerten **96,8 s** (~75 % der Suite), weil jeder Test einen kompletten Streamlit-Script-Run startet. Ein `AppTest.run()` kostet 10–30 s: ~8 s Import von `visualization.volume3d` (skimage/pyvista) und ~3,6 s in `load_last_loaded()` (87 KB Cache mit 560 toten Netzwerkpfaden). Entfernt in `8de260b`, Datei bleibt in der Historie (`6307a6a`).
 - **Dateien:** `tests/integration/test_ui_smoke.py` (neu)
@@ -479,7 +479,40 @@
   4. `visualization.volume3d`-Import messen; ggf. 3D-Render lazily laden.
   5. Optional `@pytest.mark.slow`, per Default ausgeschlossen (`-m "not slow"`).
 - **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
-- **Status:** ⚠️ Teilweise erledigt (Nov 6, 2026, `e3e54d7`) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis und Messdaten-Load ab (9 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel nicht erreicht:** 22 s statt < 15 s, Suite 30 s statt < 20 s. `pyvista` war mit ~5,6 s der größte Einzelposten und wird jetzt lazy geladen (`test_volume3d_import.py`), der Rest ist `scipy`/`skimage` plus der 3D-Render pro Script-Run. Weitere Verkürzung würde bedeuten, den Viewer-Tab-Render zu überspringen (z. B. `render_mode` per Session-State auf einen billigen Pfad setzen) — offen.
+- **Status:** ✅ Done (Nov 9, 2026) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis, Messdaten-Load und Empty-State-Start ab (14 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel erreicht:** Modul ~5 s, Suite ~16–20 s (vorher 22 s / 30 s). Der frühere Engpass `pyvista` (~5,6 s) ist durch den Lazy-Import (`test_volume3d_import.py`) und das Shelving des PyVista-Render-Modus (T-82/T-84) ganz aus dem Startpfad verschwunden.
+
+### `[x]` T-83 — Background-Startup-Load (nicht blockierender Start)
+- **Ziel:** Den Ladevorgang beim Start aus dem Streamlit-Script-Thread herausnehmen, damit Shell, Sidebar und alle drei Tabs schon bedienbar sind, während eine Serie gelesen wird.
+- **Dateien:** `src/visualization/background_load.py` (neu), `src/visualization/sidebar.py`, `src/visualization/app.py`, `tests/unit/test_background_load.py`, `tests/unit/test_startup_selection.py`, `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-81
+- **Umsetzung:**
+  1. Streamlit-freie Job-Registry: `start_job` / `job_state` / `reset_job` / `run_and_capture` mit `threading.Lock` und Daemon-Thread; genau ein Ergebnis pro Job, `run_and_capture` setzt den Endstatus im `finally` (kein endloses Polling).
+  2. `effective_status(status, started_at, now, deadline_s=600)` bricht Jobs mit Wanduhr-Deadline ab; Endzustände werden nie überschrieben.
+  3. `@st.fragment(run_every="1s")` `render_startup_status()` pollt; der `startup_polling`-Flag ist der Ausschalter, weil `run_every` nicht von innen abgeschaltet werden kann. Das Fragment zeichnet bewusst **keine** Elemente (sonst blieb eine veraltete „Loading data …"-Box stehen) — die sichtbare Box rendert der normale Script-Pfad.
+  4. Ergebnis wird nur geschrieben, wenn `st.session_state["volume"]` noch `None` ist; ein explizit geladenes „Load Series" gewinnt.
+  5. `reset_job(startup_job_name())` in „Clear Cache" (Registry lebt außerhalb des Session-State) und pro Session eigener Job-Name über `startup_job_token`.
+- **Status:** ✅ Done (Nov 9, 2026) — 11 Unit-Tests (`test_background_load.py`), 4 Tests für die Startup-Policy (`test_startup_selection.py`). **Polling und Interaktivität sind nicht durch die Suite abgedeckt**, weil `run_every` unter `AppTest` (1.39.1) nicht feuert; im Browser verifiziert. Spec: `docs/superpowers/specs/2026-11-09-background-startup-load-design.md`, Plan: `docs/superpowers/plans/2026-11-09-background-startup-load.md`.
+- **Hinweis:** Der ursprüngliche Auto-Load-Pfad ist mit T-85 entfallen; `render_startup_status()` bleibt als Polling-Mechanismus im Code, wird aktuell aber nicht angestoßen.
+
+### `[x]` T-84 — Geometrie-Overlay im 3D-Canvas schaltbar (PyVista aus der UI)
+- **Ziel:** Das Projektionsgeometrie-Overlay im 3D-Plot ein-/ausschalten, ohne einen Script-Rerun auszulösen.
+- **Dateien:** `src/visualization/volume3d.py` (`add_geometry_toggle`), `src/visualization/app.py`, `tests/unit/test_geometry_toggle.py`, `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-23, T-55
+- **Akzeptanz:**
+  - `updatemenus`-Buttonpaar „On"/„Off" unten rechts im Canvas (`x=0.99, y=0.02`), clientseitig über `visible`-Listen — kein Rerun.
+  - `n_base_traces = len(fig.data)` wird nach `create_volume_figure()` und vor jedem Overlay-Trace erfasst; „Off" blendet nur Source/Detector, Trajektorie, Detektor-Ebenen und Zentralstrahlen aus, nie das Volumen.
+- **Status:** ✅ Done (Nov 9, 2026, `53d4291`) — 10 Unit-Tests in `test_geometry_toggle.py`, Smoke-Test prüft die Button-Spec in der Figur. Zusätzlich: redundante „Show Trajectory"-Checkbox entfernt (Trajektorie folgt der geladenen Geometrie), Lade-Abschlussmeldung als selbst verschwindender Toast statt permanentem Status-Box, PyVista-Render-Modus aus der UI entfernt (`Dockerfile`/`README` ohne `pyvista`) — Reaktivierung bleibt als T-82 offen.
+
+### `[x]` T-85 — Kein Auto-Load, Empty State, Zirkulärscan-Defaults, sichtbare Richtungspfeile
+- **Ziel:** Start und „Clear Cache" landen im selben leeren Zustand, die UI ist wieder durchgehend englisch, die Geometrie-Defaults beschreiben einen zirkulären Cone-Beam-Scan, und die Richtungspfeile der Trajektorie sind sichtbar.
+- **Dateien:** `src/visualization/app.py`, `src/visualization/sidebar.py`, `src/visualization/projection_panel.py`, `src/visualization/volume3d.py`, `src/backend/geometry.py`, `tests/integration/test_ui_smoke.py`, `tests/unit/test_geometry.py`, `tests/unit/test_geometry_trajectory.py`, `tests/unit/test_startup_selection.py`
+- **Abhängig von:** T-83
+- **Umsetzung:**
+  1. `should_startup_load()` liefert immer `False`; die „Auto-load cache"-Checkbox ist entfernt, Caching ist immer aktiv. `render_empty_state()` („Nothing to show — load image data in the sidebar, or use the demo phantom.") bietet „Load Demo Phantom" an; sie ersetzt den alten Welcome-Screen und wird auch nach einem fehlgeschlagenen Startup gezeigt.
+  2. `ProjectionGeometry.pitch = 0.0` (nur negativer Pitch wird abgelehnt) = Zirkulärscan; „Projections" startet mit `projections_per_rotation` (2304, aus der Geometrie geseedet) statt 51326; „Trajectory Downsample" startet bei 1/100, damit der Ring das Volumen nicht zudeckt.
+  3. Richtungspfeile: `sizemode="raw"` + `ARROW_LENGTH_MM = 25.0` statt `sizemode="absolute"` mit `sizeref=1` (das zeichnete Cones von einer Dateneinheit, also unsichtbar); eigener Legendeneintrag „Direction" mit Plotlys nativem Cone-Swatch.
+  4. Sidebar: nur „Image" ist offen, „Projection Geometry" und „Measurements" sind zu; die abgeleiteten Geometriewerte (Fan/Cone angle, Collimation) sind eine kompakte Caption statt drei großer `st.metric`-Kacheln. Alle sichtbaren Strings wieder englisch.
+- **Status:** ✅ Done (Nov 9, 2026, `c4ad84e`) — Tests: Startup-Policy, `pitch=0.0` als gültiger Zirkulärscan, 2304-Default, Arrow-Sizing und „Direction"-Legendeneintrag, Empty-State-Start, zugeklappte Sektionen, entfallende Auto-load-Checkbox. Suite danach: **256 passed, 2 skipped** in ~16–23 s.
 
 ### `[ ]` T-82 — PyVista-Render-Modus reaktivieren (verschoben)
 - **Ziel:** Den off-screen PyVista-Render-Modus wieder in der UI anbieten — mit Geometrie-Overlay und On/Off-Schalter, nicht als statisches Bild.
@@ -531,6 +564,7 @@
 | 9 | | T-56 ⚠️, T-57 bis T-60 ⚠️ (Docker) |
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
+| 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
 
 ## Decision Log
 
@@ -545,6 +579,9 @@
 | D-7 | 2026-10-13 | Phantom bleibt trotz AAPM-Option | lizenzfreier Quickstart und Screenshots |
 | D-8 | 2026-10-24 | Plotly statt PyVista für 3D | Keine VTK-Kompatibilitätsprobleme auf Windows |
 | D-9 | 2026-11-04 | Numerisches Backend von UI trennen: `Volume`, `ProjectionGeometry`, `forward_project`, Loader (dicom/npy/projection) nach `src/backend/` | one-way dependency `visualization` → `backend`; `parallelproj` lazy import |
+| D-10 | 2026-11-09 | Start lädt nichts automatisch; „Clear Cache" führt in denselben Empty State | Startup und Cache-Reset sind ein Zustand, ein Pfad; der Nutzer wählt Bilddaten oder Demo-Phantom |
+| D-11 | 2026-11-09 | Geometrie-Overlay über Plotly-`updatemenus` im Canvas statt `st.toggle`/Rerun | clientseitiges Umschalten ohne Script-Rerun; PyVista kann als statisches PNG keinen interaktiven Schalter tragen (T-82) |
+| D-12 | 2026-11-09 | `pitch = 0.0` als Default = zirkulärer Cone-Beam-Scan | entspricht dem Aufbau der Messdaten; nur negativer Pitch ist fachlich sinnlos |
 
 ## Offene Fragen
 
@@ -564,6 +601,14 @@
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
 - T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
+
+## Erledigt (2026-11-09)
+
+- ✅ T-83: Background-Startup-Load (Job-Registry, `st.fragment`-Polling, Deadline, `reset_job` bei Clear Cache)
+- ✅ T-84: Geometrie-Overlay als In-Canvas-On/Off-Buttons; „Show Trajectory" entfernt; PyVista aus der UI genommen (T-82)
+- ✅ T-85: Kein Auto-Load + Empty State, englische UI, Zirkulärscan-Defaults (`pitch=0.0`, 2304 Projektionen, 1/100 Downsample), sichtbare Richtungspfeile (`sizemode="raw"`, `ARROW_LENGTH_MM`)
+- ⚠️ T-82: PyVista-Render-Modus shelved (statisches PNG kann keinen In-Canvas-Schalter tragen)
+- ✅ T-81: Smoke-Test-Modul jetzt bei ~5 s (vorher 22 s) — die Beseitigung des PyVista-Imports aus dem Startpfad hat das Laufzeit-Ziel erreicht
 
 ## Erledigt (2026-11-06)
 

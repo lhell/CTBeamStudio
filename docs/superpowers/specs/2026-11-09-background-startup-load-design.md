@@ -133,6 +133,24 @@ first run is not an error.
 - A wall-clock timeout (default 10 min) bounds the fragment: if a job somehow
   stays `running` past the deadline it is treated as failed and polling stops,
   rather than spinning indefinitely.
+- **A terminal state stops the polling loop.** `run_every="1s"` cannot be
+  switched off from inside the fragment, so a `failed` job would otherwise be
+  re-polled every second for the rest of the session. A `startup_polling` flag in
+  `st.session_state` is set to `True` when the job starts and cleared on the
+  terminal transition; the fragment returns immediately when it is `False`.
+  Costs one dict lookup, not one script run per second.
+
+## Testability Boundary
+
+`st.fragment(run_every=...)` does **not** fire under `AppTest`: each
+`AppTest.run()` executes the script once, and no timer-driven fragment reruns
+occur. Verified empirically against Streamlit 1.39.1. Therefore:
+
+- The suite **can** cover job lifecycle, the startup decision, and rendering in a
+  given state.
+- The suite **cannot** cover polling, automatic hand-over, or "the page stays
+  clickable while loading". Those are verified manually in the browser and are
+  recorded as such in the plan — a green suite is not evidence for them.
 
 ## Files Touched
 
@@ -144,7 +162,7 @@ first run is not an error.
 | `src/visualization/volume_cache.py` | Expose the cached-series loader as a callable factory (no behaviour change) |
 | `tests/unit/test_background_load.py` | **New.** Registry/thread behaviour |
 | `tests/unit/test_volume_cache.py` | Cover the loader factory |
-| `tests/integration/test_ui_smoke.py` | Startup job states; failed-cache prompt; fresh-start demo |
+| `tests/integration/test_ui_smoke.py` | Fixture seeds a demo volume (one line); no new runs |
 
 ## Testing
 
@@ -163,19 +181,25 @@ first run is not an error.
 - Returns `None` when `data_path` is set (sidebar load owns it).
 - Performs no filesystem reads beyond `load_last_loaded()`'s single `exists()`.
 
-**Integration — `test_ui_smoke.py`:**
-- Tabs and sidebar sections are present **while the job is running** (this is the
-  regression the change exists to prevent).
-- A cached series that fails to load shows the "No cached image data found…"
-  message and the Load Demo Phantom button, and no volume is set.
-- A fresh start still auto-loads the demo phantom.
-- The existing smoke tests stay green; the fixture seeds or awaits the job so
-  tests that need a volume are not racing the worker.
+**Integration — `test_ui_smoke.py`:** no new `AppTest` runs. The existing
+module-scoped fixture is updated to **seed a demo `Volume`** into
+`at.session_state["volume"]` before `at.run()`, so the app starts with a volume
+present — the same state the tests observe today, because `at.run()` used to
+block until loading finished. All existing assertions keep their meaning and the
+suite runtime does not change.
+
+This is a deliberate boundary: with a seeded volume the startup job never starts,
+so the smoke tests cannot detect broken fragment wiring. That gap is closed by
+manual browser verification (see Testability Boundary), not by more `AppTest`
+runs. Startup behaviour is covered by the unit tests above, which do not need
+Streamlit.
 
 ## Verification
 
-- `pytest` green (currently 237 passed, 2 skipped).
+- `pytest` green (baseline: 237 passed, 2 skipped, ~30 s).
 - `flake8` clean with the repo ignore set; `black`/`isort` unchanged.
-- Manual: restart the server, open the app with a slow/offline cache path, and
-  confirm sidebar expanders collapse and tabs switch while "Lade Daten …" is
-  displayed.
+- **Manual (required — not covered by the suite):** restart the server, point the
+  cache at a slow or unreachable path, open the app and confirm while
+  "Lade Daten …" is displayed that sidebar expanders collapse and tabs switch.
+  Then confirm the viewer swaps to the volume on its own, and that a broken cache
+  path produces the "No cached image data found…" message plus the demo button.

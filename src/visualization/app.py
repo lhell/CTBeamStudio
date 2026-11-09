@@ -473,26 +473,17 @@ def render_viewer_tab(
         st.image(sagittal_resampled, clamp=True, use_column_width=True)
 
 
-STARTUP_JOB = "startup"
 STARTUP_FAILURE_MESSAGE = (
     "No cached image data found. Select image data in the sidebar or "
     "load the demo phantom."
 )
 
 
-def startup_job_name() -> str:
-    """Return this session's startup job name.
+def _startup_job_name() -> str:
+    """This session's job name (helper lives in sidebar to avoid a cycle)."""
+    from visualization.sidebar import startup_job_name
 
-    The registry is process-global, so a single fixed name would make every
-    session after the first observe the previous session's finished job and
-    skip loading entirely. Each session therefore gets its own job, which is
-    also what it needs: the resulting volume lives in that session's state.
-    """
-    token = st.session_state.get("startup_job_token")
-    if token is None:
-        token = uuid.uuid4().hex
-        st.session_state["startup_job_token"] = token
-    return f"{STARTUP_JOB}-{token}"
+    return startup_job_name()
 
 
 @st.fragment(run_every="1s")
@@ -507,7 +498,7 @@ def render_startup_status() -> None:
     if not st.session_state.get("startup_polling"):
         return
 
-    job_name = startup_job_name()
+    job_name = _startup_job_name()
     started_at = st.session_state.get("startup_started_at", time.time())
     status, result, error = job_state(job_name)
     status = effective_status(status, started_at, time.time())
@@ -577,7 +568,7 @@ def main():
             has_data_path=bool(st.session_state.get("data_path")),
             auto_load_cache=st.session_state.get("auto_load_cache", True),
         )
-        if loader is not None and start_job(startup_job_name(), loader):
+        if loader is not None and start_job(_startup_job_name(), loader):
             st.session_state["startup_polling"] = True
             st.session_state["startup_started_at"] = time.time()
 

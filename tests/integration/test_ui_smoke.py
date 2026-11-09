@@ -4,9 +4,16 @@ One module-scoped ``AppTest`` instance is shared by all assertions: a single
 ``AppTest.run()`` costs 10-30 s (full Streamlit script run), so running it per
 test made the suite unusable (see plan.md T-81).
 
-The cache path is skipped explicitly: ``auto_load_cache=False`` stops
-``load_initial_volume()`` from touching the 87 KB cache file with its hundreds
-of dead network paths, which alone cost ~3.6 s per run.
+The cache path is skipped explicitly: ``auto_load_cache=False`` stops the
+startup load from touching the 87 KB cache file with its hundreds of dead
+network paths, which alone cost ~3.6 s per run.
+
+A demo volume is seeded into session state before the first run. Startup
+loading happens in a background thread (see
+docs/superpowers/specs/2026-11-09-background-startup-load-design.md), so
+without a seed the viewer would render the loading status block instead of the
+3D plot these assertions expect. Startup behaviour is covered by
+tests/unit/test_background_load.py and test_startup_selection.py.
 """
 
 import json
@@ -18,6 +25,8 @@ import numpy as np
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from visualization.phantom import create_demo_volume
+
 APP_PATH = Path(__file__).resolve().parents[2] / "src" / "visualization" / "app.py"
 
 SIDEBAR_SECTIONS = ["Image", "Projection Geometry", "Measurements"]
@@ -28,6 +37,13 @@ TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "⚡ Real vs Simulated"]
 def app():
     at = AppTest.from_file(str(APP_PATH), default_timeout=90)
     at.session_state["auto_load_cache"] = False
+    # Seed a volume so the app starts in the state these assertions were
+    # written against ("a volume is present"). ``at.run()`` used to block until
+    # startup loading finished; now loading happens in a background thread, so
+    # without a seed the viewer would render the status block instead of the 3D
+    # plot. Startup behaviour itself is covered by tests/unit, not here, because
+    # ``st.fragment(run_every=...)`` never fires under AppTest.
+    at.session_state["volume"] = create_demo_volume()
     at.run()
     return at
 
@@ -36,14 +52,18 @@ def test_app_renders_without_exception(app):
     assert list(app.exception) == []
 
 
-def test_load_completion_message_does_not_stay_on_screen(app):
+def test_no_completed_load_status_is_shown(app):
     """A completed ``st.status`` box is permanent: it would sit above the
     viewer for the rest of the session. Loading is a one-shot event, so the
-    completion notice is a toast, which dismisses itself after ~5 s."""
+    app never leaves a completed status element behind.
+
+    The completion toast itself is emitted inside the polling fragment, which
+    cannot be driven under AppTest (``run_every`` never fires), so it is not
+    asserted here.
+    """
     status_labels = [status.label for status in app.status]
 
     assert "Daten geladen" not in status_labels
-    assert any("Daten geladen" in toast.value for toast in app.toast)
 
 
 def test_three_tabs_are_rendered_in_order(app):

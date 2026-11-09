@@ -2,12 +2,14 @@
 
 import logging
 import tempfile
+import uuid
 from pathlib import Path
 
 import streamlit as st
 
 from backend.loaders.dicom import scan_series
 from backend.loaders.projection import load_projection_geometry
+from visualization.background_load import reset_job
 from visualization.geometry_cache import (
     clear_cached_geometry,
     default_geometry,
@@ -45,7 +47,7 @@ def render_sidebar():
 
     # Cache controls first: they act on everything below, so they should be
     # reachable without scrolling past the load sections. The checkbox writes
-    # directly to session state, which load_initial_volume() reads.
+    # directly to session state, which the startup load reads.
     st.sidebar.checkbox(
         "Auto-load cache on refresh",
         value=st.session_state.get("auto_load_cache", True),
@@ -53,6 +55,11 @@ def render_sidebar():
     )
 
     if st.sidebar.button("🗑️ Clear Cache"):
+        # The job registry lives outside session state, so a finished or failed
+        # startup job must be dropped explicitly: otherwise the next start would
+        # silently no-op and the viewer would stay empty. Read the name before
+        # the session-state wipe below removes its token.
+        reset_job(startup_job_name())
         # Clear session state
         for k in list(st.session_state.keys()):
             del st.session_state[k]
@@ -100,7 +107,8 @@ def _render_image_section():
         if "last_scanned_path" not in st.session_state:
             st.session_state["last_scanned_path"] = ""
 
-        # Initial data loading happens in load_initial_volume(), after the app
+        # Initial data loading happens in the background (see
+        # visualization.background_load), started from app.main() once the
         # shell has been rendered. Loading it here would block the first paint.
 
         if data_path and Path(data_path).exists():
@@ -290,6 +298,21 @@ def _render_geometry_section(projection_geometry):
     return projection_geometry, n_projections, downsample
 
 
+def startup_job_name() -> str:
+    """Return this session's startup job name.
+
+    The registry is process-global, so a single fixed name would make every
+    session after the first observe the previous session's finished job and
+    skip loading entirely. Each session therefore gets its own job, which is
+    also what it needs: the resulting volume lives in that session's state.
+    """
+    token = st.session_state.get("startup_job_token")
+    if token is None:
+        token = uuid.uuid4().hex
+        st.session_state["startup_job_token"] = token
+    return f"startup-{token}"
+
+
 def create_demo_volume_job():
     """Return a callable that builds the demo phantom.
 
@@ -332,52 +355,6 @@ def startup_loader(
         return load_volume_cached([str(f) for f in cached_files])
 
     return load_cached
-
-
-def load_initial_volume():
-    """Load the last cached series or the demo phantom.
-
-    Called after the UI shell has been rendered so the page is visible while
-    a potentially large (or slow network) series is being read.
-    """
-    volume = st.session_state.get("volume")
-    if volume is not None:
-        return volume
-
-    # An explicit folder was entered; don't preempt the "Load Series" action.
-    if st.session_state.get("data_path"):
-        return None
-
-    from visualization.volume_cache import (
-        clear_last_loaded,
-        load_last_loaded,
-        load_volume_cached,
-    )
-
-    cached_files = None
-    if st.session_state.get("auto_load_cache", True):
-        cached_files = load_last_loaded()
-
-    if cached_files:
-        try:
-            volume = load_volume_cached([str(f) for f in cached_files])
-        except Exception as exc:  # noqa: BLE001 - fall back to the demo phantom
-            logger.warning("Could not reload cached series: %s", exc)
-            st.warning(
-                f"Could not reload the cached series ({exc}). "
-                "Loading the demo phantom instead."
-            )
-            clear_last_loaded()
-        else:
-            st.session_state["volume"] = volume
-            st.session_state["loaded_files"] = cached_files
-            st.session_state["series"] = _series_stub(
-                "Cached Volume", "Unknown", len(cached_files)
-            )
-            st.toast(f"Loaded {len(cached_files)} slices from cache!", icon="✅")
-            return volume
-
-    return load_demo_volume()
 
 
 def load_demo_volume():

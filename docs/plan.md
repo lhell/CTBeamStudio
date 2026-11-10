@@ -542,18 +542,18 @@
 
 ### `[ ]` T-87 — Vollbild je Ansicht (Fullscreen) prüfen und dokumentieren
 - **Ziel:** Sicherstellen, dass jede der vier Ansichten (3× MPR, 1× 3D) auf Knopfdruck den verfügbaren Platz einnimmt — ohne eigenen Code, wo Streamlit/Plotly das schon können.
-- **Hintergrund:** Beim Prüfen des Viewer-Layouts (T-86) zeigte sich, dass **beide** Vollbild-Pfade bereits nativ vorhanden sind:
-  - `st.image` rendert jede MPR-Ebene in einen `stFullScreenFrame` mit eingebautem „View fullscreen"-Button (`data-testid="StyledFullScreenButton"`, erscheint beim Hover, `position: fixed`, z-index 1000050). Gemessen: drei sichtbare Buttons, einer pro Ebene.
-  - Plotly 7.1 bietet in der Modebar des 3D-Charts einen „Fullscreen"-Eintrag (`_context.displayModeBar == "hover"` ist bereits aktiv).
-  Es fehlt also **kein Feature**, sondern eine Entscheidung, ob diese zwei verschiedenen Mechanismen gut genug sind.
-- **Dateien:** `src/visualization/app.py` (`render_viewer_tab`), ggf. `src/visualization/volume3d.py` (nur Modebar-Config), `tests/integration/test_ui_smoke.py`
+- **Hintergrund:** Beim Prüfen des Viewer-Layouts (T-86) zeigte sich, dass **beide** Vollbild-Pfade bereits vorhanden sind — und zwar aus **derselben** Quelle: Streamlit, nicht Plotly.
+  - **MPR:** `st.image` rendert in einen `stFullScreenFrame` mit eingebautem „View fullscreen"-Button (`data-testid="StyledFullScreenButton"`, erscheint beim Hover, `position: fixed`, z-index 1000050). Quelle: `streamlit/static/js/5711.229cb7d0.chunk.js` — eine React-Klasse mit `state.expanded`, die `fullWidth = window.innerWidth - 2*padding` berechnet und den Children `{width: fullWidth, height: fullHeight, expanded}` übergibt.
+  - **3D:** Der „Fullscreen"-Eintrag in der Plotly-Modebar kommt **nicht** von Plotly. `plotly.min.js` (3.8.2) enthält keinen Modebar-Button mit „fullscreen" im Namen (`toImage`, `zoom2d`, `orbitRotation`, `resetCameraDefault3d`, …). Streamlit injiziert ihn in `streamlit/static/js/8237.210a5ac4.chunk.js` per `config.modeBarButtonsToAdd = [{name: "Fullscreen", icon: fullscreen-expand, click: …}]` und verdrahtet ihn mit denselben `expand`/`collapse`-Props des `stFullScreenFrame`.
+  Es fehlt also **kein Feature**, sondern eine Entscheidung, ob diese zwei Erscheinungsformen gut genug sind.
+- **Dateien:** `src/visualization/app.py` (`render_viewer_tab`), `tests/integration/test_ui_smoke.py`
 - **Abhängig von:** T-86
 - **Offene Punkte / zu entscheiden:**
-  1. **Zwei verschiedene Bedienmuster** — Bild-Vollbild ist ein Hover-Button unten rechts, 3D-Vollbild liegt im Plotly-Menü. Ein einheitlicher „⛶"-Button je Spalte wäre konsistenter, kostet aber eigene Implementierung.
-  2. **Feste Höhe vs. Vollbild — geprüft:** kein Problem. Plotly ignoriert `height` im Vollbild und baut auf die Viewport-Höhe um. Gemessen: `399×700` → **`1088×612`** (Viewport 1112×670), `_fullLayout.height` 700 → 612. `layout.height` wird dabei temporär überschrieben, nicht dauerhaft verändert.
-  3. **MPR-Vollbild skaliert nur das Bild**, nicht die zugehörigen Slice-Slider — ein Vollbild-Slice-Viewer mit Slidern wäre `st.dialog(width="large")` (in 1.39.1 vorhanden) und würde einen eigenen Renderpfad brauchen.
+  1. **Zwei verschiedene Bedienmuster bei einer Mechanik** — Bild-Vollbild ist ein Hover-Button unten rechts, das 3D-Vollbild liegt im Plotly-Menü. Beide rufen denselben `stFullScreenFrame` auf. Ein einheitlicher „⛶"-Button je Spalte wäre konsistenter, kostet aber eigene Implementierung.
+  2. **Feste Höhe vs. Vollbild — geprüft:** kein Problem. Plotly re-measured sich im Vollbild und baut auf die Viewport-Höhe um. Gemessen: `399×700` → **`1088×612`** (Viewport 1112×670), `_fullLayout.height` 700 → 612. `layout.height` wird dabei temporär überschrieben, nicht dauerhaft verändert.
+  3. **MPR-Vollbild skaliert nur den Container**, nicht die zugehörigen Slice-Slider — ein Vollbild-Slice-Viewer mit Slidern wäre `st.dialog(width="large")` (in 1.39.1 vorhanden) und würde einen eigenen Renderpfad brauchen.
   4. **Bild-Vollbild nutzt `position: fixed` + z-index 1000050** — verifiziert; die Seite muss danach neu geladen werden, sonst bleiben die `stFullScreenFrame`-Wrapper bei 0×0 hängen (im Test beobachtet). Kein App-Fehler, aber relevant für automatisierte Tests.
-  5. **Bild-Vollbild skaliert das Bild nicht hoch — gemessen.** Der Frame wächst korrekt auf den Viewport (`190×190` → **`1112×670`**, `position: fixed`), das `<img>` bleibt aber bei seiner **nativen Größe (256×256)**. Der Slice wird also nicht größer, nur die Umgebung dunkel. Für echte Detailarbeit an einer Schicht ist das zu wenig — Abhilfe: Bild vor dem Anzeigen auf die Zielauflösung hochskalieren (z. B. `to_isotropic` + Faktor) oder ein `st.dialog(width="large")`-Viewer mit eigenem Renderpfad.
+  5. **Bild-Vollbild skaliert das Bild nicht hoch — gemessen.** Der Frame bekommt korrekt `{width: 1112, height: 670}` (`190×190` → **`1112×670`**, `position: fixed`), aber `st.image` berechnet seine Breite **serverseitig/beim Rendern** als festen Inline-Style (`style="width: 189.86px"`) und liest die neue Größe nicht. Das `<img>` bleibt bei **256×256**. Der Slice wird also nicht größer, nur die Umgebung dunkel. Abhilfe: Bild vor dem Anzeigen auf die Zielauflösung hochskalieren, oder ein `st.dialog(width="large")`-Viewer mit eigenem Renderpfad.
 - **Akzeptanz:** Im Browser verifiziert, dass alle vier Ansichten per nativem Vollbild die Bildschirmhöhe nutzen (oder begründet dokumentiert, warum nicht). Entscheidung zu Punkt 1–3 im Decision Log festgehalten. Ein Smoke-Test pinnt, dass die Vollbild-Buttons vorhanden bleiben.
 - **Status:** ⚠️ Teilweise geprüft (Nov 10, 2026) — **3D-Vollbild voll nutzbar:** `399×700` → `1088×612`, Plotly baut auf die Viewport-Höhe um und ignoriert `height=700` dabei. **Bild-Vollbild nur eingeschränkt nutzbar:** Container füllt den Viewport (`1112×670`), Bild bleibt aber bei 256 px (Punkt 5). Offen: Entscheidung zu Punkt 1 und 5.
 
@@ -639,7 +639,7 @@
 | D-15 | 2026-11-10 | Umschalter **außerhalb** der Spalten | in einer kollabierten Spalte wäre er unerreichbar und der Nutzer in dieser Ansicht gefangen |
 | D-16 | 2026-11-10 | `VIEWER_HEIGHT_PX = 700` (nicht 900) + `SCENE_DOMAIN_Y = [0.2, 1]` | bei 900 px begann die Canvas 362 px unter dem Seitenanfang und die Szene lief aus dem Bild; Plotly zentriert 3D-Szenen sonst im Canvas |
 | D-17 | 2026-11-10 | MPR-Bilder mit `use_column_width=True`, kein fester Pixel-Cap | ein fester Cap läuft in einer schmalen Spalte über (gemessen: 260 px in 201 px); das 1:2-Verhältnis hält den Stapel stattdessen bei 685/700 px |
-| D-18 | 2026-11-10 | Kein eigener Fullscreen-Code — native Mechanismen nutzen | `st.image` bringt „View fullscreen" mit, Plotly 7 eine Modebar-Schaltfläche; 3D-Vollbild verifiziert (`399×700` → `1088×612`) |
+| D-18 | 2026-11-10 | Kein eigener Fullscreen-Code — Streamlits `stFullScreenFrame` nutzen | `st.image` bringt „View fullscreen" mit, Streamlit injiziert denselben Mechanismus als Modebar-Button in `st.plotly_chart` (`modeBarButtonsToAdd`); 3D-Vollbild verifiziert (`399×700` → `1088×612`), Bild-Vollbild skaliert das Bild nicht mit |
 
 ## Offene Fragen
 

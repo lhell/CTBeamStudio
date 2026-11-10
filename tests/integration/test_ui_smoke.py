@@ -201,6 +201,28 @@ def test_3d_options_no_longer_offer_a_show_trajectory_checkbox(app):
     assert "Show Trajectory" not in labels
 
 
+def test_viewer_options_are_floating_popovers(app):
+    """The option panels float over the views instead of pushing them down.
+
+    Both used to be always-open expanders above the canvas, so every control
+    pushed the 3D view further down the page.
+    """
+    labels = [block.proto.popover.label for block in app.get("popover")]
+
+    assert "⚙️ Slice Options" in labels
+    assert "⚙️ 3D Options" in labels
+
+
+def test_view_switcher_offers_all_three_layouts(app):
+    """The All / 2D / 3D switcher is the only way to change the split, and it
+    must be rendered outside the columns so it survives a collapse."""
+    switchers = [radio for radio in app.radio if radio.key == "viewer_view"]
+
+    assert len(switchers) == 1
+    assert list(switchers[0].options) == ["All", "2D", "3D"]
+    assert switchers[0].value == "All"
+
+
 def test_render_mode_offers_only_iso_surface(app):
     """The PyVista render mode is shelved for now: it produced a static PNG,
     so it could not host the interactive geometry toggle. Only the Plotly

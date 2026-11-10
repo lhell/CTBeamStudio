@@ -40,6 +40,8 @@ reachable *without* displacing either view.
 - The 3D view is visibly the largest element in the tab.
 - All three MPR planes are visible at the same time as the 3D view.
 - Opening or closing either options panel moves no view.
+- Either column can be collapsed to give the other the full width, and the
+  control that does it stays reachable in every state.
 - Every existing control still works, with the same labels, keys, defaults and
   conditional visibility.
 - No page-level scrollbar appears at 1920×1080.
@@ -55,13 +57,12 @@ reachable *without* displacing either view.
 
 ## 3. Decisions
 
-### 3.1 A 3+1 split, not a 2×2 grid
+### 3.1 A 3+1 split by default, not a 2×2 grid
 
 The user's initial phrasing was "2×2 layout, first three MPR small, bottom
 right 3D big". A literal 2×2 grid cannot deliver "3D big": in a 2×2 grid the 3D
-cell is one quadrant, so it is no larger than an MPR cell. The requirement that
-actually matters is *the 3D view dominates*, which a 3+1 split satisfies
-directly:
+cell is one quadrant, so it is no larger than an MPR cell. The default state is
+therefore a 3+1 split, which makes the 3D view dominate directly:
 
 ```
 left column (narrow)            right column (wide)
@@ -77,7 +78,10 @@ left column (narrow)            right column (wide)
 └──────────────────────┘        └───────────────────────────────┘
 ```
 
-This was chosen by the user over an equal 2×2 grid and over a 2-row split.
+The 2×2 grid is still available — as the **2D view** of the switcher in §3.5,
+where it has the full tab width to spread into and no 3D canvas competing with
+it. In the split state a 2×2 grid would shrink each plane to a quarter of a
+narrow column, which is worse than the vertical stack.
 
 ### 3.2 Options live in popovers, beside the views they control
 
@@ -109,36 +113,114 @@ dead space or a nested scrollbar. A single module-level constant is used for
 both:
 
 ```python
-VIEWER_HEIGHT_PX = 900
+VIEWER_HEIGHT_PX = 700
 ```
 
 Both columns carry a popover button of equal height above their content, so
 their content starts at the same offset and the columns end on one baseline.
 
+**Why 700 and not 900.** The first draft used 900. In the running app that put
+the top of the Plotly canvas ~362 px down the page (Streamlit header, tabs,
+switcher and popover button all stack above it), so a 900 px canvas ran to
+y ≈ 1262 and the lower half of the 3D scene sat below the fold on a 1080p
+screen. 700 keeps the canvas inside a typical laptop viewport: measured
+y = 362 → 1062 at a 670 px-tall test window, with the cube itself occupying
+560 px of the 700 px canvas.
+
+**Why the scene is top-anchored.** Plotly centres a 3D scene inside its domain.
+Even at 700 px, centring leaves a large empty band above the cube and pushes it
+down. `SCENE_DOMAIN_Y = [0.2, 1]` anchors the scene toward the top of the
+canvas while still using most of its height (measured cube height 560 px, offset
+0 px from the canvas top).
+
 `st.container(height=...)` defaults to `border=True`, which would draw a frame
-around the MPR stack. The design uses `border=False`: the slice headings and
-captions already delimit each view, and a box around three images competing with
-the 3D canvas adds visual noise without grouping anything meaningful.
+around the MPR stack. The design uses `border=False`: the slice headings already
+delimit each view, and a box around three images competing with the 3D canvas
+adds visual noise without grouping anything meaningful.
 
-### 3.4 Column ratio is derived, not chosen for looks
+### 3.4 Images fill their column; the stack scrolls if it must
 
-Three square MPR images stacked at column width `w` need `3w` px of height, plus
-~165 px of per-image chrome (bold heading ~30 px + spacing caption ~25 px, ×3).
-With content width `C` and a `[1, r]` split, the left column is `C / (1 + r)`
-wide. The layout fits only when:
+This section was rewritten after measuring the running app. The first draft
+capped images at a fixed 260 px (`MPR_IMAGE_WIDTH`) and reasoned from a
+standalone mockup. That cap is **not** in the implementation.
+
+**Why the fixed cap was dropped.** A fixed pixel width is unsafe in a flexible
+column. Measured earlier: a 260 px image in a 201 px column overflows (the
+parent is `overflow: visible`) and spills into the 3D column. Streamlit 1.39
+offers no `width=min(...)`, so a fixed cap cannot shrink with the column.
+
+**What is used instead.** `st.image(..., use_column_width=True)`, the same call
+the pre-existing code used. The image then equals the column width, so the
+stack height is a function of the column ratio:
 
 ```
-VIEWER_HEIGHT_PX >= 3 × C/(1+r) + 165
+stack_height ≈ 3 × (column_width + 26 px heading)
 ```
 
-At `C ≈ 1200` px: `r=1.4` gives a 500 px column needing ~1665 px (absurd),
-`r=3.5` gives ~343 px needing ~1194 px (does not fit in 900), `r=4` gives
-240 px needing ~885 px (fits). **`[1, 4]` at 900 px** is the starting point.
+**Measured in the running app** (1536×864 screen, 1112 px viewport):
 
-If the container is too short, the left column scrolls permanently instead of
-shrinking the images, so this inequality must hold when the values are tuned.
+| view | column | image | stack | container | fits |
+|---|---|---|---|---|---|
+| All | 195 px | 190 px | 685 px | 700 px | yes |
+| 2D | 594 px | 289 px | 2×2 grid | 700 px | yes |
 
-### 3.5 Dependency floor must be raised
+So at the chosen `[1, 2]` ratio the three planes fit inside 700 px with ~15 px
+to spare. The ratio is doing the work the dropped pixel cap was meant to do.
+
+**Accepted consequence.** On a much wider window the left column grows and the
+stack exceeds 700 px. That is fine by design: the fixed-height container
+(`st.container(height=VIEWER_HEIGHT_PX, border=False)`) scrolls internally
+instead of stretching the page or pushing the 3D view down. This also covers
+anisotropic coronal/sagittal planes, whose `to_isotropic` resampling can
+multiply their height several-fold.
+
+
+### 3.5 A view switcher: Both / 2D / 3D
+
+The user can give either side the full width. Three states, driven by one
+control:
+
+| State | Left column | Right column | MPR layout |
+|---|---|---|---|
+| **Both** | 1 part | 2 parts | vertical stack |
+| **2D** | full width | collapsed | **2×2 grid** |
+| **3D** | collapsed | full width | (hidden) |
+
+The control must live **outside** the two columns. A collapse toggle placed
+inside the column it collapses becomes unreachable once that column is 0 px
+wide — the user is then stuck in that state.
+
+Verified collapse mechanism: `st.columns([0.0001, 1])` renders the first column
+at **0 px** and the second at the full content width, with no error. A literal
+`[0, 1]` is rejected (`StreamlitInvalidColumnSpecError`: the spec must be a list
+of *positive* numbers), so the epsilon is required, not a stylistic choice.
+
+Proposed control: a single `st.segmented_control` (1.40+ only) would raise the
+floor again, so use `st.radio(..., horizontal=True)` or three `st.button`s,
+which are available at 1.37. The state lives in `st.session_state`.
+
+**2×2 grid in 2D mode.** With the MPR column at full width the three planes are
+laid out as a 2×2 grid (axial, coronal on the first row; sagittal and an empty
+cell on the second) instead of a vertical stack. Streamlit has no grid
+primitive, so this is two `st.columns(2)` rows. The fourth cell stays empty —
+there is no fourth plane, and inventing one (a composite, an overlay) is out of
+scope.
+
+Consequence: in 2D mode the image width is set by the *grid cell*, not by the
+column, so the planes render larger than in All mode (measured: 289 px vs
+190 px). That is the point of the mode.
+
+### 3.6 The slice/spacing caption moves into Slice Options
+
+The per-plane `Slice N/M | Spacing: (…)` caption used to sit under each
+image. It is diagnostic text, not a label, and in the stacked layout it costs
+~26 px × 3 of height that the images need. It moved into the Slice Options
+panel as a compact three-row block, one row per plane.
+
+This drops per-item chrome to just the plane heading (~26 px), which is what
+keeps the stack at 685 px inside the 700 px container (see §3.4).
+
+### 3.7 Dependency floor must be raised
 
 `pyproject.toml` declares `streamlit>=1.28.0,<1.40.0`, but the app **already**
 requires `st.fragment`, which was generally available in **1.37.0** — the
@@ -159,7 +241,7 @@ this codebase still uses `use_column_width` throughout.
 ## 4. Architecture
 
 The change is confined to `render_viewer_tab()` in `src/visualization/app.py`.
-No new modules, no new functions beyond the height constant.
+No new modules.
 
 ```
 render_viewer_tab(volume, projection_geometry, n_projections, trajectory_downsample)
@@ -169,21 +251,29 @@ render_viewer_tab(volume, projection_geometry, n_projections, trajectory_downsam
 ├─ compute axial_max, coronal_max, sagittal_max
 ├─ clamp_slice_state(...) × 3          ← moved above the widgets
 │
-└─ col_mpr, col_3d = st.columns([1, 4])
-   │
-   ├─ col_mpr
-   │   ├─ st.popover("⚙️ Slice Options")
-   │   │    Display Unit · Energy · Preset · Center · Width · 3 slice sliders
-   │   └─ st.container(height=VIEWER_HEIGHT_PX)
-   │        Axial → Coronal → Sagittal  (heading, caption, image)
-   │
-   └─ col_3d
-       ├─ st.popover("⚙️ 3D Options")
-       │    Render Mode · Camera · Downsample · Opacity · iso levels/threshold
-       │    SID · Gantry · Auto Isocenter (+manual) · Auto Source/Detector (+manual)
-       └─ create_volume_figure → n_base_traces → overlay traces
-          → add_geometry_toggle → st.plotly_chart(height=VIEWER_HEIGHT_PX)
+├─ view switcher (OUTSIDE the columns): Both | 2D | 3D
+│     stored in st.session_state["viewer_view"]
+│
+├─ col_mpr, col_3d = st.columns(VIEWER_SPECS[view])
+│
+├─ col_mpr                                            (skipped in 3D)
+│   ├─ st.popover("⚙️ Slice Options")
+│   │    Display Unit · Energy · Preset · Center · Width · 3 slice sliders
+│   │    + slice/spacing readout for the three planes
+│   └─ view == "2d" -> two st.columns(2) rows  (2x2 grid)
+│      else         -> st.container(height=VIEWER_HEIGHT_PX)  (vertical stack)
+│         Axial · Coronal · Sagittal  (heading + image)
+│
+└─ col_3d                                             (skipped in 2D)
+    ├─ st.popover("⚙️ 3D Options")
+    │    Render Mode · Camera · Downsample · Opacity · iso levels/threshold
+    │    SID · Gantry · Auto Isocenter (+manual) · Auto Source/Detector (+manual)
+    └─ create_volume_figure → n_base_traces → overlay traces
+       → add_geometry_toggle → st.plotly_chart(height=VIEWER_HEIGHT_PX)
 ```
+
+The switcher must be rendered before the columns and outside them, so it remains
+clickable when one column is collapsed.
 
 The `plot_slot = st.container()` reservation is deleted. It existed only because
 the 3D controls were defined after the plot needed to appear above them; with

@@ -525,6 +525,58 @@
   3. `pyvista` wieder in `Dockerfile` installieren.
 - **Akzeptanz:** Render-Mode-Auswahl bietet PyVista wieder an, das Overlay ist sichtbar und per Schalter abschaltbar, der Lazy-Import-Guard bleibt grün.
 
+### `[x]` T-86 — Viewer-Layout: All/2D/3D-Umschalter, gestapelte MPR, schwebende Options-Panels
+- **Ziel:** Der 3D-Ansicht die Mehrheit des Viewer-Tabs geben: drei kleine MPR-Ebenen links gestapelt, große 3D-Ansicht rechts, umschaltbar auf Vollbreite je Seite. Options-Panels sollen schweben, damit ihr Öffnen keine Ansicht verschiebt.
+- **Dateien:** `src/visualization/app.py` (`render_viewer_tab`), `pyproject.toml`, `tests/unit/test_viewer_layout.py` (neu), `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-23, T-84
+- **Umsetzung:**
+  1. `st.radio(..., horizontal=True)` mit `All` / `2D` / `3D`, **außerhalb** der Spalten gerendert — in einer kollabierten Spalte wäre er unerreichbar.
+  2. Spaltenbreiten aus `viewer_column_spec()`: `All=[1, 2]`, `2D=[1, 0.0001]`, `3D=[0.0001, 1]`. Der Epsilon-Wert rendert exakt 0 px; eine literale `0` lehnt `st.columns` ab (`StreamlitInvalidColumnSpecError`).
+  3. MPR-Ebenen im festen `st.container(height=VIEWER_HEIGHT_PX, border=False)`; in `2D` stattdessen ein 2×2-Raster aus zwei `st.columns(2)`-Zeilen (vierte Zelle leer).
+  4. Beide Options-Panels als `st.popover` (Slice Options, 3D Options) statt `st.expander`.
+  5. Slice-/Spacing-Readout (`Slice N/M | Spacing (…)`) aus dem Bild-Untertitel in das Slice-Options-Panel verschoben.
+  6. 3D-Figur nur bauen, wenn `viewer_has_3d(view)` — in `2D` ist die Spalte 0 px breit, Marching Cubes wäre verschwendet.
+  7. `pyproject.toml`: `streamlit>=1.28.0` → `>=1.37.0,<1.40.0`. Die alte Untergrenze war schon vorher unerfüllbar, weil `app.py` `@st.fragment` nutzt (GA erst ab 1.37).
+- **Status:** ✅ Done (Nov 10, 2026, `b0687d2`) — 7 neue Tests (5 Layout-Geometrie in `test_viewer_layout.py`, 2 Smoke-Tests für Popovers und Umschalter). Im laufenden Server alle drei Ansichten geprüft: `All` 195/399 px mit 3×190 px Ebenen (Stapel 685 px in 700 px), `2D` 594 px Vollbreite mit 3×289 px im Raster, `3D` 594 px mit Plot 594×700; keine Überläufe, kein Seiten-Scrollbalken.
+- **Abweichung vom ersten Entwurf:** `VIEWER_HEIGHT_PX` ist **700** statt 900, und die Bilder nutzen `use_column_width=True` statt eines festen 260-px-Caps. Bei 900 px begann die Plotly-Canvas 362 px unter dem Seitenanfang und die Szene lief aus dem Bild; ein fester Pixel-Cap läuft in einer schmalen Spalte über (gemessen: 260 px Bild in 201 px Spalte). Details in `docs/superpowers/specs/2026-11-09-viewer-layout-design.md` §3.3/§3.4.
+
+### `[ ]` T-87 — Vollbild je Ansicht (Fullscreen) prüfen und dokumentieren
+- **Ziel:** Sicherstellen, dass jede der vier Ansichten (3× MPR, 1× 3D) auf Knopfdruck den verfügbaren Platz einnimmt — ohne eigenen Code, wo Streamlit/Plotly das schon können.
+- **Hintergrund:** Beim Prüfen des Viewer-Layouts (T-86) zeigte sich, dass **beide** Vollbild-Pfade bereits nativ vorhanden sind:
+  - `st.image` rendert jede MPR-Ebene in einen `stFullScreenFrame` mit eingebautem „View fullscreen"-Button (`data-testid="StyledFullScreenButton"`, erscheint beim Hover, `position: fixed`, z-index 1000050). Gemessen: drei sichtbare Buttons, einer pro Ebene.
+  - Plotly 7.1 bietet in der Modebar des 3D-Charts einen „Fullscreen"-Eintrag (`_context.displayModeBar == "hover"` ist bereits aktiv).
+  Es fehlt also **kein Feature**, sondern eine Entscheidung, ob diese zwei verschiedenen Mechanismen gut genug sind.
+- **Dateien:** `src/visualization/app.py` (`render_viewer_tab`), ggf. `src/visualization/volume3d.py` (nur Modebar-Config), `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-86
+- **Offene Punkte / zu entscheiden:**
+  1. **Zwei verschiedene Bedienmuster** — Bild-Vollbild ist ein Hover-Button unten rechts, 3D-Vollbild liegt im Plotly-Menü. Ein einheitlicher „⛶"-Button je Spalte wäre konsistenter, kostet aber eigene Implementierung.
+  2. **Feste Höhe vs. Vollbild — geprüft:** kein Problem. Plotly ignoriert `height` im Vollbild und baut auf die Viewport-Höhe um. Gemessen: `399×700` → **`1088×612`** (Viewport 1112×670), `_fullLayout.height` 700 → 612. `layout.height` wird dabei temporär überschrieben, nicht dauerhaft verändert.
+  3. **MPR-Vollbild skaliert nur das Bild**, nicht die zugehörigen Slice-Slider — ein Vollbild-Slice-Viewer mit Slidern wäre `st.dialog(width="large")` (in 1.39.1 vorhanden) und würde einen eigenen Renderpfad brauchen.
+  4. **Bild-Vollbild nutzt `position: fixed` + z-index 1000050** — verifiziert; die Seite muss danach neu geladen werden, sonst bleiben die `stFullScreenFrame`-Wrapper bei 0×0 hängen (im Test beobachtet). Kein App-Fehler, aber relevant für automatisierte Tests.
+  5. **Bild-Vollbild skaliert das Bild nicht hoch — gemessen.** Der Frame wächst korrekt auf den Viewport (`190×190` → **`1112×670`**, `position: fixed`), das `<img>` bleibt aber bei seiner **nativen Größe (256×256)**. Der Slice wird also nicht größer, nur die Umgebung dunkel. Für echte Detailarbeit an einer Schicht ist das zu wenig — Abhilfe: Bild vor dem Anzeigen auf die Zielauflösung hochskalieren (z. B. `to_isotropic` + Faktor) oder ein `st.dialog(width="large")`-Viewer mit eigenem Renderpfad.
+- **Akzeptanz:** Im Browser verifiziert, dass alle vier Ansichten per nativem Vollbild die Bildschirmhöhe nutzen (oder begründet dokumentiert, warum nicht). Entscheidung zu Punkt 1–3 im Decision Log festgehalten. Ein Smoke-Test pinnt, dass die Vollbild-Buttons vorhanden bleiben.
+- **Status:** ⚠️ Teilweise geprüft (Nov 10, 2026) — **3D-Vollbild voll nutzbar:** `399×700` → `1088×612`, Plotly baut auf die Viewport-Höhe um und ignoriert `height=700` dabei. **Bild-Vollbild nur eingeschränkt nutzbar:** Container füllt den Viewport (`1112×670`), Bild bleibt aber bei 256 px (Punkt 5). Offen: Entscheidung zu Punkt 1 und 5.
+
+### `[x]` T-88 — Slice-Options-Panel: Readout-Zeilen bei Volumenwechsel konsistent halten
+- **Ziel:** Das per-Plane-Readout im Slice-Options-Popover darf nicht auf veraltete Slice-Indizes zeigen, wenn sich die Volumen-Dimensionen ändern.
+- **Hintergrund:** Mit T-86 liest der Readout die Indizes aus `raw_slices`, das **vor** dem Popover aus `st.session_state` gebaut wird; die Slider im Popover schreiben dieselben Keys. Die Reihenfolge (Clamp → `extract_slice` → Slider → Readout) ist damit korrekt, aber nur durch die Aufrufreihenfolge in `render_viewer_tab()`.
+- **Prüfung:** Im Browser/`AppTest` nacheinander Volumen mit `(64,256,256)`, `(20,50,60)`, `(60,20,30)`, `(10,10,10)` geladen — keine Exception, kein Index über dem jeweiligen Maximum (Readout zeigt z. B. `20/20`, `20/60`, `10/10`).
+- **Dateien:** `src/visualization/app.py` (unverändert), `tests/unit/test_app_integration.py`
+- **Abhängig von:** T-86
+- **Akzeptanz:** Ein Test lädt nacheinander Volumen mit unterschiedlichen Shape und prüft, dass der Readout-Index immer `<=` dem jeweiligen Maximum ist und kein `IndexError`/Widget-Key-Fehler auftritt.
+- **Status:** ✅ Done (Nov 10, 2026) — Verhalten war bereits korrekt; `test_switching_to_a_smaller_volume_keeps_indices_valid` pinnt es jetzt gegen Regressionen (19 Tests in `test_app_integration.py`).
+
+### `[x]` T-89 — Plan-Doku an tatsächliche Implementierung angleichen
+- **Ziel:** `docs/plan.md` soll den Viewer-Stand korrekt beschreiben; mehrere Notizen sind durch T-86 überholt.
+- **Überholte Stellen (in diesem Task korrigiert):**
+  - „Implementation Notes → 3D Visualization Features": „Layout | Container pattern - 3D plot above options in sidebar" — ersetzt durch `All`/`2D`/`3D` plus schwebende Panels.
+  - „Key Functions in app.py": `plot_slot` existiert nicht mehr — ersetzt durch `viewer_column_spec()` / `viewer_has_mpr()` / `viewer_has_3d()`.
+  - „Offene Fragen → Erledigt (Tag 4-7)": nannte „Slice Options Expander für MPR" — jetzt als Popover vermerkt.
+- **Dateien:** `docs/plan.md`
+- **Abhängig von:** T-86
+- **Akzeptanz:** Kein Verweis mehr auf `plot_slot`, „Expander" oder „plot above options"; die Viewer-Notes beschreiben `All`/`2D`/`3D` und die Popovers.
+- **Status:** ✅ Done (Nov 10, 2026) — die drei Stellen korrigiert, zusätzlich zwei Risikozeilen (Stapel-Überlauf, 3D unter dem Fold) und ein „Erledigt (2026-11-10)"-Block ergänzt.
+
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
 - **Dateien:** `src/reconstruction/fdk.py`
@@ -582,6 +634,12 @@
 | D-10 | 2026-11-09 | Start lädt nichts automatisch; „Clear Cache" führt in denselben Empty State | Startup und Cache-Reset sind ein Zustand, ein Pfad; der Nutzer wählt Bilddaten oder Demo-Phantom |
 | D-11 | 2026-11-09 | Geometrie-Overlay über Plotly-`updatemenus` im Canvas statt `st.toggle`/Rerun | clientseitiges Umschalten ohne Script-Rerun; PyVista kann als statisches PNG keinen interaktiven Schalter tragen (T-82) |
 | D-12 | 2026-11-09 | `pitch = 0.0` als Default = zirkulärer Cone-Beam-Scan | entspricht dem Aufbau der Messdaten; nur negativer Pitch ist fachlich sinnlos |
+| D-13 | 2026-11-10 | Viewer-Umschalter `All`/`2D`/`3D` über `st.radio(horizontal=True)` statt `st.segmented_control` | `segmented_control` gibt es erst ab 1.40, die Obergrenze bleibt wegen `use_column_width` bei `<1.40` |
+| D-14 | 2026-11-10 | Kollabieren über Spaltenverhältnis `0.0001` statt `0` | rendert exakt 0 px; eine literale `0` lehnt `st.columns` mit `StreamlitInvalidColumnSpecError` ab |
+| D-15 | 2026-11-10 | Umschalter **außerhalb** der Spalten | in einer kollabierten Spalte wäre er unerreichbar und der Nutzer in dieser Ansicht gefangen |
+| D-16 | 2026-11-10 | `VIEWER_HEIGHT_PX = 700` (nicht 900) + `SCENE_DOMAIN_Y = [0.2, 1]` | bei 900 px begann die Canvas 362 px unter dem Seitenanfang und die Szene lief aus dem Bild; Plotly zentriert 3D-Szenen sonst im Canvas |
+| D-17 | 2026-11-10 | MPR-Bilder mit `use_column_width=True`, kein fester Pixel-Cap | ein fester Cap läuft in einer schmalen Spalte über (gemessen: 260 px in 201 px); das 1:2-Verhältnis hält den Stapel stattdessen bei 685/700 px |
+| D-18 | 2026-11-10 | Kein eigener Fullscreen-Code — native Mechanismen nutzen | `st.image` bringt „View fullscreen" mit, Plotly 7 eine Modebar-Schaltfläche; 3D-Vollbild verifiziert (`399×700` → `1088×612`) |
 
 ## Offene Fragen
 
@@ -594,13 +652,20 @@
   - Iso-Surface und Volume Rendering
   - Source/Detektor Visualization mit Auto/Manual Modus
   - Opacity Controls, Camera Presets, Downsample
-  - Container Pattern für Layout (Plot zuerst, Options darunter)
-  - Slice Options Expander für MPR
+  - Slice Options als Popover (früher: Expander) — T-86
+  - Viewer-Layout `All`/`2D`/`3D` mit gestapelten MPR-Ebenen — T-86
 
 ### Noch offen
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
 - T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
+
+## Erledigt (2026-11-10)
+
+- ✅ T-86: Viewer-Layout `All`/`2D`/`3D`, gestapelte MPR-Ebenen (700 px, `border=False`), 2×2-Raster in `2D`, beide Options-Panels als `st.popover`, Slice-/Spacing-Readout ins Panel verschoben, 3D-Build in `2D` übersprungen; `streamlit>=1.37` (`b0687d2`)
+- ⚠️ T-87: Fullscreen — 3D voll nutzbar (`399×700` → `1088×612`), Bild-Vollbild füllt den Viewport (`1112×670`), skaliert das Bild aber **nicht** hoch (bleibt 256 px). Entscheidung offen.
+- ✅ T-88: Readout-Konsistenz beim Volumenwechsel geprüft und per Test gepinnt (`test_switching_to_a_smaller_volume_keeps_indices_valid`)
+- ✅ T-89: Plan-Notizen (`plot_slot`, „Expander", „plot above options") korrigiert
 
 ## Erledigt (2026-11-09)
 
@@ -651,7 +716,7 @@
 | Source/Detector | Auto or manual positioning |
 | Isocenter | Auto (from volume center) or manual (x, y, z) |
 | Downsample | 1x, 2x, 4x (default) for performance |
-| Layout | Container pattern - 3D plot above options in sidebar |
+| Layout | `All` / `2D` / `3D` switcher; MPR stacked left, 3D right; option panels float as popovers |
 
 ### Key Functions in app.py
 | Function | Purpose |
@@ -660,7 +725,8 @@
 | `slice_slider()` | Slider + anchor div + jump buttons |
 | `to_isotropic()` | Resample for correct aspect ratio |
 | `clamp_slice_state()` | Clamp session state values before widget creation |
-| `plot_slot` | Container for visual ordering - plot renders first, options below |
+| `viewer_column_spec()` | Column widths for a viewer mode (`All` = `[1, 2]`) |
+| `viewer_has_mpr()` / `viewer_has_3d()` | Whether a mode renders that side at all |
 
 ### Key Functions in mpr.py
 | Function | Purpose |
@@ -701,6 +767,8 @@ python -m pytest tests/ -v
 | Daten in Git-Historie | T-02 vor erstem Push |
 | MPR verzerrt bei anisotropem Spacing | T-14 Spacing-basierte Aspect-Ratio + Test |
 | Normalisierte `.npy` schleichen sich ein | T-12 `assert_hu` bricht ab |
+| MPR-Stapel läuft in schmaler Spalte über | T-86: `use_column_width=True` statt Pixel-Cap; 1:2-Verhältnis hält den Stapel bei 700 px |
+| `VIEWER_HEIGHT_PX` zu hoch → 3D unter dem Fold | T-86: 700 px + `SCENE_DOMAIN_Y = [0.2, 1]` |
 | Zeitplan reißt | T-23 ist explizit optional |
 
 

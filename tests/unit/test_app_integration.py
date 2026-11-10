@@ -225,3 +225,30 @@ class TestSliceIndexClamping:
 
         clamp_slice_state("test_slice", 100)
         assert st.session_state["test_slice"] == 50  # 100 // 2
+
+    def test_switching_to_a_smaller_volume_keeps_indices_valid(self):
+        """Loading a smaller volume must re-clamp every plane, or the slice
+        sliders are created with an out-of-range value and the readout in
+        Slice Options claims a slice that does not exist.
+
+        The app clamps *before* creating the sliders and before extracting the
+        slices it later shows (see render_viewer_tab), so a shape change in any
+        axis has to be absorbed here.
+        """
+        import streamlit as st
+
+        from visualization.app import clamp_slice_state
+
+        shapes = [(64, 256, 256), (20, 50, 60), (60, 20, 30), (10, 10, 10)]
+        for shape in shapes:
+            maxima = {
+                "axial_slice": shape[0] - 1,
+                "coronal_slice": shape[1] - 1,
+                "sagittal_slice": shape[2] - 1,
+            }
+            for key, maximum in maxima.items():
+                clamp_slice_state(key, maximum)
+
+            for key, maximum in maxima.items():
+                value = st.session_state[key]
+                assert 0 <= value <= maximum, f"{key}={value} outside 0..{maximum}"

@@ -4,6 +4,8 @@ A web-based tool for exploring CT scanner geometry and generating **simulated pr
 
 **Core utility:** load a CT volume together with a cone-beam projection geometry, forward-project the volume to produce *simulated* projections, and compare them directly against *measured* projection data. This simulated-vs-measured comparison (quantitative metrics plus side-by-side / difference visualization) is the central workflow of the tool — e.g. to validate scanner geometry parameters against real acquisitions.
 
+<img width="1347" height="797" alt="image" src="https://github.com/user-attachments/assets/09dd9bb6-3514-47c9-bf6a-b8fe68dada42" />
+
 ## Features
 
 ### Core Workflow

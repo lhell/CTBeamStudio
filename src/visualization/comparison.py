@@ -1,8 +1,18 @@
 """Comparison metrics for real vs simulated projection images."""
 
-from typing import Dict
+from typing import Dict, Optional, Sequence
 
 import numpy as np
+import plotly.graph_objects as go
+
+# (dict key, display name, y-axis): MAE/RMSE share the left axis,
+# Correlation/SSIM share the right one.
+_METRIC_ORDER = (
+    ("mae", "MAE", "y"),
+    ("rmse", "RMSE", "y"),
+    ("correlation", "Correlation", "y2"),
+    ("ssim", "SSIM", "y2"),
+)
 
 
 def difference_image(real: np.ndarray, simulated: np.ndarray) -> np.ndarray:
@@ -113,3 +123,90 @@ def compute_metrics_per_slice(
         key: np.asarray([frame[key] for frame in per_frame], dtype=np.float64)
         for key in ("mae", "rmse", "correlation", "ssim")
     }
+
+
+def build_metric_figure(
+    per_slice: Dict[str, np.ndarray],
+    current_index: int,
+    proj_indices: Optional[Sequence[int]] = None,
+) -> "go.Figure":
+    """Line chart of every metric against the projection index.
+
+    MAE/RMSE use the left y-axis; Correlation/SSIM use the right one. A
+    vertical line marks the projection currently shown in the views.
+    ``proj_indices`` (the gantry indices actually computed) replaces the
+    plain 0..n-1 x-axis when given.
+    """
+    x_values = (
+        list(proj_indices) if proj_indices is not None else None
+    )
+    traces = []
+    for key, name, yaxis in _METRIC_ORDER:
+        if key not in per_slice:
+            continue
+        values = np.asarray(per_slice[key], dtype=np.float64)
+        if x_values is None or len(x_values) != len(values):
+            xs = list(range(len(values)))
+        else:
+            xs = x_values
+        traces.append(
+            go.Scatter(
+                x=xs,
+                y=values,
+                name=name,
+                mode="lines",
+                yaxis=yaxis,
+            )
+        )
+    fig = go.Figure(data=traces)
+    n_items = len(fig.data[0].x) if fig.data else 0
+    if x_values:
+        marker_x = x_values[min(current_index, len(x_values) - 1)]
+    else:
+        marker_x = min(current_index, max(n_items - 1, 0))
+    fig.add_shape(
+        type="line",
+        x0=marker_x,
+        x1=marker_x,
+        y0=0,
+        y1=1,
+        yref="paper",
+        line=dict(color="grey", dash="dash"),
+    )
+    fig.update_layout(
+        xaxis_title="Projection",
+        yaxis_title="MAE / RMSE",
+        yaxis2=dict(
+            overlaying="y",
+            side="right",
+            title="Correlation / SSIM",
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=dict(l=10, r=10, t=30, b=10),
+    )
+    return fig
+
+
+def build_distribution_figure(per_slice: Dict[str, np.ndarray]) -> "go.Figure":
+    """Overlaid histograms of each metric's per-projection values."""
+    traces = []
+    for key, name, _yaxis in _METRIC_ORDER:
+        if key not in per_slice:
+            continue
+        traces.append(
+            go.Histogram(
+                x=np.asarray(per_slice[key], dtype=np.float64),
+                name=name,
+                histnorm="probability density",
+                opacity=0.6,
+            )
+        )
+    fig = go.Figure(data=traces)
+    fig.update_layout(
+        barmode="overlay",
+        xaxis_title="Metric value",
+        yaxis_title="Density",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=dict(l=10, r=10, t=30, b=10),
+    )
+    return fig

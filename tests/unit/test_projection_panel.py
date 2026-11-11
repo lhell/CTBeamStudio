@@ -10,10 +10,12 @@ from visualization.projection_panel import (
     apply_geometry_updates,
     build_selection_config,
     clamp_index_state,
+    index_slider,
     normalize_difference,
     normalize_projection,
     prepare_projection_volume,
     resolve_selection,
+    resolve_view_index,
 )
 
 
@@ -145,6 +147,42 @@ def test_clamp_index_state_missing_defaults_to_zero():
     st.session_state.pop("panel_index", None)
     clamp_index_state("panel_index", 10)
     assert st.session_state["panel_index"] == 0
+
+
+def test_resolve_view_index_clamps_within_range():
+    import streamlit as st
+
+    st.session_state["view_index"] = 99
+    assert resolve_view_index("view_index", 5) == 4
+    assert st.session_state["view_index"] == 4
+
+
+def test_resolve_view_index_single_item_returns_zero():
+    import streamlit as st
+
+    st.session_state.pop("view_index_single", None)
+    assert resolve_view_index("view_index_single", 1) == 0
+    assert st.session_state["view_index_single"] == 0
+
+
+def test_resolve_view_index_non_positive_returns_zero():
+    import streamlit as st
+
+    st.session_state.pop("view_index_empty", None)
+    assert resolve_view_index("view_index_empty", 0) == 0
+    assert "view_index_empty" not in st.session_state
+
+
+def test_index_slider_single_item_renders_nothing():
+    import streamlit as st
+
+    assert index_slider(st, "Projection index", "idx_single", 1) == 0
+
+
+def test_index_slider_non_positive_renders_nothing():
+    import streamlit as st
+
+    assert index_slider(st, "Projection index", "idx_zero", 0) == 0
 
 
 def test_prepare_projection_volume_converts_hu_to_per_mm():

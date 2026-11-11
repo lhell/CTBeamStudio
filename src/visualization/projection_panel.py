@@ -184,6 +184,34 @@ def clamp_index_state(key: str, max_index: int) -> None:
         st.session_state[key] = 0
 
 
+def resolve_view_index(key: str, n_items: int) -> int:
+    """Return a valid index for a view with ``n_items`` frames.
+
+    Clamps ``st.session_state[key]`` into ``[0, n_items - 1]`` (seeding it
+    with 0 when absent). For ``n_items <= 0`` there is nothing to index:
+    returns 0 without touching session state.
+    """
+    import streamlit as st
+
+    if n_items <= 0:
+        return 0
+    clamp_index_state(key, n_items - 1)
+    return int(st.session_state[key])
+
+
+def index_slider(container, label: str, key: str, n_items: int) -> int:
+    """Render a projection-index slider, or nothing for tiny ranges.
+
+    Streamlit rejects sliders with ``min_value == max_value``, so a
+    0..0 slider (a single frame) must never be rendered. Returns the
+    selected index: 0 for empty/single-frame cases.
+    """
+    if n_items <= 1:
+        return 0
+    index = resolve_view_index(key, n_items)
+    return int(container.slider(label, 0, n_items - 1, key=key))
+
+
 # ---------------------------------------------------------------------------
 # Streamlit rendering (thin adapters around the helpers above)
 # ---------------------------------------------------------------------------

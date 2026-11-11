@@ -92,12 +92,19 @@ def test_parallelproj_availability():
 def test_availability_flag_requires_torch_too(monkeypatch):
     """parallelproj alone cannot project: the backend builds its tensors with
     torch. If torch is missing the flag must be False, so the UI warns and
-    falls back to zeros instead of crashing with ModuleNotFoundError."""
+    falls back to zeros instead of crashing with ModuleNotFoundError.
+
+    ``importlib.reload`` mutates the shared module object, so the original
+    state must be restored even though the test passes: leaving the module
+    reloaded with the flag forced to False would make every later test (and
+    any later projection in the same process) silently take the zeros path.
+    """
     import importlib
     import sys
 
     import backend.forward_project as fp
 
+    saved_flag = fp.PARALLELPROJ_AVAILABLE
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -105,12 +112,20 @@ def test_availability_flag_requires_torch_too(monkeypatch):
             raise ImportError("simulated missing torch")
         return real_import(name, *args, **kwargs)
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    monkeypatch.setitem(sys.modules, "parallelproj", object())
+    try:
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        monkeypatch.setitem(sys.modules, "parallelproj", object())
 
-    reloaded = importlib.reload(fp)
+        reloaded = importlib.reload(fp)
 
-    assert reloaded.PARALLELPROJ_AVAILABLE is False
+        assert reloaded.PARALLELPROJ_AVAILABLE is False
+    finally:
+        # Undo the import hook and the fake parallelproj entry, then reload
+        # so the shared module object is healthy again for later tests.
+        monkeypatch.undo()
+        importlib.reload(fp)
+
+    assert fp.PARALLELPROJ_AVAILABLE is saved_flag
 
 
 def test_forward_project_rejects_hu_volume():

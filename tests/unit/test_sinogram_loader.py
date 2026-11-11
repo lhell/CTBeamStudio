@@ -150,10 +150,22 @@ def test_load_sinogram_numpy(tmp_path):
 
 
 # --- NIfTI via nibabel (optional dependency; skip if absent) ---
+#
+# The guard must not be a module-level ``pytest.importorskip``: that aborts
+# collection of the whole file, silently deleting every test below it —
+# including the numpy/DICOM tests that need no nibabel. Import defensively
+# and skip only the tests that actually use it.
+try:
+    import nibabel as nib
+except ImportError:  # pragma: no cover - depends on environment
+    nib = None
 
-nib = pytest.importorskip("nibabel")  # skip if nibabel not installed
+requires_nibabel = pytest.mark.skipif(
+    nib is None, reason="nibabel (the 'nifti' extra) is not installed"
+)
 
 
+@requires_nibabel
 def test_load_nifti_full(tmp_path):
     arr = np.zeros((3, 4, 5))
     img = nib.Nifti1Image(arr, np.eye(4))
@@ -166,6 +178,7 @@ def test_load_nifti_full(tmp_path):
     assert s.format == "nifti"
 
 
+@requires_nibabel
 def test_load_nifti_axis_normalizes(tmp_path):
     # file stored (row, proj, col) -> canonical (proj, row, col)
     arr = np.arange(24).reshape(2, 3, 4)  # (row, proj, col)
@@ -178,6 +191,7 @@ def test_load_nifti_axis_normalizes(tmp_path):
     assert s.data.shape == (3, 2, 4)
 
 
+@requires_nibabel
 def test_load_nifti_subset_shape(tmp_path):
     arr = np.arange(60).reshape(3, 4, 5)
     img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
@@ -190,6 +204,7 @@ def test_load_nifti_subset_shape(tmp_path):
     assert s.data.shape == (2, 4, 5)
 
 
+@requires_nibabel
 def test_load_nifti_4d_raises(tmp_path):
     arr = np.zeros((3, 4, 5, 6))
     img = nib.Nifti1Image(arr, np.eye(4))
@@ -289,3 +304,30 @@ def test_load_dicom_no_series(tmp_path):
     d.mkdir()
     with pytest.raises(ValueError):
         scan_dicom_sinogram(d)
+
+
+def test_load_dicom_records_only_the_files_it_read(tmp_path, create_projection_dicom):
+    """The UI has to name the exact files behind a folder load, and with a
+    projection selection that is a subset — not every file in the folder."""
+    d = create_projection_dicom(tmp_path)
+
+    full = load_sinogram(d)
+    assert [Path(f).name for f in full.files] == [
+        f.name for f in sorted(d.glob("*.dcm"))
+    ]
+
+    sel = SelectionConfig(proj_mode="range", proj_range=(1, 3))
+    subset = load_sinogram(d, selection=sel)
+    assert len(subset.files) == 2
+    assert [Path(f).name for f in subset.files] == [
+        Path(f).name for f in sorted(d.glob("*.dcm"))[1:3]
+    ]
+
+
+def test_load_numpy_records_the_single_file(tmp_path):
+    path = tmp_path / "sino.npy"
+    np.save(path, np.zeros((2, 3, 4), dtype=np.float32))
+
+    s = load_sinogram(path)
+
+    assert [Path(f).name for f in s.files] == ["sino.npy"]

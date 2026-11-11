@@ -109,7 +109,9 @@ def test_build_metric_figure_accepts_proj_indices():
 
 
 def test_build_distribution_figure_histograms_overlay():
-    values = {k: np.linspace(0.0, 1.0, 12) for k in ("mae", "rmse", "correlation", "ssim")}
+    values = {
+        k: np.linspace(0.0, 1.0, 12) for k in ("mae", "rmse", "correlation", "ssim")
+    }
 
     fig = build_distribution_figure(values)
 

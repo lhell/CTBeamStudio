@@ -106,6 +106,9 @@ class SinogramData:
     path: Optional[Path] = None
     format: str = "unknown"  # "numpy" | "nifti" | "dicom"
     lazy: bool = False
+    # Exact files the load read: one path for .npy/.nii, the selected
+    # projections' files for a DICOM folder. Lets the UI name its input.
+    files: tuple[Path, ...] = ()
     _loader: Optional[Callable[[], np.ndarray]] = None
     # Raw array in the FILE's native order. Held only on a full load so the
     # axis_order change can re-derive in memory; else re-read from `path`.
@@ -138,9 +141,9 @@ class SinogramData:
             self._loader = None
         else:
             # partial / lazy subset (no raw held): re-read from path with new order
-            self.data = load_sinogram(
-                self.path, self.selection, self.geometry, value
-            ).data
+            reloaded = load_sinogram(self.path, self.selection, self.geometry, value)
+            self.data = reloaded.data
+            self.files = reloaded.files
             self._loader = None
 
     def materialize(self) -> np.ndarray:
@@ -214,6 +217,7 @@ def _finish_sinogram(
     selection: SelectionConfig,
     axis_order: tuple[str, str, str],
     fmt: str,
+    files: tuple[Path, ...] = (),
 ) -> SinogramData:
     """Transpose ``raw`` to canonical (proj, row, col), apply selection."""
     data = _apply_selection(raw, selection, axis_order)
@@ -238,6 +242,7 @@ def _finish_sinogram(
         format=fmt,
         lazy=False,
         _raw_file_order=raw_file_order,
+        files=files,
     )
 
 
@@ -263,7 +268,9 @@ def _load_numpy(
         )
 
     original_shape = raw.shape
-    return _finish_sinogram(raw, original_shape, path, selection, axis_order, "numpy")
+    return _finish_sinogram(
+        raw, original_shape, path, selection, axis_order, "numpy", files=(path,)
+    )
 
 
 def _load_nifti(path, selection, axis_order, _on_read=None):
@@ -280,7 +287,9 @@ def _load_nifti(path, selection, axis_order, _on_read=None):
     data = np.asarray(img.dataobj)
     if _on_read is not None:
         _on_read()
-    return _finish_sinogram(data, raw_shape, path, selection, axis_order, "nifti")
+    return _finish_sinogram(
+        data, raw_shape, path, selection, axis_order, "nifti", files=(path,)
+    )
 
 
 def scan_dicom_sinogram(dir_path: Path) -> dict:
@@ -358,6 +367,7 @@ def _load_dicom(path, selection, geometry, axis_order):
         path=path,
         format="dicom",
         lazy=False,
+        files=tuple(files[idx] for idx in proj_canonical),
     )
 
 

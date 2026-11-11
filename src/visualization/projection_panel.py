@@ -349,6 +349,37 @@ def render_measurement_sidebar() -> None:
         )
         selection = render_selection_controls("meas", container=st)
 
+        clicked = st.button("Load Measurements", key="load_measurements")
+        if clicked:
+            if not path_str:
+                st.warning("Enter a file or folder path first.")
+            else:
+                path = Path(path_str)
+                if not path.exists():
+                    st.error(f"Path not found: {path}")
+                else:
+                    try:
+                        with st.spinner("Loading measurements..."):
+                            sinogram = load_sinogram(
+                                path,
+                                selection=selection,
+                                geometry=st.session_state.get("projection_geometry"),
+                                axis_order=axis_order,
+                            )
+                    except Exception as exc:  # noqa: BLE001 - surface loader errors
+                        st.error(f"Failed to load measurements: {exc}")
+                    else:
+                        st.session_state["sinogram"] = sinogram
+                        shape = (
+                            sinogram.data.shape
+                            if sinogram.data is not None
+                            else sinogram.original_shape
+                        )
+                        st.success(f"Loaded measurements {shape}.")
+                        st.toast("Measurements loaded!", icon="✅")
+
+        # Rendered after the load attempt so the success path shows the file
+        # immediately, without waiting for a later rerun.
         if st.session_state.get("sinogram") is not None:
             sinogram = st.session_state["sinogram"]
             shape = (
@@ -357,38 +388,17 @@ def render_measurement_sidebar() -> None:
                 else sinogram.original_shape
             )
             st.caption(f"Loaded: {shape} ({sinogram.format})")
-
-        if not st.button("Load Measurements", key="load_measurements"):
-            return
-        if not path_str:
-            st.warning("Enter a file or folder path first.")
-            return
-
-        path = Path(path_str)
-        if not path.exists():
-            st.error(f"Path not found: {path}")
-            return
-
-        try:
-            with st.spinner("Loading measurements..."):
-                sinogram = load_sinogram(
-                    path,
-                    selection=selection,
-                    geometry=st.session_state.get("projection_geometry"),
-                    axis_order=axis_order,
+            if sinogram.path is not None:
+                st.caption(f"Path: `{Path(sinogram.path).resolve()}`")
+            files = tuple(getattr(sinogram, "files", ()) or ())
+            if files:
+                st.caption(f"Files read: {len(files)}")
+                # Not an expander: this panel already lives inside the
+                # "Measurements" expander, and Streamlit forbids nesting.
+                st.code(
+                    "\n".join(str(Path(f).resolve()) for f in files),
+                    language=None,
                 )
-        except Exception as exc:  # noqa: BLE001 - surface loader errors in the UI
-            st.error(f"Failed to load measurements: {exc}")
-            return
-
-        st.session_state["sinogram"] = sinogram
-        shape = (
-            sinogram.data.shape
-            if sinogram.data is not None
-            else sinogram.original_shape
-        )
-        st.success(f"Loaded measurements {shape}.")
-        st.toast("Measurements loaded!", icon="✅")
 
 
 def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
@@ -515,15 +525,113 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
 
     measured = None
     if sinogram is not None:
-        measured = sinogram.data if sinogram.data is not None else sinogram.materialize()
+        measured = (
+            sinogram.data if sinogram.data is not None else sinogram.materialize()
+        )
+
+    result = st.session_state.get("forward_projection")
+    simulated = result.projections if result is not None else None
+
+    # --- Views first: the three panels sit at the top of the tab ------------
+    n_meas = measured.shape[0] if measured is not None else 0
+    n_sim = simulated.shape[0] if simulated is not None else 0
+    n_total = max(n_meas, n_sim)
+
+    shared = resolve_view_index("sino_shared_index", n_total)
+    meas_index = min(shared, n_meas - 1) if n_meas else 0
+    sim_index = min(shared, n_sim - 1) if n_sim else 0
+    shapes_match = (
+        measured is not None
+        and simulated is not None
+        and measured.shape == simulated.shape
+    )
+
+    col_meas, col_sim, col_diff = st.columns(3)
+    with col_meas:
+        if n_meas:
+            st.caption(f"Measured projection {meas_index + 1}/{n_meas}")
+            _render_projection_image(
+                measured[meas_index],
+                f"Measured projection {meas_index + 1}/{n_meas}",
+            )
+        else:
+            st.info("No measured data loaded — load measurements in the sidebar.")
+    with col_sim:
+        if n_sim:
+            st.caption(f"Simulated projection {sim_index + 1}/{n_sim}")
+            _render_projection_image(
+                simulated[sim_index],
+                f"Simulated projection {sim_index + 1}/{n_sim}",
+            )
+        else:
+            st.info("Run the forward projection to fill this column.")
+    with col_diff:
+        if shapes_match:
+            st.image(
+                normalize_difference(measured[meas_index] - simulated[sim_index]),
+                caption="Difference (measured − simulated)",
+                clamp=True,
+                use_column_width=True,
+            )
+        elif n_meas and n_sim:
+            st.info(
+                f"Shapes differ ({measured.shape} vs {simulated.shape}) — load a "
+                "matching selection to compare."
+            )
+        else:
+            st.info("Difference appears once measured and simulated shapes match.")
+
+    # Shared slider below the views. Renders nothing when there are fewer
+    # than two frames on either side (a 0..0 slider is illegal in Streamlit).
+    index_slider(st, "Projection index", "sino_shared_index", n_total)
+
+    if sinogram is not None:
         st.caption(
             f"Measured: {measured.shape} · axis order "
             f"{format_axis_order(sinogram.axis_order)} · format {sinogram.format}"
+            + (
+                f" · `{Path(sinogram.path).resolve()}`"
+                if sinogram.path is not None
+                else ""
+            )
         )
     else:
         st.caption("Measured: none loaded")
+    if result is not None:
+        st.caption(
+            f"Simulated: {simulated.shape} · {len(result.proj_indices)} projections"
+        )
+    else:
+        st.caption("Simulated: not run yet")
 
-    # --- Forward-projection run controls (always rendered) -------------------
+    # --- Per-slice metrics + distribution (only when comparable) ------------
+    if shapes_match:
+        per_slice = compute_metrics_per_slice(measured, simulated)
+        col_plot, col_dist = st.columns(2)
+        with col_plot:
+            st.caption("Metrics per slice")
+            st.plotly_chart(
+                build_metric_figure(
+                    per_slice,
+                    current_index=shared,
+                    proj_indices=result.proj_indices,
+                ),
+                use_container_width=True,
+            )
+        with col_dist:
+            st.caption("Distribution over projections")
+            st.plotly_chart(
+                build_distribution_figure(per_slice),
+                use_container_width=True,
+            )
+        st.caption(
+            f"Slice {shared + 1}: MAE {per_slice['mae'][shared]:.4g} · "
+            f"RMSE {per_slice['rmse'][shared]:.4g} · "
+            f"Correlation {per_slice['correlation'][shared]:.4f} · "
+            f"SSIM {per_slice['ssim'][shared]:.4f}"
+        )
+
+    # --- Forward-projection run controls (below the views) ------------------
     with st.expander("Forward projection settings", expanded=True):
         selection = render_selection_controls(
             "fp",
@@ -589,99 +697,10 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 st.error(f"Forward projection failed: {exc}")
             else:
                 st.session_state["forward_projection"] = result
-                st.success(f"Computed {result.projections.shape[0]} projections.")
-
-    result = st.session_state.get("forward_projection")
-    simulated = result.projections if result is not None else None
-    if result is not None:
-        st.caption(f"Simulated: {simulated.shape} · {len(result.proj_indices)} projections")
-    else:
-        st.caption("Simulated: not run yet")
-
-    # --- Three views + shared index slider ----------------------------------
-    n_meas = measured.shape[0] if measured is not None else 0
-    n_sim = simulated.shape[0] if simulated is not None else 0
-    n_total = max(n_meas, n_sim)
-
-    # The shared slider renders below the views, but its value is read (and
-    # clamped) here: Streamlit applies widget state updates at the start of
-    # a rerun, so the current slider position is available before the
-    # widget is instantiated.
-    shared = resolve_view_index("sino_shared_index", n_total)
-    meas_index = min(shared, n_meas - 1) if n_meas else 0
-    sim_index = min(shared, n_sim - 1) if n_sim else 0
-    shapes_match = (
-        measured is not None
-        and simulated is not None
-        and measured.shape == simulated.shape
-    )
-
-    col_meas, col_sim, col_diff = st.columns(3)
-    with col_meas:
-        if n_meas:
-            st.caption(f"Measured projection {meas_index + 1}/{n_meas}")
-            _render_projection_image(
-                measured[meas_index], f"Measured projection {meas_index + 1}/{n_meas}"
-            )
-        else:
-            st.info(
-                "No measured data loaded — load measurements in the sidebar."
-            )
-    with col_sim:
-        if n_sim:
-            st.caption(f"Simulated projection {sim_index + 1}/{n_sim}")
-            _render_projection_image(
-                simulated[sim_index],
-                f"Simulated projection {sim_index + 1}/{n_sim}",
-            )
-        else:
-            st.info("Run the forward projection to fill this column.")
-    with col_diff:
-        if shapes_match:
-            st.image(
-                normalize_difference(measured[meas_index] - simulated[sim_index]),
-                caption="Difference (measured − simulated)",
-                clamp=True,
-                use_column_width=True,
-            )
-        elif n_meas and n_sim:
-            st.info(
-                f"Shapes differ ({measured.shape} vs {simulated.shape}) — load a "
-                "matching selection to compare."
-            )
-        else:
-            st.info(
-                "Difference appears once measured and simulated shapes match."
-            )
-
-    # Shared slider below the views. Renders nothing when there are fewer
-    # than two frames on either side (a 0..0 slider is illegal in Streamlit).
-    index_slider(st, "Projection index", "sino_shared_index", n_total)
-
-    # --- Per-slice metrics + distribution (only when comparable) ------------
-    if shapes_match:
-        per_slice = compute_metrics_per_slice(measured, simulated)
-        st.caption("Metrics over the acquisition")
-        col_plot, col_dist = st.columns(2)
-        with col_plot:
-            st.caption("Metrics per slice")
-            st.plotly_chart(
-                build_metric_figure(
-                    per_slice,
-                    current_index=shared,
-                    proj_indices=result.proj_indices,
-                ),
-                use_container_width=True,
-            )
-        with col_dist:
-            st.caption("Distribution over projections")
-            st.plotly_chart(
-                build_distribution_figure(per_slice),
-                use_container_width=True,
-            )
-        st.caption(
-            f"Slice {shared + 1}: MAE {per_slice['mae'][shared]:.4g} · "
-            f"RMSE {per_slice['rmse'][shared]:.4g} · "
-            f"Correlation {per_slice['correlation'][shared]:.4f} · "
-            f"SSIM {per_slice['ssim'][shared]:.4f}"
-        )
+                # The views and captions above already rendered with the old
+                # state this run, so rerun to fill the simulated column and
+                # the metric plots immediately.
+                st.toast(
+                    f"Computed {result.projections.shape[0]} projections.", icon="✅"
+                )
+                st.rerun()

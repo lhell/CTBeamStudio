@@ -116,9 +116,7 @@ def compute_metrics_per_slice(
         )
 
     n_proj = measured.shape[0]
-    per_frame = [
-        compute_metrics(measured[i], simulated[i]) for i in range(n_proj)
-    ]
+    per_frame = [compute_metrics(measured[i], simulated[i]) for i in range(n_proj)]
     return {
         key: np.asarray([frame[key] for frame in per_frame], dtype=np.float64)
         for key in ("mae", "rmse", "correlation", "ssim")
@@ -137,9 +135,7 @@ def build_metric_figure(
     ``proj_indices`` (the gantry indices actually computed) replaces the
     plain 0..n-1 x-axis when given.
     """
-    x_values = (
-        list(proj_indices) if proj_indices is not None else None
-    )
+    x_values = list(proj_indices) if proj_indices is not None else None
     traces = []
     for key, name, yaxis in _METRIC_ORDER:
         if key not in per_slice:

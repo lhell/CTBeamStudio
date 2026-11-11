@@ -255,6 +255,46 @@ def test_load_measurements_from_npy(app):
     np.testing.assert_array_equal(loaded.data, expected)
 
 
+def test_sidebar_shows_absolute_path_of_loaded_measurements(app):
+    """The Measurements panel must name the exact file it loaded, so a user
+    can tell several sinograms apart without trusting the text input."""
+    expected = np.arange(4 * 6 * 8, dtype=np.float32).reshape(4, 6, 8)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        sinogram_path = Path(tmp_dir) / "path_check.npy"
+        np.save(sinogram_path, expected)
+
+        app.sidebar.text_input(key="sinogram_path").set_value(str(sinogram_path))
+        app.sidebar.button(key="load_measurements").click()
+        app.run()
+
+        sidebar_text = " ".join(c.value for c in app.get("caption"))
+
+    assert list(app.exception) == []
+    assert "Path:" in sidebar_text
+    assert str(sinogram_path.resolve()) in sidebar_text
+    assert "path_check.npy" in sidebar_text
+
+
+def test_sidebar_lists_every_file_read_for_a_folder_load(app, create_projection_dicom):
+    """A DICOM folder load must list the files actually read, not just the
+    folder — the user needs to see which projections went in."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        folder = create_projection_dicom(tmp_dir)
+
+        app.sidebar.text_input(key="sinogram_path").set_value(str(folder))
+        app.sidebar.button(key="load_measurements").click()
+        app.run()
+
+        text = " ".join(
+            [c.value for c in app.get("caption")] + [c.value for c in app.get("code")]
+        )
+
+    assert list(app.exception) == []
+    assert "Files read: 3" in text
+    for index in range(3):
+        assert f"proj_{index}.dcm" in text
+
+
 # ---------------------------------------------------------------------------
 # Sinogram Inspection tab
 # ---------------------------------------------------------------------------
@@ -307,7 +347,7 @@ def test_sinogram_inspection_crash_regression_no_volume(app):
     """Regression: with no volume, the old preview branch rendered a
     0..0 slider for a 1-projection sinogram and raised
     StreamlitAPIException ('min_value must be less than max_value')."""
-    app.session_state.pop("volume", None)
+    app.session_state["volume"] = None
     _seed_measurements(app, shape=(1, 736, 64))
 
     app.run()
@@ -342,8 +382,8 @@ def test_sinogram_inspection_shape_mismatch_hints(app):
 
 def test_sinogram_inspection_empty_frame_hints(app):
     """Nothing loaded → the frame renders with hints, not a dead end."""
-    app.session_state.pop("sinogram", None)
-    app.session_state.pop("forward_projection", None)
+    app.session_state["sinogram"] = None
+    app.session_state["forward_projection"] = None
     app.session_state["volume"] = create_demo_volume()
 
     app.run()

@@ -1,26 +1,30 @@
-# CTBeamStudio conda environment with parallelproj GPU support
+# CTBeamStudio conda environment (conda-forge, CPU-only by default)
 #
-# Usage:
+# parallelproj is NOT on PyPI: it ships compiled kernels and must come from
+# conda-forge. Everything else is plain Python and installs with pip.
+#
+# Usage (Miniforge or Miniconda, CPU-only):
 #   conda env create -f environment.yml
 #   conda activate ct-viewer
+#
+# NVIDIA GPU variant (after creating the env above):
 #   conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
 #
-# Note: parallelproj requires conda-forge for the compiled GPU backend
+# This file pins CPU-only parallelproj because the default target machine has
+# no NVIDIA GPU. On a GPU machine the last line can be swapped for the GPU
+# variant; the app detects either at runtime.
 
 name: ct-viewer
 channels:
   - conda-forge
-  - pytorch
-  - nvidia
-  - defaults
+  - nodefaults
 dependencies:
   - python=3.11
   - pip
-  # Install these with pip after activating the environment:
-  # pip install streamlit pydicom numpy plotly pytest pyyaml scipy scikit-image array-api-compat
-  #
-  # Install these from conda-forge (GPU support):
-  # conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
-  #
-  # Or CPU-only:
-  # conda install -c conda-forge parallelproj "libparallelproj=*=cpu*" -y
+  - parallelproj
+  - libparallelproj=*=cpu*
+  # The parallelproj backend in src/backend/forward_project.py builds its
+  # tensors with torch, so torch is required, not optional.
+  - pytorch=*=cpu*
+  - pip:
+      - -e .[dev]

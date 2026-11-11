@@ -1,5 +1,7 @@
 """Tests for forward projection module."""
 
+import builtins
+
 import numpy as np
 import pytest
 
@@ -85,6 +87,30 @@ def test_parallelproj_availability():
 
     # Just check the flag exists and is a boolean
     assert isinstance(PARALLELPROJ_AVAILABLE, bool)
+
+
+def test_availability_flag_requires_torch_too(monkeypatch):
+    """parallelproj alone cannot project: the backend builds its tensors with
+    torch. If torch is missing the flag must be False, so the UI warns and
+    falls back to zeros instead of crashing with ModuleNotFoundError."""
+    import importlib
+    import sys
+
+    import backend.forward_project as fp
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "torch" or name.startswith("torch."):
+            raise ImportError("simulated missing torch")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setitem(sys.modules, "parallelproj", object())
+
+    reloaded = importlib.reload(fp)
+
+    assert reloaded.PARALLELPROJ_AVAILABLE is False
 
 
 def test_forward_project_rejects_hu_volume():

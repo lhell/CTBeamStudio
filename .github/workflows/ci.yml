@@ -53,13 +53,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up conda (parallelproj ships only on conda-forge)
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: latest
           python-version: '3.11'
-      - name: Install dependencies
+          channels: conda-forge
+          channel-priority: strict
+          activate-environment: ct-viewer
+          use-mamba: true
+      - name: Install parallelproj and torch (CPU-only)
+        shell: bash -el {0}
+        run: |
+          conda install -y "parallelproj" "libparallelproj=*=cpu*" "pytorch=*=cpu*"
+          python -c "import parallelproj, torch; print('parallelproj OK, torch', torch.__version__)"
+      - name: Install the app and test dependencies
+        shell: bash -el {0}
         run: |
           pip install -e ".[dev]"
       - name: Run pytest
+        shell: bash -el {0}
         run: |
           pytest tests/ -v

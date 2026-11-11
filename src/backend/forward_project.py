@@ -11,9 +11,15 @@ from typing import List, Optional
 
 import numpy as np
 
-# Try to import parallelproj, fallback to None if not available
+# The projection path needs both: parallelproj supplies the C library, and
+# torch supplies the tensors the backend builds on top of it. Missing either
+# one means "cannot project", so the UI must fall back to its warned-about
+# zeros path instead of raising ModuleNotFoundError mid-run.
 try:
-    import parallelproj
+    import parallelproj  # noqa: F401
+    # Imported at module scope so PARALLELPROJ_AVAILABLE reflects whether the
+    # projection path can actually run; _forward_project_parallelproj uses it.
+    import torch  # noqa: F401
 
     PARALLELPROJ_AVAILABLE = True
 except ImportError:
@@ -181,8 +187,6 @@ def _forward_project_parallelproj(
     Returns:
         ForwardProjectionResult with synthetic projections
     """
-    import torch
-
     from backend.parallelproj import (
         ConeBeamProjector,
         geometry_from_projection_geometry,

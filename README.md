@@ -57,12 +57,16 @@ pip install -e .
 streamlit run src/visualization/app.py
 ```
 
-**Local with Conda (for GPU forward projection):**
+**Local with Conda (required for real forward projection):**
 ```bash
 conda env create -f environment.yml
 conda activate ct-viewer
 streamlit run src/visualization/app.py
 ```
+
+On Windows, `run_app.cmd` wraps those steps (it activates `ct-viewer` and warns
+if parallelproj is missing). Using pip alone is fine for the viewer, but
+"Run Forward Projection" then returns zeros.
 
 ## Usage
 

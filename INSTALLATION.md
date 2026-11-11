@@ -47,11 +47,37 @@ streamlit run src/visualization/app.py
 
 ---
 
-### Option 3: Conda (Required for parallelproj GPU support)
+### Option 3: Conda (Required for parallelproj forward projection)
 
-parallelproj requires conda-forge for the compiled GPU backend.
+parallelproj is **not available on PyPI** — it ships compiled kernels and must
+be installed from conda-forge. Without it the app still runs, but
+"Run Forward Projection" returns all zeros and shows a warning.
 
-#### Option 3a: Using environment.yml (recommended)
+#### Option 3a: Miniforge (recommended — conda-forge by default)
+
+[Miniforge](https://github.com/conda-forge/miniforge) is a minimal conda
+distribution hosted on GitHub that defaults to the conda-forge channel. Prefer
+it over Miniconda if `repo.anaconda.com` is unreachable on your network.
+
+```bash
+# 1. Download the installer for your platform from
+#    https://github.com/conda-forge/miniforge/releases/latest
+#    (Windows: Miniforge3-Windows-x86_64.exe)
+
+# 2. Windows silent install, no PATH changes:
+#    Miniforge3-Windows-x86_64.exe /InstallationType=JustMe /RegisterPython=0 /AddToPath=0 /S
+#    Linux/macOS:
+bash Miniforge3-Linux-x86_64.sh -b -p "$HOME/miniforge3"
+
+# 3. Create the environment (CPU-only parallelproj)
+conda env create -f environment.yml
+conda activate ct-viewer
+
+# 4. Run the app
+streamlit run src/visualization/app.py
+```
+
+#### Option 3b: Using environment.yml with Miniconda
 
 ```bash
 # Install Miniconda if not present:
@@ -62,18 +88,20 @@ conda env create -f environment.yml
 conda activate ct-viewer
 ```
 
-#### Option 3b: Manual conda install
+#### Option 3c: Manual conda install
 
 ```bash
-# Create new conda environment
 conda create -n ct-viewer python=3.11 -y
 conda activate ct-viewer
 
-# Install parallelproj + PyTorch + CUDA from conda-forge
-conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
+# CPU-only (no NVIDIA GPU)
+conda install -c conda-forge parallelproj "libparallelproj=*=cpu*" -y
 
-# Install remaining dependencies with pip
-pip install streamlit pydicom numpy plotly pytest pyyaml scipy scikit-image array-api-compat
+# Or with GPU support (NVIDIA GPU + drivers required)
+# conda install -c conda-forge parallelproj pytorch cuda-toolkit -y
+
+# Install the app and remaining dependencies with pip
+pip install -e ".[dev]"
 
 # Run the app
 streamlit run src/visualization/app.py
@@ -105,7 +133,22 @@ python -c "import streamlit; import pydicom; import plotly; print('OK')"
 ## Troubleshooting
 
 ### "conda not found"
-- Install [Miniconda](https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe)
+- Install [Miniforge](https://github.com/conda-forge/miniforge/releases/latest) (recommended) or [Miniconda](https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe)
+
+### "repo.anaconda.com" unreachable / Miniconda download fails
+Some networks resolve `repo.anaconda.com` to IPv6 addresses that do not
+connect, while `conda.anaconda.org` and GitHub work fine. Use Miniforge from
+GitHub instead — it is conda-compatible and defaults to conda-forge.
+
+### "parallelproj is not installed in this environment"
+The app is running on a plain pip/venv interpreter. parallelproj only exists on
+conda-forge, so create and activate the `ct-viewer` env (Option 3) and start
+Streamlit from it:
+```bash
+conda activate ct-viewer
+python -c "import parallelproj; print(parallelproj.__version__)"
+streamlit run src/visualization/app.py
+```
 
 ### CUDA not detected
 - Ensure NVIDIA GPU drivers are installed

@@ -15,11 +15,17 @@ SRC_PATH = Path(__file__).resolve().parents[2] / "src"
 
 def test_importing_volume3d_does_not_import_pyvista():
     """Importing the module must not pull in pyvista; only rendering needs it."""
+    # The answer is printed behind a marker: importing this module reaches
+    # backend/__init__, which imports parallelproj when it is installed, and
+    # parallelproj prints a multi-line citation banner to stdout on import.
+    # Matching the whole of stdout would therefore fail in exactly the
+    # environments that have parallelproj, for a reason unrelated to pyvista.
+    marker = "PYVISTA_IMPORTED="
     code = (
         "import sys; "
         f"sys.path.insert(0, {str(SRC_PATH)!r}); "
         "import visualization.volume3d; "
-        "print('pyvista' in sys.modules)"
+        f"print('{marker}' + str('pyvista' in sys.modules))"
     )
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -27,4 +33,9 @@ def test_importing_volume3d_does_not_import_pyvista():
         text=True,
         check=True,
     )
-    assert result.stdout.strip() == "False"
+    answers = [
+        line[len(marker) :]
+        for line in result.stdout.splitlines()
+        if line.startswith(marker)
+    ]
+    assert answers == ["False"]

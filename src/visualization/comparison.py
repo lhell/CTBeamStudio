@@ -86,3 +86,30 @@ def compute_metrics(real: np.ndarray, simulated: np.ndarray) -> Dict[str, float]
         "correlation": correlation,
         "ssim": ssim,
     }
+
+
+def compute_metrics_per_slice(
+    measured: np.ndarray, simulated: np.ndarray
+) -> Dict[str, np.ndarray]:
+    """Compute per-projection metric series for two sinogram stacks.
+
+    Both inputs are canonical ``(n_proj, rows, cols)`` stacks; frame ``i``
+    of each is compared with :func:`compute_metrics`. Returns a dict with
+    the same keys, each mapping to a float64 array of shape ``(n_proj,)``.
+    """
+    measured = np.asarray(measured, dtype=np.float64)
+    simulated = np.asarray(simulated, dtype=np.float64)
+    if measured.shape != simulated.shape:
+        raise ValueError(
+            "measured and simulated stacks must have the same shape, got "
+            f"{measured.shape} and {simulated.shape}"
+        )
+
+    n_proj = measured.shape[0]
+    per_frame = [
+        compute_metrics(measured[i], simulated[i]) for i in range(n_proj)
+    ]
+    return {
+        key: np.asarray([frame[key] for frame in per_frame], dtype=np.float64)
+        for key in ("mae", "rmse", "correlation", "ssim")
+    }

@@ -15,10 +15,12 @@ import numpy as np
 # torch supplies the tensors the backend builds on top of it. Missing either
 # one means "cannot project", so the UI must fall back to its warned-about
 # zeros path instead of raising ModuleNotFoundError mid-run.
+#
+# torch is imported at module scope (not only inside
+# _forward_project_parallelproj) precisely so this check reflects whether the
+# projection path can actually run.
 try:
     import parallelproj  # noqa: F401
-    # Imported at module scope so PARALLELPROJ_AVAILABLE reflects whether the
-    # projection path can actually run; _forward_project_parallelproj uses it.
     import torch  # noqa: F401
 
     PARALLELPROJ_AVAILABLE = True

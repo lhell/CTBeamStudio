@@ -654,7 +654,7 @@ def main():
     shell.empty()
 
     tab_view, tab_geometry, tab_compare = st.tabs(
-        ["🩻 Viewer", "📐 Geometry", "⚡ Real vs Simulated"]
+        ["🩻 Viewer", "📐 Geometry", "🔍 Sinogram Inspection"]
     )
 
     with tab_view:

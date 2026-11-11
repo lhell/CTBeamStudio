@@ -21,12 +21,15 @@ import numpy as np
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from backend.forward_project import ForwardProjectionResult
+from backend.geometry import ProjectionGeometry
+from backend.loaders.sinogram import SelectionConfig, SinogramData
 from visualization.phantom import create_demo_volume
 
 APP_PATH = Path(__file__).resolve().parents[2] / "src" / "visualization" / "app.py"
 
 SIDEBAR_SECTIONS = ["Image", "Projection Geometry", "Measurements"]
-TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "⚡ Real vs Simulated"]
+TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "🔍 Sinogram Inspection"]
 
 
 @pytest.fixture(scope="module")
@@ -250,3 +253,119 @@ def test_load_measurements_from_npy(app):
     loaded = app.session_state["sinogram"]
     assert loaded.data.shape == (4, 6, 8)
     np.testing.assert_array_equal(loaded.data, expected)
+
+
+# ---------------------------------------------------------------------------
+# Sinogram Inspection tab
+# ---------------------------------------------------------------------------
+
+# Calculated from the default geometry (2304 projections, 64 rows, 512
+# columns) with the tab's fp defaults (proj step 100, row step 4, col step
+# 8): ceil-ish index counts 2304/100=24, 64/4=16, 512/8=64.
+FP_DEFAULT_SIM_SHAPE = (24, 16, 64)
+
+
+def _seed_measurements(at, shape, fmt="numpy"):
+    rng = np.random.default_rng(7)
+    data = rng.random(shape, dtype=np.float32)
+    at.session_state["sinogram"] = SinogramData(
+        data=data,
+        geometry=None,
+        selection=SelectionConfig(),
+        original_shape=tuple(shape),
+        source_axis_order=("proj", "row", "col"),
+        path=None,
+        format=fmt,
+    )
+    return data
+
+
+def _main_text(at) -> str:
+    """Concatenate every caption/info/warning string rendered in main."""
+    return " ".join(
+        [c.value for c in at.caption]
+        + [i.value for i in at.info]
+        + [w.value for w in at.warning]
+    )
+
+
+def test_sinogram_inspection_renders_single_projection(app):
+    """The user's exact case: measurements (1, 736, 64) must be visible with
+    a volume loaded, before any forward projection runs."""
+    app.session_state["volume"] = create_demo_volume()
+    _seed_measurements(app, shape=(1, 736, 64))
+
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "Measured: (1, 736, 64)" in text
+    assert "Measured projection 1/1" in text
+
+
+def test_sinogram_inspection_crash_regression_no_volume(app):
+    """Regression: with no volume, the old preview branch rendered a
+    0..0 slider for a 1-projection sinogram and raised
+    StreamlitAPIException ('min_value must be less than max_value')."""
+    app.session_state.pop("volume", None)
+    _seed_measurements(app, shape=(1, 736, 64))
+
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "Measured projection 1/1" in text
+    assert "run the forward projection" in text.lower()
+
+
+def test_sinogram_inspection_shape_mismatch_hints(app):
+    """Shapes differ → both image columns stay visible, difference and
+    metric plots are omitted with an in-slot hint, no exception."""
+    app.session_state["volume"] = create_demo_volume()
+    _seed_measurements(app, shape=(1, 736, 64))
+    app.session_state["forward_projection"] = ForwardProjectionResult(
+        projections=np.zeros((2, 3, 4), dtype=np.float32),
+        geometry=ProjectionGeometry(),
+        row_indices=[0, 1],
+        col_indices=[0, 1, 2],
+        proj_indices=[0, 1],
+    )
+
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "shapes differ" in text.lower()
+    assert "Measured projection 1/1" in text
+    assert "Simulated: (2, 3, 4)" in text
+
+
+def test_sinogram_inspection_empty_frame_hints(app):
+    """Nothing loaded → the frame renders with hints, not a dead end."""
+    app.session_state.pop("sinogram", None)
+    app.session_state.pop("forward_projection", None)
+    app.session_state["volume"] = create_demo_volume()
+
+    app.run()
+
+    assert list(app.exception) == []
+    hints = _main_text(app).lower()
+    assert "measured data" in hints
+    assert "run the forward projection" in hints
+
+
+def test_sinogram_inspection_run_button_produces_simulation(app):
+    """Placeholder backend: with a matching measured shape (fp defaults
+    on the default geometry yield the (24, 16, 64) simulated stack),
+    clicking Run fills the simulated column and the metric plots,
+    without exception."""
+    app.session_state["volume"] = create_demo_volume()
+    _seed_measurements(app, shape=FP_DEFAULT_SIM_SHAPE)
+
+    app.button(key="fp_run").click()
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "Simulated: (24, 16, 64)" in text
+    assert "Simulated projection" in text

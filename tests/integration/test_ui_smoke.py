@@ -394,6 +394,46 @@ def test_sinogram_inspection_empty_frame_hints(app):
     assert "run the forward projection" in hints
 
 
+def _block_heights(node) -> list[int]:
+    """Collect the fixed heights of every ``st.container(height=...)``."""
+    heights = []
+    proto = getattr(node, "proto", None)
+    if proto is not None:
+        try:
+            if proto.HasField("vertical") and proto.vertical.height:
+                heights.append(proto.vertical.height)
+        except Exception:
+            pass
+    for child in (getattr(node, "children", {}) or {}).values():
+        heights.extend(_block_heights(child))
+    return heights
+
+
+def test_sinogram_inspection_placeholders_are_square_blocks(app):
+    """The empty slots must reserve the same vertical space a projection
+    image will occupy, so the layout does not jump when data arrives.
+
+    A one-line st.info leaves the three columns as thin strips. Each empty
+    slot therefore renders inside a fixed-height, square-ish container.
+    """
+    from visualization.projection_panel import PLACEHOLDER_HEIGHT_PX
+
+    app.session_state["sinogram"] = None
+    app.session_state["forward_projection"] = None
+    app.session_state["volume"] = create_demo_volume()
+
+    app.run()
+
+    assert list(app.exception) == []
+    # Square-ish: tall enough to match an image slot rather than a one-line
+    # hint. (The viewer's own image box uses a different height, so match on
+    # the placeholder's rather than counting every sized block in the app.)
+    assert PLACEHOLDER_HEIGHT_PX >= 240
+    heights = [h for h in _block_heights(app.main) if h == PLACEHOLDER_HEIGHT_PX]
+    # One per empty slot: measured, simulated, difference.
+    assert len(heights) == 3, heights
+
+
 def test_sinogram_inspection_run_button_produces_simulation(app):
     """Placeholder backend: with a matching measured shape (fp defaults
     on the default geometry yield the (24, 16, 64) simulated stack),

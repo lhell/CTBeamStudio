@@ -504,6 +504,27 @@ def _render_projection_image(array: np.ndarray, caption: str) -> None:
     )
 
 
+# Height (px) of an empty slot in the Sinogram Inspection tab. The three
+# views sit in equal thirds of a wide layout, so this roughly squares the
+# box off against one column. The point is that an empty slot reserves the
+# same vertical space as a filled one, which keeps the row -- and everything
+# below it -- from jumping when the first projection arrives.
+PLACEHOLDER_HEIGHT_PX = 360
+
+
+def _render_placeholder(message: str) -> None:
+    """Render an empty slot at the size a projection image will occupy.
+
+    A bare ``st.info`` is a one-line strip, which left the three columns
+    looking collapsed until data arrived. The fixed-height, borderless
+    container gives the hint the same footprint as an image slot.
+    """
+    import streamlit as st
+
+    with st.container(height=PLACEHOLDER_HEIGHT_PX, border=False):
+        st.info(message)
+
+
 def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> None:
     """Sinogram Inspection: measured vs simulated projections side by side.
 
@@ -555,7 +576,9 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 f"Measured projection {meas_index + 1}/{n_meas}",
             )
         else:
-            st.info("No measured data loaded — load measurements in the sidebar.")
+            _render_placeholder(
+                "No measured data loaded — load measurements in the sidebar."
+            )
     with col_sim:
         if n_sim:
             st.caption(f"Simulated projection {sim_index + 1}/{n_sim}")
@@ -564,7 +587,7 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 f"Simulated projection {sim_index + 1}/{n_sim}",
             )
         else:
-            st.info("Run the forward projection to fill this column.")
+            _render_placeholder("Run the forward projection to fill this column.")
     with col_diff:
         if shapes_match:
             st.image(
@@ -574,12 +597,14 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 use_column_width=True,
             )
         elif n_meas and n_sim:
-            st.info(
+            _render_placeholder(
                 f"Shapes differ ({measured.shape} vs {simulated.shape}) — load a "
                 "matching selection to compare."
             )
         else:
-            st.info("Difference appears once measured and simulated shapes match.")
+            _render_placeholder(
+                "Difference appears once measured and simulated shapes match."
+            )
 
     # Shared slider below the views. Renders nothing when there are fewer
     # than two frames on either side (a 0..0 slider is illegal in Streamlit).

@@ -107,7 +107,7 @@ class SinogramData:
     original_shape: tuple[int, int, int]  # file's native shape
     source_axis_order: tuple[str, str, str]  # native order, e.g. ("proj", "row", "col")
     path: Optional[Path] = None
-    format: str = "unknown"  # "numpy" | "nifti" | "dicom"
+    format: str = "unknown"  # "numpy" | "nifti" | "dicom" | "synthetic"
     lazy: bool = False
     # Exact files the load read: one path for .npy/.nii, the selected
     # projections' files for a DICOM folder. Lets the UI name its input.
@@ -175,6 +175,15 @@ def _is_permutation(value: tuple[str, str, str]) -> bool:
     if not isinstance(value, tuple) or len(value) != 3:
         return False
     return set(value) == {"proj", "row", "col"}
+
+
+def _is_full_selection(selection: SelectionConfig) -> bool:
+    """Return True if all three axes of ``selection`` use mode "all"."""
+    return (
+        selection.proj_mode == "all"
+        and selection.row_mode == "all"
+        and selection.col_mode == "all"
+    )
 
 
 def _reorder_canonical(
@@ -268,14 +277,7 @@ def _finish_sinogram(
     # holds the whole file, so that an axis_order change can re-derive it in
     # memory; otherwise leave the raw array unheld so the change re-reads from
     # `path`. A pre-pruned ``raw`` must never be treated as the whole file.
-    is_full = (
-        applied.row_mode == "all"
-        and applied.col_mode == "all"
-        and applied.proj_mode == "all"
-        and selection.row_mode == "all"
-        and selection.col_mode == "all"
-        and selection.proj_mode == "all"
-    )
+    is_full = _is_full_selection(applied) and _is_full_selection(selection)
     raw_file_order = raw if is_full else None
 
     return SinogramData(
@@ -297,15 +299,25 @@ def _load_numpy(
     selection: SelectionConfig,
     axis_order: tuple[str, str, str],
 ) -> SinogramData:
-    """Load a ``.npy``/``.npz`` sine file into a canonical SinogramData."""
+    """Load a ``.npy``/``.npz`` sine file into a canonical SinogramData.
+
+    A subset selection is read lazily: ``.npy`` is memory-mapped and the
+    selection's fancy indexing reads only the selected pages from disk, so
+    the whole file never enters memory. A full (all/all/all) selection stays
+    on the eager path so ``_raw_file_order`` can re-derive an ``axis_order``
+    change in memory. ``.npz`` (a zip container) cannot be memory-mapped and
+    always reads eagerly.
+    """
     if path.suffix == ".npz":
         with np.load(path) as zf:
             if "arr_0" in zf:
                 raw = zf["arr_0"]
             else:
                 raw = zf[zf.files[0]]
-    else:
+    elif _is_full_selection(selection):
         raw = np.load(path)
+    else:
+        raw = np.load(path, mmap_mode="r")
 
     if raw.ndim != 3:
         raise ValueError(
@@ -319,6 +331,58 @@ def _load_numpy(
     )
 
 
+def _selection_axis(
+    selection: SelectionConfig, label: str
+) -> tuple[str, Optional[tuple[int, int]], Optional[int]]:
+    """Return (mode, range_, downsample) for one canonical axis label."""
+    if label == "proj":
+        return selection.proj_mode, selection.proj_range, selection.proj_downsample
+    if label == "row":
+        return selection.row_mode, selection.row_range, selection.row_downsample
+    return selection.col_mode, selection.col_range, selection.col_downsample
+
+
+def _mark_axis_all(selection: SelectionConfig, label: str) -> SelectionConfig:
+    """Return ``selection`` with the given canonical axis mode set to "all"."""
+    if label == "proj":
+        return replace(selection, proj_mode="all")
+    if label == "row":
+        return replace(selection, row_mode="all")
+    return replace(selection, col_mode="all")
+
+
+def _basic_slice_for_axis(
+    mode: str,
+    size: int,
+    range_: Optional[tuple[int, int]],
+    downsample: Optional[int],
+) -> Optional[slice]:
+    """Return a basic slice matching a selection axis, or None.
+
+    nibabel's ``ArrayProxy`` supports only basic slicing, so an axis can be
+    pre-sliced lazily on disk only when its selection is expressible as one:
+    ``central``/``range`` (contiguous) and ``downsample`` (strided).
+    ``all`` needs no slice and ``custom`` index lists need fancy indexing,
+    which the proxy cannot do — those return None (read fully).
+
+    Invalid parameters (missing range_, empty or out-of-bounds) also return
+    None so that ``resolve_indices`` raises the established error instead of
+    a ``slice`` silently clamping out-of-bounds bounds.
+    """
+    if mode in ("central", "range"):
+        if range_ is None:
+            return None
+        start, stop = range_
+        if start >= stop or start < 0 or stop > size:
+            return None
+        return slice(start, stop)
+    if mode == "downsample":
+        if downsample is None or downsample <= 0:
+            return None
+        return slice(0, size, downsample)
+    return None
+
+
 def _load_nifti(path, selection, axis_order, _on_read=None):
     try:
         import nibabel as nib
@@ -330,11 +394,39 @@ def _load_nifti(path, selection, axis_order, _on_read=None):
     raw_shape = img.shape
     if len(raw_shape) != 3:
         raise ValueError(f"NIfTI sinogram must be 3D, got {len(raw_shape)}D")
-    data = np.asarray(img.dataobj)
+
+    # Lazy subset: pre-slice every axis whose selection is a basic slice so
+    # only the selected region is read from disk; the remaining axes are
+    # applied in memory via `applied_selection` (the DICOM loader's pattern).
+    slices = []
+    applied = selection
+    for file_axis, label in enumerate(axis_order):
+        mode, range_, downsample = _selection_axis(selection, label)
+        axis_slice = _basic_slice_for_axis(
+            mode, raw_shape[file_axis], range_, downsample
+        )
+        if axis_slice is not None:
+            slices.append(axis_slice)
+            applied = _mark_axis_all(applied, label)
+        else:
+            slices.append(slice(None))
+
+    if all(s == slice(None) for s in slices):
+        data = np.asarray(img.dataobj)
+    else:
+        data = np.asarray(img.dataobj[tuple(slices)])
+
     if _on_read is not None:
         _on_read()
     return _finish_sinogram(
-        data, raw_shape, path, selection, axis_order, "nifti", files=(path,)
+        data,
+        raw_shape,
+        path,
+        selection,
+        axis_order,
+        "nifti",
+        files=(path,),
+        applied_selection=applied,
     )
 
 

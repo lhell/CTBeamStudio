@@ -631,6 +631,34 @@
 - **Akzeptanz:** `python -m pytest -q -rs` im Env `ct-viewer` endet mit „0 skipped"; `flake8` (Projekt-Ignore-Set), `black --check`, `isort --check-only` laufen im selben Env fehlerfrei.
 - **Status:** ✅ Done (Nov 12, 2026) — Env 3.11.18 mit parallelproj, torch, nibabel, flake8/black/isort. Suite: **301 passed, 0 skipped** (~25–40 s), vorher 293 passed / 2 skipped im System-Python bzw. 297/4 im Env ohne nibabel. `flake8 --count` = 0, `black --check` 60 Dateien unverändert, `isort --check-only` exit 0. Zusatzbefund: `.[cpu]`/`.[gpu]` waren nur in der Doku vorhanden, nie in `pyproject.toml`; `pip install -e ".[bogus]"` warnt nicht und installiert nichts — die Doku führt jetzt die conda-Befehle.
 
+### `[x]` T-92 — Sinogram-Loader: Lazy Subset-Reads für große Dateien
+- **Ziel:** Subset-Auswahl (Zeilen/Spalten/Projektionen) aus großen `.npy`-/NIfTI-Dateien lesen, ohne die ganze Datei in den RAM zu laden — gemäß der in `docs/superpowers/plans/2026-11-04-sinogram-loader.md` vorgesehenen, aber nie umgesetzten mmap-/dataobj-Slices. DICOM bleibt unverändert (T-65 liest bereits nur die gewählten Projektionen, frame-weise).
+- **Dateien:** `src/backend/loaders/sinogram.py`, `tests/unit/test_sinogram_loader.py`, `docs/superpowers/specs/2026-11-12-sinogram-lazy-subset-reads-design.md` (neu)
+- **Abhängig von:** T-90
+- **Umsetzung:**
+  1. `.npy`: Subset → `np.load(path, mmap_mode="r")`; die bestehende `_apply_selection` (transpose + `np.ix_`) materialisiert nur die Auswahl, der Rest der Datei wird nie gelesen. Vollauswahl bleibt auf dem eager-Pfad (`_raw_file_order` hält das Roharray für die In-Memory-`axis_order`-Ableitung). `.npz` (Zip-Container) kann nicht gemappt werden — bleibt eager.
+  2. NIfTI: Jede Dateiachse, deren kanonischer Modus als Basic-Slice ausdrückbar ist (`central`/`range`/`downsample`), wird vor dem Materialisieren über `img.dataobj[slice_tuple]` auf der Platte vorgeschnitten (ein Read, nur der gewählte Bereich); vorgeschnittene Achsen werden in `applied_selection` auf `"all"` gesetzt — dasselbe Muster wie im DICOM-Loader. `custom`-Indexlisten brauchen Fancy-Indexing, das der Proxy nicht kann (verifiziert in nibabel 5.5.0: `ArrayProxy`/`slicer` werfen „Cannot handle fancy indexing") → voller Read-Pfad wie bisher.
+  3. Validierung bleibt erhalten: ungültige `range_` (leer/außerhalb) werden nicht vorgeschnitten, sodass `resolve_indices` weiterhin `IndexError`/`ValueError` wirft — ein `slice` würde Out-of-Bounds stillschweigend clampsen. Neue Helfer: `_is_full_selection` (nutzt auch `_finish_sinogram` statt der doppellten Bedingung), `_selection_axis`, `_mark_axis_all`, `_basic_slice_for_axis`.
+- **Akzeptanz:** Subset-Loads liefern exakt die Daten der eager-Variante; Tests belegen mmap (Spy auf `np.load`: `mmap_mode="r"` bei Subset, `None` bei Vollauswahl) bzw. Basic-Slice-Read (Spy auf `ArrayProxy.__getitem__`: ein Slice-Tuple, nie ein Voll-Read); Vollauswahl und Fehlerverträge unverändert; Suite grün ohne neue Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — 10 neue Tests (3 numpy/npz, 7 NIfTI inkl. downsample, Mehrachsen- und transponiertem Subset). `test_sinogram_loader.py`: 48 passed. `SinogramData.lazy` bleibt `False` (Auswahl ist nach dem Load materialisiert; Lazy ist Read-Zeit, nicht Zugriffszeit) — chunk-weises Streamen durch die Vorwärtsprojektion bleibt out of scope. `SinogramData`/UI/`forward_project` unverändert.
+
+### `[x]` T-93 — Dummy-Messung: 3D-Shepp-Logan-FP + Streuung + Rauschen
+- **Ziel:** Ein künstliches „gemessenes" Sinogramm für das Demo-Phantom — 3D-Shepp-Logan-Forward-Projektion + Streuung + Poisson-Rauschen — per Knopfdruck im Measurements-Panel, als kohärentes Demo-Trio (Volumen + Geometrie + Messung) für den Sinogram-Inspection-Vergleich ohne echte Messdaten.
+- **Hintergrund:**
+  - Das Demo-Phantom ist bereits in Standard-Kopfgröße (~138 × 184 × 180 mm im 192-mm-FOV, durch `test_head_dimensions_match_phantom_geometry` gepinnt); die Dummy-Messung nutzt genau diese Größe, kein geschrumpftes Spielzeug-Volumen.
+  - Die Default-Geometrie (64 Detektorzeilen × 1 mm) überstreicht nur ~32 mm in z auf der Isocenter-Ebene — ein kopfgroßes Phantom würde auf einen Slab zugeschnitten. Die Dummy-Geometrie (192 Zeilen × 2 mm, 512 Spalten × 1 mm, 60 Views/Rotation) überstreicht 192 mm in z und sieht den ganzen Kopf.
+  - Vorab gemessen (CPU-only, keine CUDA in `ct-viewer`): FP des Standard-Phantoms ≈ 10–20 s, Streuung+Rauschen ≈ 3 s. Ohne Puffer wäre jeder Klick eine Re-Projektion.
+- **Umsetzung:**
+  1. `create_dummy_geometry()` in `src/visualization/phantom.py`: Dummy-CBCT-Geometrie in Kopfgröße (s.o.).
+  2. `create_dummy_measured_sinogram()`: FP des HU→1/mm-konvertierten Phantoms → idealer Linienintegral-Stack; Streuung als Gauß-geglättete Kopie der Primär-Transmittanz (SPR-Verhältnis, Sigma in mm am Detektor, pro Achse konvertiert), in der Intensitätsdomäne addiert (Streuung zählt Photonen dazu, gemessenes Linienintegral also niedriger — Kontrastverlust/Cupping-Richtung); Poisson-Zählrauschen mit `i0` einfallenden Photonen pro Ray, Photonenmangel floort bei einem Zählwert. Ergebnis als `SinogramData` (format `"synthetic"`, kanonisch, ohne Datei — der T-90-Setter-Zweig transponiert in-memory).
+  3. **Ideal-FP auf Disk gepuffert** (`data/cache/dummy_fp_standard.npz`, gitignored; Fingerprint aus Geometrie + Energie + Cache-Version): erste Generierung ~13–23 s, jeder weitere Klick/App-Start ~3,5 s. Nur die Standard-Phantom-Strecke wird gepuffert; Streuung/Rauschen bleiben live, sodass `spr`/`i0`/`seed` nie re-projizieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule).
+  4. Phantom auf die Rotationsachse zentriert (Origin ≈ (−95.6, −95.6, −94.5) mm): der parallelproj-Kreis rotiert um den Weltsprungpunkt, der Demo-Default-Origin (0,0,0) parkt den Kopf im +x/+y/+z-Oktanten — außerhalb des FOV und halb außerhalb des Kegels (vorab so gemessen, siehe Preview). Der geteilte Demo-Default bleibt unverändert (separater Quirk, eigener Task-Kandidat).
+  5. UI: Button „🎲 Generate dummy measurement" im Measurements-Expander; setzt Volumen + Geometrie (`geometry_is_default=False`, `geometry_loaded_original`) + Messung in den Session-State und presetet die FP-Auswahl auf „all" — ein Klick auf „Run Forward Projection" reproduziert die Messform exakt, Difference und Metriken leben sofort. Empty-State-Hint im Inspection-Tab verweist auf den Button.
+- **Dateien:** `src/visualization/phantom.py`, `src/visualization/projection_panel.py`, `src/backend/loaders/sinogram.py` (Kommentar: `"synthetic"`-Format), `tests/test_dummy_measurement.py` (neu, 16 Tests), `tests/integration/test_ui_smoke.py` (3 Tests, Generator per Stub), `docs/superpowers/specs/2026-11-12-dummy-measured-sinogram-design.md` (neu)
+- **Abhängig von:** T-67, T-69, T-90
+- **Akzeptanz:** Der Generator liefert `(ppr, Zeilen, Spalten)` float32, endliche Werte, mit Seed reproduzierbar; `spr=0` ist reines Poisson-Rauschen um das ideale FP (Mittelwert ≈ 0), `spr>0` senkt die gemessenen Linienintegrale systematisch; Photonenmangel floort bei `ln(i0)`; Achsenwechsel transponiert in-memory reversibel; Cache-Roundtrip bit-identisch, invalidiert bei Geometrie-/Energie-Änderung, Custom-Volumes schreiben nie; UI-Button setzt das kohärente Trio und presetet die FP-Auswahl. Volle Suite grün, 0 Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — 19 neue Tests (16 Unit + 3 UI-Stub). Nachgemessen in `ct-viewer` (CPU-only): erste Generierung 12,6 s (unkorrekter Origin) bzw. 19,5 s (zentriert, ganzer Kopf im Kegel), Cache-Treffer 3,2 s, Cache 4,0 MB komprimiert; Preview bestätigt zentrierten, rotierenden Kopf mit Schädelrand, Streu-Belag und Rauschkorn. Lint: flake8 0, black/isort sauber.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -647,7 +675,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips) |
+| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom) |
 
 ## Decision Log
 
@@ -675,6 +703,7 @@
 | D-20 | 2026-11-12 | Achsenreihenfolge wird beim Ändern **sofort** angewandt, nicht erst beim nächsten Lade-Klick | Der Nutzer beurteilt die Auswahl am Bild; ein Regler, der scheinbar nichts tut, gilt als defekt (gemeldeter Fehler) |
 | D-21 | 2026-11-12 | Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; ein Skip im Testlauf gilt als Defekt | `parallelproj_c.dll` liegt nur im aktivierten Env auf `PATH` — ein System-Interpreter *überspringt* die parallelproj-Tests, statt sie laufen zu lassen; das sieht wie grün aus, ist aber verlorene Abdeckung |
 | D-22 | 2026-11-12 | `nibabel` steht in `dev` **und** in `nifti`; kein `cpu`/`gpu`-Extra | Die Suite deckt NIfTI ab, also muss die Test-Abhängigkeit `dev` sein — sonst skippt ein grüner Lauf still vier Tests. `parallelproj` ist conda-forge-only und kann kein pip-Extra sein; ein nicht existierendes Extra akzeptiert pip warnungslos und installiert nichts |
+| D-23 | 2026-11-12 | Dummy-Messung puffert nur das **ideale** FP auf Disk (`data/cache/`, gitignored); Streuung/Rauschen bleiben live; Phantom zentriert auf der Rotationsachse; FP-Auswahl wird auf „all" presetet | Der FP ist der einzige teure Schritt (~10–20 s CPU) — Puffer macht jeden weiteren Klick ~3,5 s; live-Streuung hält `spr`/`i0`/`seed` ohne Re-Projektion veränderbar; ohne Zentrierung parkt der Demo-Origin (0,0,0) den Kopf außerhalb von FOV und Kegel (gemessen); „all" lässt einen Klick auf „Run Forward Projection" die Messform exakt reproduzieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule) |
 
 ## Offene Fragen
 
@@ -699,6 +728,7 @@
 
 - ✅ T-90: „File axis order" wirkt jetzt für DICOM-Ordner (Transposition des nativen Stapels statt Ignorieren) und beim Ändern sofort statt erst nach erneutem „Load Measurements"; 9 neue Tests, inkl. künstlicher DICOM-Serien mit Gradient pro Rahmen
 - ✅ T-91: Conda-Env `ct-viewer` verbindlich gemacht (`AGENTS.md`, `LINTING.md`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`), `nifti`-Extra in `environment.yml` und CI ergänzt — Suite jetzt **301 passed, 0 skipped**
+- ✅ T-92: Lazy Subset-Reads im Sinogram-Loader (`.npy` via mmap bei Subset, NIfTI via `dataobj`-Basic-Slices; `custom`/`.npz` weiterhin eager) — Subset-Loads lesen nur den gewählten Bereich, Vollauswahl und Fehlerverträge unverändert
 
 ## Erledigt (2026-11-10)
 

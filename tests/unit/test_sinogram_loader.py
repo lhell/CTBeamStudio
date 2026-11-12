@@ -149,6 +149,54 @@ def test_load_sinogram_numpy(tmp_path):
     assert s.format == "numpy"
 
 
+# --- T-90: lazy subset reads (mmap npy, pre-sliced NIfTI) ---
+
+
+def test_load_numpy_subset_uses_mmap(tmp_path, monkeypatch):
+    arr = np.arange(60).reshape(3, 4, 5)
+    p = tmp_path / "s.npy"
+    np.save(p, arr)
+    calls = []
+    real_load = np.load
+
+    def spy_load(*args, **kwargs):
+        calls.append(kwargs.get("mmap_mode"))
+        return real_load(*args, **kwargs)
+
+    monkeypatch.setattr(np, "load", spy_load)
+    sel = SelectionConfig(row_mode="range", row_range=(1, 3))
+    s = _load_numpy(p, sel, ("proj", "row", "col"))
+    assert calls == ["r"]  # subset: memory-mapped, only selected pages read
+    assert s.data.shape == (3, 2, 5)
+    np.testing.assert_array_equal(s.data[:, 0], arr[:, 1])
+
+
+def test_load_numpy_full_stays_eager(tmp_path, monkeypatch):
+    arr = np.zeros((3, 4, 5))
+    p = tmp_path / "s.npy"
+    np.save(p, arr)
+    calls = []
+    real_load = np.load
+
+    def spy_load(*args, **kwargs):
+        calls.append(kwargs.get("mmap_mode"))
+        return real_load(*args, **kwargs)
+
+    monkeypatch.setattr(np, "load", spy_load)
+    s = _load_numpy(p, SelectionConfig(), ("proj", "row", "col"))
+    assert calls == [None]  # full selection: eager read for in-memory re-derive
+    assert s.data.shape == (3, 4, 5)
+
+
+def test_load_npz(tmp_path):
+    arr = np.zeros((3, 4, 5))
+    p = tmp_path / "s.npz"
+    np.savez(p, arr)
+    s = _load_numpy(p, SelectionConfig(), ("proj", "row", "col"))
+    assert s.data.shape == (3, 4, 5)
+    assert s.format == "numpy"
+
+
 # --- NIfTI via nibabel (optional dependency; skip if absent) ---
 #
 # The guard must not be a module-level ``pytest.importorskip``: that aborts
@@ -202,6 +250,159 @@ def test_load_nifti_subset_shape(tmp_path):
     sel = SelectionConfig(proj_mode="range", proj_range=(1, 3))
     s = _load_nifti(p, sel, ("proj", "row", "col"))
     assert s.data.shape == (2, 4, 5)
+
+
+# --- T-90: lazy subset reads via dataobj basic slicing ---
+
+
+@requires_nibabel
+def test_load_nifti_lazy_range_preslices_dataobj(tmp_path, monkeypatch):
+    import nibabel.arrayproxy as ap
+
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.arange(60).reshape(3, 4, 5)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    reads = []
+    real_getitem = ap.ArrayProxy.__getitem__
+
+    def spy_getitem(self, item):
+        reads.append(item)
+        return real_getitem(self, item)
+
+    monkeypatch.setattr(ap.ArrayProxy, "__getitem__", spy_getitem)
+    sel = SelectionConfig(proj_mode="range", proj_range=(1, 3))
+    s = _load_nifti(p, sel, ("proj", "row", "col"))
+    # only the selected slab was read from disk, as one basic slice
+    assert reads == [(slice(1, 3), slice(None), slice(None))]
+    assert s.data.shape == (2, 4, 5)
+    np.testing.assert_array_equal(s.data, arr[1:3])
+
+
+@requires_nibabel
+def test_load_nifti_lazy_downsample(tmp_path, monkeypatch):
+    import nibabel.arrayproxy as ap
+
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.arange(60).reshape(3, 4, 5)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    reads = []
+    real_getitem = ap.ArrayProxy.__getitem__
+
+    def spy_getitem(self, item):
+        reads.append(item)
+        return real_getitem(self, item)
+
+    monkeypatch.setattr(ap.ArrayProxy, "__getitem__", spy_getitem)
+    sel = SelectionConfig(proj_mode="downsample", proj_downsample=2)
+    s = _load_nifti(p, sel, ("proj", "row", "col"))
+    assert reads == [(slice(0, 3, 2), slice(None), slice(None))]
+    assert s.data.shape == (2, 4, 5)
+    np.testing.assert_array_equal(s.data, arr[::2])
+
+
+@requires_nibabel
+def test_load_nifti_lazy_multi_axis_subset(tmp_path, monkeypatch):
+    import nibabel.arrayproxy as ap
+
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.arange(60).reshape(3, 4, 5)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    reads = []
+    real_getitem = ap.ArrayProxy.__getitem__
+
+    def spy_getitem(self, item):
+        reads.append(item)
+        return real_getitem(self, item)
+
+    monkeypatch.setattr(ap.ArrayProxy, "__getitem__", spy_getitem)
+    sel = SelectionConfig(
+        proj_mode="range",
+        proj_range=(0, 2),
+        col_mode="downsample",
+        col_downsample=2,
+    )
+    s = _load_nifti(p, sel, ("proj", "row", "col"))
+    assert reads == [(slice(0, 2), slice(None), slice(0, 5, 2))]
+    assert s.data.shape == (2, 4, 3)
+    np.testing.assert_array_equal(s.data, arr[0:2, :, ::2])
+
+
+@requires_nibabel
+def test_load_nifti_lazy_subset_transposed(tmp_path, monkeypatch):
+    # file stored (row, proj, col): the proj slab sits on file axis 1
+    import nibabel.arrayproxy as ap
+
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.arange(24).reshape(2, 3, 4)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    reads = []
+    real_getitem = ap.ArrayProxy.__getitem__
+
+    def spy_getitem(self, item):
+        reads.append(item)
+        return real_getitem(self, item)
+
+    monkeypatch.setattr(ap.ArrayProxy, "__getitem__", spy_getitem)
+    sel = SelectionConfig(proj_mode="range", proj_range=(0, 2))
+    s = _load_nifti(p, sel, ("row", "proj", "col"))
+    assert reads == [(slice(None), slice(0, 2), slice(None))]
+    assert s.data.shape == (2, 2, 4)
+    np.testing.assert_array_equal(s.data, arr[:, 0:2, :].transpose(1, 0, 2))
+
+
+@requires_nibabel
+def test_load_nifti_custom_selection_reads_fully(tmp_path):
+    # "custom" index lists need fancy indexing, which the proxy cannot do:
+    # the file is read fully and the selection applied in memory
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.arange(60).reshape(3, 4, 5)
+    img = nib.Nifti1Image(arr, np.eye(4), dtype=np.float32)
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    sel = SelectionConfig(proj_mode="custom", proj_custom=[0, 2])
+    s = _load_nifti(p, sel, ("proj", "row", "col"))
+    assert s.data.shape == (2, 4, 5)
+    np.testing.assert_array_equal(s.data, arr[[0, 2]])
+
+
+@requires_nibabel
+def test_load_nifti_range_out_of_bounds_raises(tmp_path):
+    # invalid range_ is not pre-sliced; resolve_indices raises as before
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.zeros((3, 4, 5))
+    img = nib.Nifti1Image(arr, np.eye(4))
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    sel = SelectionConfig(proj_mode="range", proj_range=(0, 100))
+    with pytest.raises(IndexError):
+        _load_nifti(p, sel, ("proj", "row", "col"))
+
+
+@requires_nibabel
+def test_load_nifti_empty_range_raises(tmp_path):
+    from backend.loaders.sinogram import SelectionConfig, _load_nifti
+
+    arr = np.zeros((3, 4, 5))
+    img = nib.Nifti1Image(arr, np.eye(4))
+    p = tmp_path / "s.nii.gz"
+    nib.save(img, p)
+    sel = SelectionConfig(proj_mode="range", proj_range=(2, 2))
+    with pytest.raises(ValueError):
+        _load_nifti(p, sel, ("proj", "row", "col"))
 
 
 @requires_nibabel

@@ -247,11 +247,20 @@ def _axis_selection_inputs(
     default_mode: str,
     default_step: int,
 ):
+    import streamlit as st
+
+    # The mode key is preset via the Session State API (dummy measurement,
+    # full-geometry button). A widget created with an ``index=`` default
+    # AND such a preset makes Streamlit warn "created with a default
+    # value but also had its value set via the Session State API", so the
+    # default lives in session state instead of the widget call.
+    key = f"{prefix}_mode"
+    if key not in st.session_state:
+        st.session_state[key] = default_mode
     mode = container.selectbox(
         f"{label} selection",
         SELECTION_MODES,
-        index=SELECTION_MODES.index(default_mode),
-        key=f"{prefix}_mode",
+        key=key,
     )
     range_ = None
     downsample = None
@@ -327,6 +336,37 @@ def render_selection_controls(
     )
 
 
+def default_sample_selection() -> SelectionConfig:
+    """Defaults matching the shared sample-option widget defaults.
+
+    Used as fallback when the sample options have not rendered yet; keep
+    in sync with the defaults passed to ``render_selection_controls``.
+    """
+    return build_selection_config(
+        proj_mode="downsample",
+        proj_downsample=100,
+        row_mode="downsample",
+        row_downsample=4,
+        col_mode="downsample",
+        col_downsample=8,
+    )
+
+
+def read_shared_selection() -> SelectionConfig:
+    """Read the shared sample-option selection rendered in the tab.
+
+    The sample options render in the Sinogram Inspection tab, which runs
+    after the sidebar; the sidebar can therefore not instantiate the
+    widgets itself (duplicate keys) and reads the stashed config instead.
+    A missing stash (nothing rendered yet) falls back to the defaults the
+    sample-option widgets show.
+    """
+    import streamlit as st
+
+    selection = st.session_state.get("sample_selection")
+    return selection if selection is not None else default_sample_selection()
+
+
 def apply_axis_order_change(sinogram, axis_order: tuple[str, str, str]):
     """Reorient ``sinogram`` to ``axis_order``; return True if it changed.
 
@@ -361,7 +401,9 @@ def render_measurement_sidebar() -> None:
             format_func=format_axis_order,
             key="sinogram_axis_order",
         )
-        selection = render_selection_controls("meas", container=st)
+        # The selection controls live once, in the tab's "Sample options"
+        # expander, and drive both this load and the forward projection.
+        selection = read_shared_selection()
 
         clicked = st.button("Load Measurements", key="load_measurements")
         if clicked:
@@ -454,9 +496,9 @@ def render_measurement_sidebar() -> None:
                 # of its geometry, so "all" reproduces it exactly: one click
                 # on "Run Forward Projection" then yields matching shapes and
                 # a live comparison with difference and metrics.
-                st.session_state["fp_proj_mode"] = "all"
-                st.session_state["fp_row_mode"] = "all"
-                st.session_state["fp_col_mode"] = "all"
+                st.session_state["sample_proj_mode"] = "all"
+                st.session_state["sample_row_mode"] = "all"
+                st.session_state["sample_col_mode"] = "all"
                 # New geometry: drop cached widget values so the geometry
                 # form prefills the dummy values instead of stale ones.
                 clear_geometry_edit_state()
@@ -725,10 +767,15 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             f"SSIM {per_slice['ssim'][shared]:.4f}"
         )
 
-    # --- Forward-projection run controls (below the views) ------------------
-    with st.expander("Forward projection settings", expanded=True):
+    # --- Sample options (shared: measurement loading + forward projection) --
+    with st.expander("Sample options", expanded=True):
+        st.caption(
+            "Which projections and detector rows/columns to sample. These "
+            "options drive both loading measurements and the forward "
+            "projection."
+        )
         selection = render_selection_controls(
-            "fp",
+            "sample",
             container=st,
             default_proj_mode="downsample",
             default_proj_step=100,
@@ -737,7 +784,38 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             default_col_mode="downsample",
             default_col_step=8,
         )
-        use_cuda = st.checkbox("Use CUDA if available", value=True, key="fp_use_cuda")
+        # The sidebar loads measurements before this tab renders, so the
+        # loader cannot instantiate the shared widgets itself — it reads
+        # this stash instead. A widget change reruns before any click can
+        # happen, so the stash is never stale at click time.
+        st.session_state["sample_selection"] = selection
+        # One click back to the full detector and every projection of the
+        # geometry: the same preset the dummy measurement applies, without
+        # having to touch the three dropdowns by hand. The preset runs as
+        # an on_click callback because callbacks execute before the script
+        # (and thus before these widgets are instantiated) — assigning the
+        # widget-backed keys after them would raise.
+
+        def _preset_full_geometry():
+            for axis in ("proj", "row", "col"):
+                st.session_state[f"sample_{axis}_mode"] = "all"
+
+        if st.button(
+            "📐 Full projection geometry",
+            key="sample_full_geometry",
+            on_click=_preset_full_geometry,
+            help=(
+                "Preset all selections to 'all': every projection, all "
+                "detector rows and columns. Click 'Run Forward Projection' "
+                "afterwards to compute."
+            ),
+        ):
+            st.toast("Selection preset to full projection geometry.", icon="📐")
+        use_cuda = st.checkbox(
+            "Use CUDA if available (forward projection only)",
+            value=True,
+            key="fp_use_cuda",
+        )
         st.caption("Without CUDA the projection runs on the CPU.")
         energy_kev = float(
             st.slider(

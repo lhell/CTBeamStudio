@@ -237,6 +237,26 @@ def test_render_mode_offers_only_iso_surface(app):
     assert render_modes[0].value == "iso"
 
 
+def _select_all_samples(app):
+    """Preset the shared sample options to "all" so a UI load fetches the
+    whole file. The shared defaults are the forward-projection-friendly
+    downsample ones (a full default geometry is 2304 x 64 x 512), which
+    would subsample a small test file to (1, 2, 1)."""
+    for axis in ("proj", "row", "col"):
+        app.selectbox(key=f"sample_{axis}_mode").set_value("all")
+    app.run()
+
+
+def _restore_sample_defaults(app):
+    """Restore the downsample sample-option defaults. The AppTest instance
+    is module-scoped: an "all" selection would leak into later tests, whose
+    "Run Forward Projection" clicks would compute a full default geometry
+    (2304 x 64 x 512) and time out."""
+    for axis in ("proj", "row", "col"):
+        app.selectbox(key=f"sample_{axis}_mode").set_value("downsample")
+    app.run()
+
+
 def test_load_measurements_from_npy(app):
     """The measurement loader works through the new Measurements expander."""
     expected = np.arange(4 * 6 * 8, dtype=np.float32).reshape(4, 6, 8)
@@ -245,8 +265,10 @@ def test_load_measurements_from_npy(app):
         np.save(sinogram_path, expected)
 
         app.sidebar.text_input(key="sinogram_path").set_value(str(sinogram_path))
+        _select_all_samples(app)
         app.sidebar.button(key="load_measurements").click()
         app.run()
+        _restore_sample_defaults(app)
 
     assert list(app.exception) == []
     assert "sinogram" in app.session_state
@@ -267,6 +289,7 @@ def test_changing_axis_order_reorients_without_reloading(app):
         np.save(sinogram_path, np.zeros((4, 6, 8), dtype=np.float32))
 
         app.sidebar.text_input(key="sinogram_path").set_value(str(sinogram_path))
+        _select_all_samples(app)
         app.sidebar.button(key="load_measurements").click()
         app.run()
         assert app.session_state["sinogram"].data.shape == (4, 6, 8)
@@ -280,12 +303,13 @@ def test_changing_axis_order_reorients_without_reloading(app):
         assert app.session_state["sinogram"].data.shape == (4, 8, 6)
         assert app.session_state["sinogram"].axis_order == ("proj", "col", "row")
 
-        # The AppTest instance is module-scoped: restore the canonical order so
-        # later tests do not inherit this declaration for their seeded data.
+        # The AppTest instance is module-scoped: restore the canonical order
+        # and the sample-option defaults so later tests do not inherit this
+        # declaration for their seeded data.
         app.sidebar.selectbox(key="sinogram_axis_order").set_value(
             ("proj", "row", "col")
         )
-        app.run()
+        _restore_sample_defaults(app)
 
 
 def test_sidebar_shows_absolute_path_of_loaded_measurements(app):
@@ -297,8 +321,10 @@ def test_sidebar_shows_absolute_path_of_loaded_measurements(app):
         np.save(sinogram_path, expected)
 
         app.sidebar.text_input(key="sinogram_path").set_value(str(sinogram_path))
+        _select_all_samples(app)
         app.sidebar.button(key="load_measurements").click()
         app.run()
+        _restore_sample_defaults(app)
 
         sidebar_text = " ".join(c.value for c in app.get("caption"))
 
@@ -315,8 +341,10 @@ def test_sidebar_lists_every_file_read_for_a_folder_load(app, create_projection_
         folder = create_projection_dicom(tmp_dir)
 
         app.sidebar.text_input(key="sinogram_path").set_value(str(folder))
+        _select_all_samples(app)
         app.sidebar.button(key="load_measurements").click()
         app.run()
+        _restore_sample_defaults(app)
 
         text = " ".join(
             [c.value for c in app.get("caption")] + [c.value for c in app.get("code")]
@@ -554,9 +582,9 @@ def test_dummy_button_seeds_coherent_demo_pair(app, monkeypatch):
     assert app.session_state["geometry_is_default"] is False
     # The dummy is the full detector and every projection of its geometry:
     # "all" makes the simulated side reproduce it exactly.
-    assert app.session_state["fp_proj_mode"] == "all"
-    assert app.session_state["fp_row_mode"] == "all"
-    assert app.session_state["fp_col_mode"] == "all"
+    assert app.session_state["sample_proj_mode"] == "all"
+    assert app.session_state["sample_row_mode"] == "all"
+    assert app.session_state["sample_col_mode"] == "all"
 
 
 def test_dummy_button_overrides_a_loaded_measurement(app, monkeypatch):

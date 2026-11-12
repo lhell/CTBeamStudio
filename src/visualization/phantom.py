@@ -3,11 +3,29 @@
 The 2D phantom is the classic ellipse-based Shepp-Logan slice. The 3D phantom
 is built from true ellipsoids (not by stacking the 2D slice), so coronal and
 sagittal reconstructions show a realistic head profile.
+
+The module also synthesizes a dummy *measured* sinogram for the 3D phantom:
+forward projection + scatter + Poisson noise (see
+create_dummy_measured_sinogram).
 """
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
 from backend.volume import Volume
+
+if TYPE_CHECKING:
+    # Annotations only (strings via ``from __future__ import annotations``);
+    # importing these at runtime would pull pydicom into every phantom use.
+    from backend.geometry import ProjectionGeometry
+    from backend.loaders.sinogram import SinogramData
 
 # 1 phantom unit = 100 mm. This maps the classical Shepp-Logan parameter
 # table onto a realistically sized head (~138 x 184 x 180 mm).
@@ -214,6 +232,275 @@ def create_demo_volume(
         Volume with HU values and spacing metadata
     """
     return create_shepp_logan_hu(size, num_slices, spacing)
+
+
+# ---------------------------------------------------------------------------
+# Dummy measured sinogram: Shepp-Logan forward projection + scatter + noise
+# ---------------------------------------------------------------------------
+
+# Disk cache for the ideal (scatter/noise-free) forward projection of the
+# standard dummy phantom. The forward projection is the only expensive step
+# (~10 s on CPU for the standard-size head), so it is stored in the
+# gitignored data/ directory and reused; scatter and noise are applied live,
+# so changing spr/i0/seed never triggers a re-projection. Bump
+# DUMMY_CACHE_VERSION when the projection path itself changes (v2: the
+# phantom is now centered on the rotation axis).
+DUMMY_FP_CACHE = Path("data/cache/dummy_fp_standard.npz")
+DUMMY_CACHE_VERSION = 2
+
+
+@dataclass(frozen=True)
+class DummyMeasurement:
+    """Coherent dummy demo trio: phantom volume, matching geometry, and a
+    synthetic 'measured' sinogram, plus the generation parameters.
+
+    Attributes:
+        volume: The projected phantom (HU).
+        geometry: The geometry the sinogram was projected with.
+        sinogram: The simulated measurement as ``SinogramData`` (canonical
+            (proj, row, col), format "synthetic", in memory — no file).
+        params: Generation parameters (energy_kev, spr, scatter_sigma_mm,
+            i0, seed, fp_from_cache).
+    """
+
+    volume: Volume
+    geometry: ProjectionGeometry
+    sinogram: SinogramData
+    params: dict
+
+
+def create_dummy_geometry() -> ProjectionGeometry:
+    """Dummy CBCT geometry sized to the standard Shepp-Logan head.
+
+    The default 64-row detector covers only ~32 mm of z at the isocenter
+    (64 rows x 1 mm x SID/SDD), which would crop the ~180 mm tall head to
+    a slab. This geometry uses 192 rows x 2 mm (collimation 384 mm at the
+    detector), covering 192 mm of z at the isocenter — the whole head plus
+    margin — while the 512 columns x 1 mm cover the 192 mm wide FOV
+    in-plane.
+
+    Returns
+    -------
+    ProjectionGeometry
+        60 views per rotation, circular scan (pitch 0).
+    """
+    from backend.geometry import ProjectionGeometry
+
+    return ProjectionGeometry(
+        sdd=1000.0,
+        sid=500.0,
+        n_det_cols=512,
+        n_det_rows=192,
+        det_col_spacing_mm=1.0,
+        det_row_spacing_mm=2.0,
+        projections_per_rotation=60,
+        source="dummy (Shepp-Logan head)",
+    )
+
+
+def _fp_fingerprint(geometry: ProjectionGeometry, energy_kev: float) -> str:
+    """Stable hash over everything that changes the ideal projection."""
+    payload = {
+        "version": DUMMY_CACHE_VERSION,
+        "phantom": "shepp-logan-3d-standard",
+        "energy_kev": float(energy_kev),
+        "geometry": asdict(geometry),
+    }
+    blob = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_cached_fp(
+    cache_path: Path, fingerprint: Optional[str]
+) -> Optional[np.ndarray]:
+    """Return the cached ideal projection, or None on any mismatch."""
+    if fingerprint is None or not cache_path.exists():
+        return None
+    try:
+        with np.load(cache_path, allow_pickle=False) as npz:
+            if str(npz["fingerprint"]) != fingerprint:
+                return None
+            return np.asarray(npz["projections"], dtype=np.float32)
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _save_cached_fp(
+    cache_path: Path, projections: np.ndarray, fingerprint: str
+) -> None:
+    """Write the ideal projection to the cache (best effort)."""
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            cache_path, projections=projections, fingerprint=fingerprint
+        )
+    except OSError:
+        pass  # a read-only data directory must not fail the generation
+
+
+def _centered_shepp_logan_hu() -> Volume:
+    """Standard-size Shepp-Logan head, centered on the rotation axis.
+
+    The parallelproj cone circles the isocenter at the world origin, and the
+    demo default origin (0, 0, 0) would park the whole head in the +x/+y/+z
+    octant — outside the in-plane FOV and half outside the cone in z. This
+    shifts the origin so the volume center sits on the axis; everything else
+    (HU values, spacing, size) matches :func:`create_shepp_logan_hu`.
+    """
+    from dataclasses import replace
+
+    volume = create_shepp_logan_hu()
+    nz, ny, nx = volume.shape
+    sz, sy, sx = volume.spacing
+    origin = (
+        -0.5 * (nx - 1) * float(sx),
+        -0.5 * (ny - 1) * float(sy),
+        -0.5 * (nz - 1) * float(sz),
+    )
+    return replace(volume, origin=origin, meta={**volume.meta, "origin": "centered"})
+
+
+def create_dummy_measured_sinogram(
+    geometry: Optional[ProjectionGeometry] = None,
+    *,
+    volume: Optional[Volume] = None,
+    energy_kev: float = 70.0,
+    spr: float = 0.3,
+    scatter_sigma_mm: float = 25.0,
+    i0: float = 1e5,
+    seed: Optional[int] = 42,
+    use_cuda: bool = True,
+    use_cache: bool = True,
+    cache_path: Optional[Path] = None,
+) -> DummyMeasurement:
+    """
+    Synthesize a dummy 'measured' sinogram for the Shepp-Logan phantom.
+
+    The measurement is simulated in three steps:
+
+    1. Forward projection of the 3D Shepp-Logan phantom (standard physical
+       size, ~138 x 184 x 180 mm, centered on the rotation axis so the whole
+       head is inside the cone) at ``energy_kev`` -> ideal line integrals.
+       This is the only expensive step (~10 s on CPU), so it is cached on
+       disk under ``data/cache/`` and reused while phantom, geometry and
+       energy are unchanged. Only the standard phantom (``volume=None``) is
+       cached; a custom ``volume`` always re-projects.
+    2. Scatter: a Gaussian-blurred copy of the primary transmittance, added
+       in the intensity domain with scatter-to-primary ratio ``spr``. The
+       blur width ``scatter_sigma_mm`` is given at the detector and converted
+       per axis, so the blur is isotropic in mm despite anisotropic detector
+       spacing. Scatter adds counts, so the measured line integral is LOWER
+       than the ideal one (the contrast-loss/cupping direction).
+    3. Quantum noise: Poisson-distributed counts with ``i0`` incident photons
+       per ray. Rays that would see fewer than one photon floor at one count
+       (photon starvation).
+
+    Parameters
+    ----------
+    geometry : ProjectionGeometry, optional
+        None uses :func:`create_dummy_geometry`, sized so the whole standard
+        head is inside the cone.
+    volume : Volume, optional
+        Phantom to project; None uses the standard-size
+        :func:`create_shepp_logan_hu` volume.
+    energy_kev : float
+        Monoenergetic energy for the HU -> 1/mm conversion.
+    spr : float
+        Scatter-to-primary ratio (0 disables scatter).
+    scatter_sigma_mm : float
+        Scatter blur width in mm at the detector.
+    i0 : float
+        Incident photons per ray (dose; sets the noise level).
+    seed : int, optional
+        RNG seed for reproducibility; None gives fresh noise per call.
+    use_cuda : bool
+        Whether the forward projection may use CUDA if available.
+    use_cache : bool
+        Whether the ideal projection may be read from / written to the disk
+        cache.
+    cache_path : Path, optional
+        Cache file override (tests); None uses ``DUMMY_FP_CACHE``.
+
+    Returns
+    -------
+    DummyMeasurement
+        The phantom volume, the geometry used, and the measured sinogram as
+        ``SinogramData`` (canonical (proj, row, col), format "synthetic",
+        in memory — no file behind it).
+    """
+    from scipy.ndimage import gaussian_filter
+
+    from backend.attenuation import volume_for_projection
+    from backend.forward_project import PARALLELPROJ_AVAILABLE, forward_project
+    from backend.loaders.sinogram import CANONICAL, SelectionConfig, SinogramData
+
+    if spr < 0:
+        raise ValueError("spr must not be negative")
+    if scatter_sigma_mm < 0:
+        raise ValueError("scatter_sigma_mm must not be negative")
+    if i0 <= 0:
+        raise ValueError("i0 must be positive")
+
+    if geometry is None:
+        geometry = create_dummy_geometry()
+
+    cache_file = cache_path if cache_path is not None else DUMMY_FP_CACHE
+    cacheable = volume is None and use_cache
+    if volume is None:
+        # Standard physical size: ~138 x 184 x 180 mm head in a 192 mm FOV,
+        # centered on the rotation axis so the whole head is inside the cone.
+        volume = _centered_shepp_logan_hu()
+
+    fingerprint = _fp_fingerprint(geometry, energy_kev) if cacheable else None
+    ideal = _load_cached_fp(cache_file, fingerprint)
+    fp_from_cache = ideal is not None
+    if ideal is None:
+        result = forward_project(
+            volume_for_projection(volume, energy_kev),
+            geometry,
+            use_cuda=use_cuda,
+        )
+        ideal = np.asarray(result.projections, dtype=np.float32)
+        if cacheable and PARALLELPROJ_AVAILABLE:
+            _save_cached_fp(cache_file, ideal, fingerprint)
+
+    # Primary transmittance with I0 = 1, then scatter + quantum noise.
+    primary = np.exp(-ideal)
+    if spr > 0.0 and scatter_sigma_mm > 0.0:
+        sigma_px = (
+            0.0,  # no blur along the projection axis: scatter is per-frame
+            scatter_sigma_mm / float(geometry.det_row_spacing_mm),
+            scatter_sigma_mm / float(geometry.det_col_spacing_mm),
+        )
+        scatter = spr * gaussian_filter(primary, sigma=sigma_px, mode="nearest")
+    else:
+        scatter = np.zeros_like(primary)
+
+    lam = (primary + scatter).astype(np.float64) * float(i0)
+    rng = np.random.default_rng(seed)
+    counts = rng.poisson(lam)
+    measured = (-np.log(np.maximum(counts, 1) / float(i0))).astype(np.float32)
+
+    sinogram = SinogramData(
+        data=measured,
+        geometry=geometry,
+        selection=SelectionConfig(),
+        original_shape=tuple(measured.shape),
+        source_axis_order=CANONICAL,
+        path=None,
+        format="synthetic",
+    )
+    params = {
+        "energy_kev": energy_kev,
+        "spr": spr,
+        "scatter_sigma_mm": scatter_sigma_mm,
+        "i0": i0,
+        "seed": seed,
+        "fp_from_cache": fp_from_cache,
+    }
+    return DummyMeasurement(
+        volume=volume, geometry=geometry, sinogram=sinogram, params=params
+    )
 
 
 if __name__ == "__main__":

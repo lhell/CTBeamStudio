@@ -24,7 +24,7 @@ from streamlit.testing.v1 import AppTest
 from backend.forward_project import ForwardProjectionResult
 from backend.geometry import ProjectionGeometry
 from backend.loaders.sinogram import SelectionConfig, SinogramData
-from visualization.phantom import create_demo_volume
+from visualization.phantom import DummyMeasurement, create_demo_volume
 
 APP_PATH = Path(__file__).resolve().parents[2] / "src" / "visualization" / "app.py"
 
@@ -482,3 +482,94 @@ def test_sinogram_inspection_run_button_produces_simulation(app):
     text = _main_text(app)
     assert "Simulated: (24, 16, 64)" in text
     assert "Simulated projection" in text
+
+
+# ---------------------------------------------------------------------------
+# Dummy measurement button
+# ---------------------------------------------------------------------------
+
+DUMMY_BUTTON_LABEL = "🎲 Generate dummy measurement"
+
+
+def test_measurements_panel_offers_dummy_measurement(app):
+    """The Measurements expander carries the dummy-measurement button."""
+    labels = [b.label for b in app.sidebar.button]
+    assert DUMMY_BUTTON_LABEL in labels
+
+
+def _stub_dummy_measurement() -> DummyMeasurement:
+    """A tiny coherent stand-in for the (expensive) real generator."""
+    geometry = ProjectionGeometry(
+        n_det_cols=8,
+        n_det_rows=4,
+        projections_per_rotation=3,
+        source="dummy-test",
+    )
+    data = np.zeros((3, 4, 8), dtype=np.float32)
+    sinogram = SinogramData(
+        data=data,
+        geometry=geometry,
+        selection=SelectionConfig(),
+        original_shape=data.shape,
+        source_axis_order=("proj", "row", "col"),
+        path=None,
+        format="synthetic",
+    )
+    return DummyMeasurement(
+        volume=create_demo_volume(),
+        geometry=geometry,
+        sinogram=sinogram,
+        params={
+            "energy_kev": 70.0,
+            "spr": 0.3,
+            "scatter_sigma_mm": 25.0,
+            "i0": 1e5,
+            "seed": 42,
+            "fp_from_cache": False,
+        },
+    )
+
+
+def test_dummy_button_seeds_coherent_demo_pair(app, monkeypatch):
+    """Clicking the dummy button seeds volume + geometry + measurement and
+    presets the fp selection to "all", so a click on "Run Forward
+    Projection" reproduces the measurement's shape exactly. The heavy
+    generator is stubbed — its numerics are covered in
+    tests/test_dummy_measurement.py."""
+    monkeypatch.setattr(
+        "visualization.phantom.create_dummy_measured_sinogram",
+        _stub_dummy_measurement,
+    )
+
+    app.sidebar.button(key="dummy_measurement").click()
+    app.run()
+
+    assert list(app.exception) == []
+    sinogram = app.session_state["sinogram"]
+    assert sinogram.data.shape == (3, 4, 8)
+    assert sinogram.format == "synthetic"
+    geometry = app.session_state["projection_geometry"]
+    assert geometry.projections_per_rotation == 3
+    assert geometry.source == "dummy-test"
+    assert app.session_state["geometry_is_default"] is False
+    # The dummy is the full detector and every projection of its geometry:
+    # "all" makes the simulated side reproduce it exactly.
+    assert app.session_state["fp_proj_mode"] == "all"
+    assert app.session_state["fp_row_mode"] == "all"
+    assert app.session_state["fp_col_mode"] == "all"
+
+
+def test_dummy_button_overrides_a_loaded_measurement(app, monkeypatch):
+    """The dummy is a self-contained demo pair: it replaces whatever volume,
+    geometry and measurement were in session state before."""
+    _seed_measurements(app, shape=(5, 9, 11))
+    monkeypatch.setattr(
+        "visualization.phantom.create_dummy_measured_sinogram",
+        _stub_dummy_measurement,
+    )
+
+    app.sidebar.button(key="dummy_measurement").click()
+    app.run()
+
+    assert list(app.exception) == []
+    assert app.session_state["sinogram"].data.shape == (3, 4, 8)

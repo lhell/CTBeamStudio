@@ -426,6 +426,48 @@ def render_measurement_sidebar() -> None:
                     language=None,
                 )
 
+        st.divider()
+        st.caption(
+            "No measurement file at hand? Generate a coherent dummy pair: "
+            "3D Shepp-Logan phantom (standard head size), a dummy geometry "
+            "that sees the whole head, and a forward projection with "
+            "scatter and Poisson noise."
+        )
+        if st.button("🎲 Generate dummy measurement", key="dummy_measurement"):
+            from visualization.phantom import create_dummy_measured_sinogram
+
+            try:
+                with st.spinner(
+                    "Synthesizing dummy measurement (forward projection + "
+                    "scatter + noise)..."
+                ):
+                    dummy = create_dummy_measured_sinogram()
+            except Exception as exc:  # noqa: BLE001 - surface generator errors
+                st.error(f"Dummy measurement failed: {exc}")
+            else:
+                st.session_state["volume"] = dummy.volume
+                st.session_state["projection_geometry"] = dummy.geometry
+                st.session_state["geometry_is_default"] = False
+                st.session_state["geometry_loaded_original"] = dummy.geometry
+                st.session_state["sinogram"] = dummy.sinogram
+                # The dummy contains the full detector and every projection
+                # of its geometry, so "all" reproduces it exactly: one click
+                # on "Run Forward Projection" then yields matching shapes and
+                # a live comparison with difference and metrics.
+                st.session_state["fp_proj_mode"] = "all"
+                st.session_state["fp_row_mode"] = "all"
+                st.session_state["fp_col_mode"] = "all"
+                # New geometry: drop cached widget values so the geometry
+                # form prefills the dummy values instead of stale ones.
+                clear_geometry_edit_state()
+                fp_note = (
+                    "cached projection reused"
+                    if dummy.params["fp_from_cache"]
+                    else "projection computed"
+                )
+                st.toast(f"Dummy measurement ready ({fp_note}).", icon="🎲")
+                st.rerun()
+
 
 def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
     """Show the loaded geometry and let the user edit its parameters."""
@@ -603,7 +645,8 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             )
         else:
             _render_placeholder(
-                "No measured data loaded — load measurements in the sidebar."
+                "No measured data — load measurements in the sidebar or "
+                "generate a dummy measurement."
             )
     with col_sim:
         if n_sim:

@@ -81,9 +81,10 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **301 passed, 0 skipped**, ~25–40 s depending on disk
-  cache. When your task changes the suite profile, update the numbers here as part
-  of done.
+- Baseline in `ct-viewer`: **330 passed, 0 skipped**, ~25–45 s depending on disk
+  cache (T-92 + T-93 added 29 tests over the 301 baseline; 7 `slow` tests are
+  deselected by default). When your task changes the suite profile, update the
+  numbers here as part of done.
 - `@pytest.mark.slow` tests exist; default runs exclude them.
 - `AppTest` cannot fire `run_every` fragments or interactive modebar toggles —
   verify those in the browser and say so in the ledger status (precedent: T-83).

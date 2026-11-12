@@ -714,7 +714,7 @@ def main():
     # Render a lightweight shell first: it is streamed to the browser before
     # the (potentially slow) data loading below, so the page appears instantly.
     shell = st.empty()
-    shell.info("⏳ Initialising interface …")
+    shell.info("⏳ Loading …")
 
     # Render sidebar and get values
     from visualization.sidebar import render_sidebar

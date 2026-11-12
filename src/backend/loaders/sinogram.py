@@ -298,6 +298,7 @@ def _load_numpy(
     path: Path,
     selection: SelectionConfig,
     axis_order: tuple[str, str, str],
+    geometry: Optional[object] = None,
 ) -> SinogramData:
     """Load a ``.npy``/``.npz`` sine file into a canonical SinogramData.
 
@@ -327,7 +328,14 @@ def _load_numpy(
 
     original_shape = raw.shape
     return _finish_sinogram(
-        raw, original_shape, path, selection, axis_order, "numpy", files=(path,)
+        raw,
+        original_shape,
+        path,
+        selection,
+        axis_order,
+        "numpy",
+        files=(path,),
+        geometry=geometry,
     )
 
 
@@ -383,7 +391,7 @@ def _basic_slice_for_axis(
     return None
 
 
-def _load_nifti(path, selection, axis_order, _on_read=None):
+def _load_nifti(path, selection, axis_order, _on_read=None, geometry=None):
     try:
         import nibabel as nib
     except ImportError:
@@ -427,6 +435,7 @@ def _load_nifti(path, selection, axis_order, _on_read=None):
         "nifti",
         files=(path,),
         applied_selection=applied,
+        geometry=geometry,
     )
 
 
@@ -457,7 +466,7 @@ def scan_dicom_sinogram(dir_path: Path) -> dict:
     }
 
 
-def _load_dicom(path, selection, geometry, axis_order):
+def _load_dicom(path, selection, geometry, axis_order, progress=None):
     path = Path(path)
     info = scan_dicom_sinogram(path)
     files = info["files"]
@@ -487,9 +496,13 @@ def _load_dicom(path, selection, geometry, axis_order):
         proj_canonical = list(range(n_proj))
 
     frames = []
-    for idx in proj_canonical:
+    for n_read, idx in enumerate(proj_canonical, start=1):
         ds = pydicom.dcmread(files[idx])
         frames.append(np.asarray(ds.pixel_array).astype(np.float32))
+        # Per-projection progress, like the DICOM image loader: the UI shows
+        # a loading bar with "current/total projections".
+        if progress is not None:
+            progress(n_read, len(proj_canonical))
     # Native stack: (n_sel_proj, n_rows, n_cols) in the folder's own order.
     raw = np.stack(frames, axis=0)
 
@@ -518,15 +531,35 @@ def load_sinogram(
     selection: Optional[SelectionConfig] = None,
     geometry: Optional[object] = None,
     axis_order: tuple[str, str, str] = ("proj", "row", "col"),
+    progress: Optional[Callable[[int, int], None]] = None,
 ) -> SinogramData:
-    """Load a sinogram from ``path``, dispatching on the detected format."""
+    """Load a sinogram from ``path``, dispatching on the detected format.
+
+    ``progress`` (optional) is called as ``(current, total)`` per projection
+    for DICOM folders, and once with ``(1, 1)`` for single-read formats.
+    """
     path = Path(path)
     fmt = _detect_format(path)
 
     if fmt == "numpy":
-        return _load_numpy(path, selection or SelectionConfig(), axis_order)
+        sinogram = _load_numpy(
+            path, selection or SelectionConfig(), axis_order, geometry
+        )
+        if progress is not None:
+            progress(1, 1)
+        return sinogram
     if fmt == "nifti":
-        return _load_nifti(path, selection or SelectionConfig(), axis_order)
+        sinogram = _load_nifti(
+            path,
+            selection or SelectionConfig(),
+            axis_order,
+            geometry=geometry,
+        )
+        if progress is not None:
+            progress(1, 1)
+        return sinogram
     if fmt == "dicom":
-        return _load_dicom(path, selection or SelectionConfig(), geometry, axis_order)
+        return _load_dicom(
+            path, selection or SelectionConfig(), geometry, axis_order, progress
+        )
     raise ValueError(f"Unknown sinogram format for {path}")

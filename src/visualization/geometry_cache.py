@@ -40,9 +40,18 @@ def load_cached_geometry(path: Optional[Path] = None) -> Optional[ProjectionGeom
 
 
 def default_geometry(path: Optional[Path] = None) -> ProjectionGeometry:
-    """Return the cached geometry or the dataclass defaults."""
+    """Return the cached geometry or the dummy-phantom geometry.
+
+    The dummy CBCT geometry (``visualization.phantom.create_dummy_geometry``)
+    is the default: it is sized to the standard Shepp-Logan head, so the
+    empty state and the demo stay coherent (same detector, same scan).
+    """
     cached = load_cached_geometry(path)
-    return cached if cached is not None else ProjectionGeometry()
+    if cached is not None:
+        return cached
+    from visualization.phantom import create_dummy_geometry
+
+    return create_dummy_geometry()
 
 
 def clear_cached_geometry(path: Optional[Path] = None) -> None:

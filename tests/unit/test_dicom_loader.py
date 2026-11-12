@@ -283,6 +283,34 @@ class TestLoadDicomSeries:
             # Check meta
             assert volume.meta["unit"] == "HU"
 
+    def test_load_dicom_series_reorients_to_patient_frame(self):
+        """Standard axial DICOM grids are transposed to the project's patient
+        frame at load time: rows (posterior-ward) become the flipped x axis
+        and columns (patient-left-ward) the y axis — the axial MPR slice
+        comes out un-rotated."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            uid = "1.2.3.4.5"
+            _create_ct_dicom(
+                root / "slice0.dcm",
+                series_instance_uid=uid,
+                slice_location=0.0,
+                image_position_patient=(0.0, 0.0, 0.0),
+                pixel_spacing=(0.5, 0.8),  # [row, col]
+                rows=4,
+                cols=6,
+            )
+            volume = load_dicom_series(list(root.glob("*.dcm")))
+
+            # (z, y, x): the in-plane axes swap, x flips.
+            assert volume.array.shape == (1, 6, 4)
+            # The circle's centre moves from (row 2, col 3) to (y 3, x 1).
+            # HU: circle 1000 - 1024 = -24, background 0 - 1024 = -1024.
+            assert volume.array[0, 3, 1] == -24
+            assert volume.array[0, 2, 3] == -1024
+            # Spacing follows the axes: new y = old columns, new x = old rows.
+            assert volume.spacing == (1.0, 0.8, 0.5)
+
     def test_load_dicom_series_custom_rescale(self):
         """Custom rescale slope and intercept."""
         with tempfile.TemporaryDirectory() as tmpdir:

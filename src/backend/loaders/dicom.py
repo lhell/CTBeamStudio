@@ -344,6 +344,16 @@ def load_dicom_series(
     # Stack pixel arrays into volume (z, y, x)
     array = np.stack(pixel_arrays, axis=0)
 
+    # Reorient the native DICOM grid to the project's patient frame: for
+    # standard axial data the row index increases toward posterior (LPS +Y)
+    # and the column index toward patient left (LPS +X), while the project
+    # frame has x = anterior/posterior (anterior positive) and y = left/right
+    # (patient left positive). Transpose the in-plane axes and flip the depth
+    # axis, so the axial MPR slice comes out un-rotated.
+    standard_axial = np.allclose(orientation, [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], atol=1e-6)
+    if standard_axial:
+        array = np.transpose(array, (0, 2, 1))[:, :, ::-1]
+
     # Detect or use forced unit
     if unit is None:
         detected_unit, detected_slope, detected_intercept, _confidence = _detect_unit(
@@ -373,8 +383,13 @@ def load_dicom_series(
     # DICOM position is (x, y, z), Volume expects (x, y, z)
     origin = tuple(positions[0])
 
-    # Build spacing tuple (z, y, x)
-    spacing = (slice_spacing, row_spacing, col_spacing)
+    # Build spacing tuple (z, y, x). With the standard-axial reorientation
+    # the new y axis is the old column axis and the new x axis the old row
+    # axis, so the in-plane spacings swap with them.
+    if standard_axial:
+        spacing = (slice_spacing, col_spacing, row_spacing)
+    else:
+        spacing = (slice_spacing, row_spacing, col_spacing)
 
     # Create metadata
     meta = {

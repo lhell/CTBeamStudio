@@ -34,26 +34,35 @@ PHANTOM_UNIT_MM = 100.0
 AIR_HU = -1000
 
 # 3D Shepp-Logan ellipsoids: (x0, y0, z0, a, b, c, theta_deg, hu)
-# Geometry follows Kak & Slaney; the classical densities are replaced by
-# absolute Hounsfield units. Components are painted outside-in, so inner
-# structures overwrite outer ones.
+# Geometry follows Kak & Slaney, re-oriented onto the patient frame so the
+# first (anterior, source angle 0 deg) projection shows the classic upright
+# phantom: the classic in-plane horizontal axis runs along y (patient
+# left-right) and the classic vertical axis along z, while x (anterior-
+# posterior) is the through-plane axis. a is the semi-axis along y, b along
+# z, c along x. The classical densities are replaced by absolute Hounsfield
+# units. Components are painted outside-in, so inner structures overwrite
+# outer ones.
 ELLIPSOIDS_3D = (
     (0.0, 0.0, 0.0, 0.69, 0.92, 0.90, 0.0, 1000),  # skull
-    (0.0, -0.0184, 0.0, 0.6624, 0.874, 0.88, 0.0, 40),  # brain
-    (0.22, 0.0, 0.0, 0.11, 0.31, 0.22, -18.0, 30),  # white matter (right)
-    (-0.22, 0.0, 0.0, 0.16, 0.41, 0.21, 18.0, 30),  # white matter (left)
-    (0.0, 0.35, -0.15, 0.21, 0.25, 0.35, 0.0, 25),  # large superior structure
-    (0.0, 0.1, 0.25, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (right)
-    (0.0, -0.1, 0.25, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (left)
-    (-0.08, -0.605, 0.0, 0.046, 0.023, 0.05, 0.0, 60),  # small lesion
-    (0.0, -0.606, 0.0, 0.023, 0.011, 0.05, 0.0, 60),  # small lesion
-    (0.06, -0.605, 0.0, 0.023, 0.046, 0.05, 0.0, 60),  # small lesion
+    (0.0, 0.0, -0.0184, 0.6624, 0.874, 0.88, 0.0, 40),  # brain
+    (0.0, 0.22, 0.0, 0.11, 0.31, 0.22, -18.0, 30),  # white matter (left, +y)
+    (0.0, -0.22, 0.0, 0.16, 0.41, 0.21, 18.0, 30),  # white matter (right, -y)
+    (-0.15, 0.0, 0.35, 0.21, 0.25, 0.35, 0.0, 25),  # large superior structure
+    (0.25, 0.0, 0.1, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (z = +0.1)
+    (0.25, 0.0, -0.1, 0.046, 0.046, 0.046, 0.0, 10),  # ventricle (z = -0.1)
+    (0.0, -0.08, -0.605, 0.046, 0.023, 0.05, 0.0, 60),  # small lesion
+    (0.0, 0.0, -0.606, 0.023, 0.011, 0.05, 0.0, 60),  # small lesion
+    (0.0, 0.06, -0.605, 0.023, 0.046, 0.05, 0.0, 60),  # small lesion
 )
 
 
 def create_shepp_logan_phantom(size: int = 256) -> np.ndarray:
     """
     Create a Shepp-Logan head phantom.
+
+    The 2D result is the classic Kak & Slaney slice: the column axis is the
+    classic horizontal (patient left-right in the 3D phantom,
+    :func:`create_shepp_logan_3d`) and the row axis the classic vertical.
 
     Parameters
     ----------
@@ -136,32 +145,35 @@ def create_shepp_logan_3d(
 
     phantom = np.full((num_slices, size, size), AIR_HU, dtype=np.int16)
 
-    # In-plane grids in phantom units (1 unit = PHANTOM_UNIT_MM).
+    # Classic phantom plane: u runs along the rows (y, patient left-right)
+    # and v along the slices (z, the classic phantom vertical). The
+    # through-plane axis is the columns (x, anterior-posterior), so the
+    # first (anterior, source angle 0 deg) projection sees the classic
+    # upright phantom.
     in_plane = (np.arange(size) - (size - 1) / 2.0) / PHANTOM_UNIT_MM
-    x = in_plane * spacing[2]
-    y = in_plane * spacing[1]
-    X, Y = np.meshgrid(x, y)
+    u = in_plane * spacing[1]
+    v = (np.arange(num_slices) - (num_slices - 1) / 2.0) * spacing[0] / PHANTOM_UNIT_MM
+    V, U = np.meshgrid(v, u, indexing="ij")  # shapes (slices, rows)
 
-    # Pre-rotate each ellipsoid once around the z-axis.
+    # Pre-rotate each ellipsoid once in the classic (y, z) plane.
     ellipsoids = []
     for x0, y0, z0, a, b, c, theta_deg, hu in ELLIPSOIDS_3D:
         theta = np.deg2rad(theta_deg)
         cos_t = np.cos(theta)
         sin_t = np.sin(theta)
-        x_rot = ((X - x0) * cos_t + (Y - y0) * sin_t) / a
-        y_rot = (-(X - x0) * sin_t + (Y - y0) * cos_t) / b
-        ellipsoids.append((x_rot**2 + y_rot**2, z0, c, hu))
+        u_rot = ((U - y0) * cos_t + (V - z0) * sin_t) / a
+        v_rot = (-(U - y0) * sin_t + (V - z0) * cos_t) / b
+        ellipsoids.append((u_rot**2 + v_rot**2, x0, c, hu))
 
-    z_axis = (np.arange(num_slices) - (num_slices - 1) / 2.0) * spacing[0]
-    z_axis = z_axis / PHANTOM_UNIT_MM
+    x_axis = in_plane * spacing[2]
 
-    for z_index, z in enumerate(z_axis):
-        axial_slice = phantom[z_index]
-        for radial_sq, z0, c, hu in ellipsoids:
-            remaining = 1.0 - ((z - z0) / c) ** 2
+    for col_index, x_val in enumerate(x_axis):
+        plane = phantom[:, :, col_index]  # view (slices, rows) = (z, y)
+        for radial_sq, x0, c, hu in ellipsoids:
+            remaining = 1.0 - ((x_val - x0) / c) ** 2
             if remaining <= 0.0:
                 continue
-            axial_slice[radial_sq <= remaining] = hu
+            plane[radial_sq <= remaining] = hu
 
     return phantom
 
@@ -258,7 +270,7 @@ def create_demo_volume(
 # DUMMY_CACHE_VERSION when the projection path itself changes (v2: the
 # phantom is now centered on the rotation axis).
 DUMMY_FP_CACHE = Path("data/cache/dummy_fp_standard.npz")
-DUMMY_CACHE_VERSION = 2
+DUMMY_CACHE_VERSION = 3
 
 
 @dataclass(frozen=True)

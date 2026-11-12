@@ -93,16 +93,16 @@ class TestSliderBounds:
         assert slice_img.shape == (10, 10)
 
     def test_coronal_slider_bounds(self, test_volume):
-        """Coronal slider max should be shape[1] - 1."""
-        max_idx = test_volume.array.shape[1] - 1
+        """Coronal slider max should be shape[2] - 1 (fixed x axis)."""
+        max_idx = test_volume.array.shape[2] - 1
         assert max_idx == 9
 
         slice_img, _ = extract_slice(test_volume, "coronal", max_idx)
         assert slice_img.shape == (10, 10)
 
     def test_sagittal_slider_bounds(self, test_volume):
-        """Sagittal slider max should be shape[2] - 1."""
-        max_idx = test_volume.array.shape[2] - 1
+        """Sagittal slider max should be shape[1] - 1 (fixed y axis)."""
+        max_idx = test_volume.array.shape[1] - 1
         assert max_idx == 9
 
         slice_img, _ = extract_slice(test_volume, "sagittal", max_idx)
@@ -132,11 +132,11 @@ class TestVolumeInfoDisplay:
         _, spacing = extract_slice(test_volume, "axial", 10)
         assert spacing == (0.5, 0.5)
 
-        # Coronal: spacing[0], spacing[2] - use valid index 5 (max is 511)
+        # Coronal: spacing[0], spacing[1] - use valid index 5 (max is 511)
         _, spacing = extract_slice(test_volume, "coronal", 5)
         assert spacing == (2.5, 0.5)
 
-        # Sagittal: spacing[0], spacing[1] - use valid index 5
+        # Sagittal: spacing[0], spacing[2] - use valid index 5
         _, spacing = extract_slice(test_volume, "sagittal", 5)
         assert spacing == (2.5, 0.5)
 

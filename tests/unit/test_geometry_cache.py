@@ -9,6 +9,7 @@ from visualization.geometry_cache import (
     load_cached_geometry,
     save_cached_geometry,
 )
+from visualization.phantom import create_dummy_geometry
 
 
 def test_load_cached_geometry_returns_none_when_missing(tmp_path):
@@ -40,10 +41,13 @@ def test_default_geometry_uses_cached_geometry(tmp_path):
     assert default_geometry(path) == cached
 
 
-def test_default_geometry_falls_back_to_dataclass_defaults(tmp_path):
+def test_default_geometry_falls_back_to_dummy_phantom_geometry(tmp_path):
+    """No cached geometry: the default is the dummy phantom's geometry —
+    sized to the standard Shepp-Logan head, so the empty state and the demo
+    stay coherent (same detector, same scan)."""
     path = tmp_path / "geometry.json"
 
-    assert default_geometry(path) == ProjectionGeometry()
+    assert default_geometry(path) == create_dummy_geometry()
 
 
 def test_clear_cached_geometry_removes_file(tmp_path):

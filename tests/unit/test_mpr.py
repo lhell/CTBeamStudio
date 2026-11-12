@@ -30,10 +30,10 @@ class TestExtractSlice:
         """Extract coronal slice — should have aspect ratio ~4.29."""
         slice_img, in_plane_spacing = extract_slice(sample_volume, "coronal", 3)
 
-        # Coronal: fix y, vary x and z
-        # Shape: (10, 7) — z slices, x pixels
+        # Coronal: fix x (anterior-posterior), vary y (left-right) and z
+        # Shape: (10, 7) — z slices, y pixels
         assert slice_img.shape == (10, 7)
-        # In-plane spacing: (z_spacing, x_spacing) = (3.0, 0.7)
+        # In-plane spacing: (z_spacing, y_spacing) = (3.0, 0.7)
         assert in_plane_spacing == (3.0, 0.7)
 
         # Aspect ratio = 3.0 / 0.7 ≈ 4.2857...
@@ -44,10 +44,10 @@ class TestExtractSlice:
         """Extract sagittal slice."""
         slice_img, in_plane_spacing = extract_slice(sample_volume, "sagittal", 3)
 
-        # Sagittal: fix x, vary y and z
-        # Shape: (10, 7) — z slices, y pixels
+        # Sagittal: fix y (left-right), vary x (anterior-posterior) and z
+        # Shape: (10, 7) — z slices, x pixels
         assert slice_img.shape == (10, 7)
-        # In-plane spacing: (z_spacing, y_spacing) = (3.0, 0.7)
+        # In-plane spacing: (z_spacing, x_spacing) = (3.0, 0.7)
         assert in_plane_spacing == (3.0, 0.7)
 
     def test_invalid_plane_raises(self, sample_volume):

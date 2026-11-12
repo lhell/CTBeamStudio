@@ -87,12 +87,12 @@ class TestSheppLogan3D:
         """Test slices differ along z (no extruded 2D phantom)."""
         phantom = create_shepp_logan_3d(**SMALL_GEOMETRY)
         center = phantom.shape[0] // 2
-        top = 3  # still inside the head, but near the superior pole
-        assert not np.array_equal(phantom[center], phantom[top])
+        pole = 3  # still inside the head, but near one pole of the z extent
+        assert not np.array_equal(phantom[center], phantom[pole])
 
         center_area = np.count_nonzero(phantom[center] > TISSUE_THRESHOLD)
-        top_area = np.count_nonzero(phantom[top] > TISSUE_THRESHOLD)
-        assert center_area > top_area * 1.5
+        pole_area = np.count_nonzero(phantom[pole] > TISSUE_THRESHOLD)
+        assert center_area > pole_area * 1.5
 
     def test_coronal_slice_has_air_above_and_below_head(self):
         """Test a coronal slice has air at the top and bottom rows."""
@@ -138,7 +138,13 @@ class TestSheppLogan3D:
         assert center == pytest.approx((0.0, 0.0, 0.0), abs=1e-6)
 
     def test_head_dimensions_match_phantom_geometry(self):
-        """Test physical head size is anisotropic-spacing correct (in mm)."""
+        """Test physical head size is anisotropic-spacing correct (in mm).
+
+        Patient frame: x = anterior-posterior, y = left-right, z =
+        superior-inferior. The classic phantom vertical (0.92) maps onto the
+        superior-inferior axis, the classic horizontal (0.69) onto
+        left-right, and the through-plane axis (0.90) onto anterior-posterior.
+        """
         volume = create_shepp_logan_hu()
         tissue = volume.array > TISSUE_THRESHOLD
         z_idx, y_idx, x_idx = np.where(tissue)
@@ -147,10 +153,12 @@ class TestSheppLogan3D:
         y_mm = (y_idx.max() - y_idx.min() + 1) * volume.spacing[1]
         z_mm = (z_idx.max() - z_idx.min() + 1) * volume.spacing[0]
 
-        assert abs(x_mm - 138) <= 4
-        assert abs(y_mm - 184) <= 4
-        assert abs(z_mm - 180) <= 4
-        assert 0.9 < z_mm / y_mm < 1.15
+        assert abs(x_mm - 180) <= 4
+        assert abs(y_mm - 138) <= 4
+        assert abs(z_mm - 184) <= 4
+        # A real head is deeper front-to-back and taller than it is wide.
+        assert y_mm < x_mm
+        assert y_mm < z_mm
 
     def test_default_demo_volume(self):
         """Test the demo volume uses the new physical defaults."""

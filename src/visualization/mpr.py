@@ -6,7 +6,7 @@ import numpy as np
 
 from backend.volume import Volume
 
-AXIS = {"axial": 0, "coronal": 1, "sagittal": 2}
+AXIS = {"axial": 0, "coronal": 2, "sagittal": 1}
 
 
 def extract_slice(
@@ -48,25 +48,34 @@ def extract_slice(
         raise IndexError(f"index {index} out of bounds for {plane} axis (size {size})")
 
     # Extract slice and determine in-plane spacing based on plane orientation
+    # Patient frame: +x = anterior/posterior, +y = left/right, +z = superior.
+    # Display convention (user-set): posterior on top in axial, anterior on
+    # the left in coronal, patient left on the left in sagittal — see the
+    # per-plane notes below.
     if plane == "axial":
-        # Axial: slice along z-axis (head-to-feet)
-        # Output shape: (rows, cols) = (y, x)
-        # Spacing: (y_spacing, x_spacing)
-        slice_array = volume.array[index, :, :]
-        in_plane_spacing = (volume.spacing[1], volume.spacing[2])
+        # Axial: slice at fixed z (longitudinal). LR runs horizontally with
+        # patient right on the right edge; posterior on the top row.
+        # Output shape: (rows, cols) = (x, y) — posterior (-x) top,
+        # patient left (+y) left.
+        slice_array = volume.array[index].T[:, ::-1]
+        in_plane_spacing = (volume.spacing[2], volume.spacing[1])
 
     elif plane == "coronal":
-        # Coronal: slice along y-axis (front-to-back)
-        # Output shape: (rows, cols) = (z, x)
-        # Spacing: (z_spacing, x_spacing)
-        slice_array = volume.array[:, index, :]
-        in_plane_spacing = (volume.spacing[0], volume.spacing[2])
+        # Coronal: slice at fixed x (anterior-posterior) — the plane that
+        # divides front from back; spans y (left-right) and z (superior-
+        # inferior). Superior on the top row, patient left on the left edge.
+        # Output shape: (rows, cols) = (z, y) — superior (+z) top,
+        # patient left (+y) left.
+        slice_array = volume.array[::-1, ::-1, index]
+        in_plane_spacing = (volume.spacing[0], volume.spacing[1])
 
     elif plane == "sagittal":
-        # Sagittal: slice along x-axis (left-to-right)
-        # Output shape: (rows, cols) = (z, y)
-        # Spacing: (z_spacing, y_spacing)
-        slice_array = volume.array[:, :, index]
-        in_plane_spacing = (volume.spacing[0], volume.spacing[1])
+        # Sagittal: slice at fixed y (left-right) — the plane that divides
+        # left from right; spans x (anterior-posterior) and z (superior-
+        # inferior). Superior on the top row, anterior on the left edge.
+        # Output shape: (rows, cols) = (z, x) — superior (+z) top,
+        # anterior (+x) left.
+        slice_array = volume.array[::-1, index, ::-1]
+        in_plane_spacing = (volume.spacing[0], volume.spacing[2])
 
     return slice_array, in_plane_spacing

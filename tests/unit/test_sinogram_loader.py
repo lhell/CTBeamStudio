@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from backend.geometry import ProjectionGeometry
 from backend.loaders.sinogram import (
     SelectionConfig,
     SinogramData,
@@ -429,6 +430,18 @@ def test_load_sinogram_dispatch_numpy(tmp_path):
     assert s.data.shape == (3, 4, 5)
 
 
+def test_load_sinogram_numpy_attaches_geometry(tmp_path):
+    """A numpy load must carry the given geometry — the app passes the
+    active (default) geometry, whose projections_per_rotation is 2304 —
+    instead of silently dropping it like the DICOM path never did."""
+    p = tmp_path / "s.npy"
+    np.save(p, np.zeros((4, 5, 6), dtype=np.float32))
+    geometry = ProjectionGeometry()
+    s = load_sinogram(p, geometry=geometry)
+    assert s.geometry is geometry
+    assert s.geometry.projections_per_rotation == 2304
+
+
 def test_load_sinogram_unknown(tmp_path):
     p = tmp_path / "a.xyz"
     p.touch()
@@ -505,6 +518,31 @@ def test_load_dicom_no_series(tmp_path):
     d.mkdir()
     with pytest.raises(ValueError):
         scan_dicom_sinogram(d)
+
+
+def test_load_dicom_reports_per_projection_progress(tmp_path, create_projection_dicom):
+    """The UI shows a loading bar during the load, so the DICOM sinogram
+    loader reports (current, total) per projection like the image loader
+    reports slices."""
+    d = create_projection_dicom(tmp_path)
+    calls = []
+
+    s = load_sinogram(d, progress=lambda current, total: calls.append((current, total)))
+
+    assert s.data.shape == (3, 4, 5)
+    assert calls == [(1, 3), (2, 3), (3, 3)]
+
+
+def test_load_numpy_reports_single_shot_progress(tmp_path):
+    """Single-read formats call progress once — the bar jumps to 100 %."""
+    p = tmp_path / "s.npy"
+    np.save(p, np.zeros((3, 4, 5), dtype=np.float32))
+    calls = []
+
+    s = load_sinogram(p, progress=lambda current, total: calls.append((current, total)))
+
+    assert s.data.shape == (3, 4, 5)
+    assert calls == [(1, 1)]
 
 
 def test_load_dicom_records_only_the_files_it_read(tmp_path, create_projection_dicom):

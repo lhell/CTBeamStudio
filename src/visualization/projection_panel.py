@@ -336,37 +336,6 @@ def render_selection_controls(
     )
 
 
-def default_sample_selection() -> SelectionConfig:
-    """Defaults matching the shared sample-option widget defaults.
-
-    Used as fallback when the sample options have not rendered yet; keep
-    in sync with the defaults passed to ``render_selection_controls``.
-    """
-    return build_selection_config(
-        proj_mode="downsample",
-        proj_downsample=100,
-        row_mode="downsample",
-        row_downsample=4,
-        col_mode="downsample",
-        col_downsample=8,
-    )
-
-
-def read_shared_selection() -> SelectionConfig:
-    """Read the shared sample-option selection rendered in the tab.
-
-    The sample options render in the Sinogram Inspection tab, which runs
-    after the sidebar; the sidebar can therefore not instantiate the
-    widgets itself (duplicate keys) and reads the stashed config instead.
-    A missing stash (nothing rendered yet) falls back to the defaults the
-    sample-option widgets show.
-    """
-    import streamlit as st
-
-    selection = st.session_state.get("sample_selection")
-    return selection if selection is not None else default_sample_selection()
-
-
 def apply_axis_order_change(sinogram, axis_order: tuple[str, str, str]):
     """Reorient ``sinogram`` to ``axis_order``; return True if it changed.
 
@@ -401,9 +370,12 @@ def render_measurement_sidebar() -> None:
             format_func=format_axis_order,
             key="sinogram_axis_order",
         )
-        # The selection controls live once, in the tab's "Sample options"
-        # expander, and drive both this load and the forward projection.
-        selection = read_shared_selection()
+        # "Load Measurements" loads the whole file: the user picked it, so the
+        # shape readout shows the true shape and an axis-order change can
+        # re-derive in memory. The Sample options in the tab govern the
+        # forward projection; to compare shapes against the full load, preset
+        # the FP to "all" (📐 Full projection geometry).
+        selection = build_selection_config()
 
         clicked = st.button("Load Measurements", key="load_measurements")
         if clicked:
@@ -752,8 +724,9 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             )
         elif n_meas and n_sim:
             _render_placeholder(
-                f"Shapes differ ({measured.shape} vs {simulated.shape}) — load a "
-                "matching selection to compare."
+                f"Shapes differ ({measured.shape} vs {simulated.shape}) — preset "
+                'the projection to "all" (📐 Full projection geometry) to '
+                "compare."
             )
         else:
             _render_placeholder(
@@ -810,12 +783,13 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             f"SSIM {per_slice['ssim'][shared]:.4f}"
         )
 
-    # --- Sample options (shared: measurement loading + forward projection) --
+    # --- Sample options (forward projection) --------------------------------
     with st.expander("Sample options", expanded=True):
         st.caption(
-            "Which projections and detector rows/columns to sample. These "
-            "options drive both loading measurements and the forward "
-            "projection."
+            "Which projections and detector rows/columns the forward "
+            "projection samples. Measurements always load the whole file; "
+            'to compare shapes, preset the projection to "all" (📐 Full '
+            "projection geometry)."
         )
         selection = render_selection_controls(
             "sample",

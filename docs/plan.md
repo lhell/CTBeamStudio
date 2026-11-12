@@ -700,6 +700,17 @@
 - **Akzeptanz:** Helper-Tests pinnen `(2.0, 1.0)` für die Dummy-Geometrie bzw. `None`; die Ansichten zeigen quadratische mm-Pixel; bestehende Inspection-Tests unverändert grün.
 - **Status:** ✅ Done (Nov 12, 2026) — 2 neue Helper-Tests, `test_sinogram_inspection_*`-Suite grün.
 
+### `[x]` T-98 — Messungs-Laden lädt die ganze Datei („All" statt Downsample-Default)
+- **Ziel:** „Load Measurements" nutzte die geteilte Sample-Options-Auswahl mit FP-freundlichen Downsample-Defaults (proj 100, row 4, col 8) — eine Datei mit 2304 Projektionen wurde still auf (24, 16, 64) subsampelt (Nutzermeldung: „default measurement loading in sidebar: All statt 2304"). Jetzt lädt der Loader immer die ganze Datei; die Sample options im Tab steuern nur noch die Forward-Projektion.
+- **Dateien:** `src/visualization/projection_panel.py` (Loader-Selection = voll; `read_shared_selection`/`default_sample_selection` entfernt; Sample-Options-Caption und Shapes-differ-Hinweis angepasst), `tests/integration/test_ui_smoke.py` (redundante `_select_all_samples`/`_restore_sample_defaults`-Aufrufe entfernt; App-Fixture seedet jetzt auch die Dataclass-Default-Geometrie)
+- **Abhängig von:** T-93, T-96 (Sample-Options-Refactor)
+- **Umsetzung:**
+  1. Der Loader baut `build_selection_config()` (alle Achsen „all") statt `read_shared_selection()` — die Form-Readout zeigt die wahre Shape, und der T-90-Achsenwechsel kann in-memory ableiten. Zum Shape-Vergleich preset man die FP auf „all" (📐 Full projection geometry) — der Shapes-differ-Hinweis sagt es jetzt.
+  2. Die dadurch toten Helper `read_shared_selection`/`default_sample_selection` entfernt; die `_select_all_samples`/`_restore_sample_defaults`-Test-Helfer entfallen (der Loader lädt immer voll) — damit verschwindet auch der module-scoped „all"-Leak, der `fp_run`-Klicks auf die volle Default-Geometrie (2304 × 64 × 512 ≈ 75 M Rays) und einen 90-s-AppTest-Timeout auslöste.
+  3. Test-Determinismus: die App-Fixture seedet jetzt neben dem Volumen auch `projection_geometry` (Dataclass-Defaults) — ohne Seed stellte die App die machine-abhängige `data/.last_geometry.json` wieder her (zuletzt die Dummy-Geometrie mit 360 Views aus einer Form-Bearbeitung), und die erwartete FP-Shape war rechnerabhängig.
+- **Akzeptanz:** „Load Measurements" lädt die ganze Datei (Load-Tests ohne Sample-Vorwahl grün, exakte Daten); `fp_run` mit Downsample-Defaults liefert (24, 16, 64) unabhängig vom Maschinen-Cache; Sample-Options-Caption nennt nur noch die FP. Volle Suite grün, 0 Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — `test_sinogram_inspection_run_button_produces_simulation` läuft jetzt deterministisch in ~3 s (vorher 90-s-Timeout bzw. maschinenabhängige Shape).
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -716,7 +727,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅, T-95 ✅, T-96 ✅, T-97 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing) |
+| 13 | Mi, 12.11. | T-90 ✅ bis T-98 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei) |
 
 ## Decision Log
 
@@ -776,6 +787,7 @@
 - ✅ T-95: Demo-Phantom-Origin zentriert (erster Voxel bei minus halber Ausdehnung pro Achse, Gittermitte auf der Rotationsachse); der Dummy-Wrapper `_centered_shepp_logan_hu` entfällt — der Dummy nutzt die geteilte Default-Funktion; Ideal-FP-Cache bleibt gültig
 - ✅ T-96: Laden des Demo-Bildes erzeugt automatisch die kohärente Demo-Trio (Volumen + Dummy-Geometrie + synthetische Messung) — kein eigener Button-Klick nötig; der manuelle Generate-Button bleibt als Regeneration erhalten
 - ✅ T-97: Sinogram-Ansichten (gemessen/simuliert/Differenz) resampeln die Zeilenachse um das Detektor-Spacing (`to_isotropic`, wie die MPR-Ebenen) — ein 2 mm × 1 mm-Detektor zeigt das Phantom nicht mehr halb so hoch wie real
+- ✅ T-98: „Load Measurements" lädt die ganze Datei („All" statt Downsample-Default); die Sample options steuern nur noch die FP; der module-scoped „all"-Leak im UI-Test (90-s-Timeout bei 75 M Rays) ist behoben, die App-Fixture seedet jetzt auch die Default-Geometrie statt des maschinenabhängigen Geometry-Caches
 
 ## Erledigt (2026-11-10)
 

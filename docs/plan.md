@@ -692,6 +692,14 @@
 - **Akzeptanz:** AppTest (Generator per Stub, Numerics in `test_dummy_measurement.py`): Klick auf „Load Demo Phantom" setzt das kohärente Trio (Sinogramm format `"synthetic"`, Dummy-Geometrie, „all"-Preset) und überschreibt zuvor geladene Daten.
 - **Status:** ✅ Done (Nov 12, 2026) — 2 neue Tests in `tests/unit/test_demo_load.py` (eigenes Modul mit module-scoped `AppTest`, frische Session → Empty State).
 
+### `[x]` T-97 — Sinogram-Ansichten im korrekten Detektor-Spacing
+- **Ziel:** Die Projektions-Ansichten im Sinogram-Inspection-Tab (gemessen, simuliert, Differenz) zeigten das Roh-Array, ohne die Pixel-Anisotropie in mm zu berücksichtigen — ein 2 mm × 1 mm-Detektor zeigte das Phantom halb so hoch wie real. Jetzt resampelt die UI die Zeilenachse um row/col-Spacing vor der Anzeige — dieselbe Kanten-Konversion, die die MPR-Ebenen bekommen (`to_isotropic`).
+- **Dateien:** `src/visualization/projection_panel.py` (`projection_display_spacing`, `_render_projection_image`, Differenz-Ansicht), `tests/unit/test_projection_panel.py` (2 Tests)
+- **Abhängig von:** T-93
+- **Umsetzung:** Neuer Helper `projection_display_spacing(geometry)` → `(det_row_spacing_mm, det_col_spacing_mm)` oder `None`; `_render_projection_image(..., spacing=)` und die Differenz-Ansicht wenden `to_isotropic` (lazy aus `visualization.app`) auf das normalisierte Bild an. Ohne Geometrie (unbekanntes Spacing) bleibt das Roh-Shape unverändert.
+- **Akzeptanz:** Helper-Tests pinnen `(2.0, 1.0)` für die Dummy-Geometrie bzw. `None`; die Ansichten zeigen quadratische mm-Pixel; bestehende Inspection-Tests unverändert grün.
+- **Status:** ✅ Done (Nov 12, 2026) — 2 neue Helper-Tests, `test_sinogram_inspection_*`-Suite grün.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -708,7 +716,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅, T-95 ✅, T-96 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden) |
+| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅, T-95 ✅, T-96 ✅, T-97 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing) |
 
 ## Decision Log
 
@@ -767,6 +775,7 @@
 - ✅ T-94: 3D-Ansicht im echten FP-Weltkoordinatensystem (Volumen am echten DICOM-Origin statt schematisch zentriert; Downsample-Shift korrigiert; Detektor-Ebene bei `sdd - sid` statt `-sdd`) — der gemeldete Fehler „3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor" ist behoben, indem die Ansicht zeigt, was die FP rechnet
 - ✅ T-95: Demo-Phantom-Origin zentriert (erster Voxel bei minus halber Ausdehnung pro Achse, Gittermitte auf der Rotationsachse); der Dummy-Wrapper `_centered_shepp_logan_hu` entfällt — der Dummy nutzt die geteilte Default-Funktion; Ideal-FP-Cache bleibt gültig
 - ✅ T-96: Laden des Demo-Bildes erzeugt automatisch die kohärente Demo-Trio (Volumen + Dummy-Geometrie + synthetische Messung) — kein eigener Button-Klick nötig; der manuelle Generate-Button bleibt als Regeneration erhalten
+- ✅ T-97: Sinogram-Ansichten (gemessen/simuliert/Differenz) resampeln die Zeilenachse um das Detektor-Spacing (`to_isotropic`, wie die MPR-Ebenen) — ein 2 mm × 1 mm-Detektor zeigt das Phantom nicht mehr halb so hoch wie real
 
 ## Erledigt (2026-11-10)
 

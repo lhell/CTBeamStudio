@@ -15,9 +15,27 @@ from visualization.projection_panel import (
     normalize_difference,
     normalize_projection,
     prepare_projection_volume,
+    projection_display_spacing,
     resolve_selection,
     resolve_view_index,
 )
+
+
+def test_projection_display_spacing_returns_detector_row_col_mm():
+    """The display resampling gets the detector (row, col) spacing in mm:
+    the raw projection pixels are anisotropic in mm, so the row axis is
+    stretched by row/col spacing before display."""
+    geometry = ProjectionGeometry(
+        n_det_cols=512,
+        n_det_rows=192,
+        det_col_spacing_mm=1.0,
+        det_row_spacing_mm=2.0,
+    )
+    assert projection_display_spacing(geometry) == (2.0, 1.0)
+
+
+def test_projection_display_spacing_without_geometry_is_none():
+    assert projection_display_spacing(None) is None
 
 
 def test_normalize_projection_scales_to_unit_range():

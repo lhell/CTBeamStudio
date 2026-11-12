@@ -81,8 +81,8 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **338 passed, 0 skipped**, ~25–45 s depending on disk
-  cache (T-92 + T-93 added 29 tests, T-94 + T-95 + T-96 added 8, over the 301
+- Baseline in `ct-viewer`: **340 passed, 0 skipped**, ~25–45 s depending on disk
+  cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, over the 301
   baseline; 7 `slow` tests are deselected by default). When your task changes
   the suite profile, update the numbers here as part of done.
 - `@pytest.mark.slow` tests exist; default runs exclude them.

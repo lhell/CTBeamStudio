@@ -603,11 +603,36 @@ def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
             st.rerun()
 
 
-def _render_projection_image(array: np.ndarray, caption: str) -> None:
+def projection_display_spacing(geometry):
+    """Detector ``(row_spacing_mm, col_spacing_mm)`` for display resampling.
+
+    The raw projection image's pixels are anisotropic in mm (axial row
+    spacing vs in-plane column spacing), so the UI resamples the row axis
+    by the row/col ratio before display — the same edge conversion the MPR
+    planes get. ``None`` geometry means the raw shape is shown as-is.
+    """
+    if geometry is None:
+        return None
+    return (float(geometry.det_row_spacing_mm), float(geometry.det_col_spacing_mm))
+
+
+def _render_projection_image(array: np.ndarray, caption: str, spacing=None) -> None:
+    """Render one projection image with square mm pixels.
+
+    ``spacing`` is ``(row_spacing_mm, col_spacing_mm)`` from
+    :func:`projection_display_spacing`; an anisotropic detector would
+    otherwise show a distorted phantom (a 2 mm x 1 mm detector shows the
+    head half as tall as it really is).
+    """
     import streamlit as st
 
+    from visualization.app import to_isotropic
+
+    image = normalize_projection(array)
+    if spacing is not None:
+        image = to_isotropic(image, spacing)
     st.image(
-        normalize_projection(array),
+        image,
         caption=caption,
         clamp=True,
         use_column_width=True,
@@ -678,12 +703,24 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
     )
 
     col_meas, col_sim, col_diff = st.columns(3)
+    # Detector (row, col) spacing in mm for the display resampling: the raw
+    # projection pixels are anisotropic in mm, so the views resample the row
+    # axis to show the phantom undistorted.
+    meas_spacing = projection_display_spacing(
+        getattr(sinogram, "geometry", None) if sinogram is not None else None
+    )
+    sim_spacing = (
+        projection_display_spacing(getattr(result, "geometry", None))
+        if result is not None
+        else None
+    )
     with col_meas:
         if n_meas:
             st.caption(f"Measured projection {meas_index + 1}/{n_meas}")
             _render_projection_image(
                 measured[meas_index],
                 f"Measured projection {meas_index + 1}/{n_meas}",
+                spacing=meas_spacing,
             )
         else:
             _render_placeholder(
@@ -696,13 +733,19 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             _render_projection_image(
                 simulated[sim_index],
                 f"Simulated projection {sim_index + 1}/{n_sim}",
+                spacing=sim_spacing,
             )
         else:
             _render_placeholder("Run the forward projection to fill this column.")
     with col_diff:
         if shapes_match:
+            diff = normalize_difference(measured[meas_index] - simulated[sim_index])
+            if meas_spacing is not None:
+                from visualization.app import to_isotropic
+
+                diff = to_isotropic(diff, meas_spacing)
             st.image(
-                normalize_difference(measured[meas_index] - simulated[sim_index]),
+                diff,
                 caption="Difference (measured − simulated)",
                 clamp=True,
                 use_column_width=True,

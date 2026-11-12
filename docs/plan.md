@@ -719,6 +719,14 @@
 - **Akzeptanz:** UI-Smoke-Suite grün (Sidebar-Expander „Projection Geometry" bleibt, jetzt ohne Upload); Notes erscheinen im Geometry-Tab; Trajectory-Settings wirken nur auf das 3D-Overlay.
 - **Status:** ✅ Done (Nov 12, 2026) — `test_ui_smoke.py` + `test_demo_load.py` grün, flake8/black/isort sauber.
 
+### `[x]` T-100 — Difference-Bild auf gleicher Starthöhe wie die Nachbarspalten
+- **Ziel:** Das Difference-Bild im Sinogram-Inspection-Tab startete eine Caption-Zeile höher als die Measured/Simulated-Bilder: die Nachbarspalten haben `st.caption` über dem Bild, die Difference-Spalte übergab ihr Label als `st.image`-Caption (unter dem Bild) — das Bild begann also am Spaltenanfang. Jetzt gleiche Struktur in allen drei Spalten: Caption-Zeile oben, dann das Bild.
+- **Dateien:** `src/visualization/projection_panel.py` (Difference-Zweig)
+- **Abhängig von:** T-97
+- **Umsetzung:** `st.caption("Difference (measured − simulated)")` über dem Bild, `st.image` ohne `caption=`-Parameter — die drei Spalten sind strukturell identisch und die Bildoberkanten liegen auf einer Höhe.
+- **Akzeptanz:** Difference-Bild startet auf derselben vertikalen Höhe wie Measured/Simulated; UI-Smoke-Suite grün.
+- **Status:** ✅ Done (Nov 12, 2026) — `test_ui_smoke.py` + `test_projection_panel.py` grün, Lint sauber.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |

@@ -760,9 +760,12 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 from visualization.app import to_isotropic
 
                 diff = to_isotropic(diff, meas_spacing)
+            # Same structure as the measured/simulated columns: a caption line
+            # above, then the image — otherwise the difference image starts
+            # one caption-line higher than its neighbours.
+            st.caption("Difference (measured − simulated)")
             st.image(
                 diff,
-                caption="Difference (measured − simulated)",
                 clamp=True,
                 use_column_width=True,
             )

@@ -84,6 +84,8 @@ class ConeBeamGeometry:
         dev: str = "cpu",
         projection_indices: Optional[Sequence[int]] = None,
         z_offset_mm: float = 0.0,
+        z_step_mm: float = 0.0,
+        n_projections_total: int = 0,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Calculate LOR start/end points for all projections.
 
@@ -172,10 +174,24 @@ class ConeBeamGeometry:
                 ]
             )
 
-            # Initial source position: (sid, 0, z_offset) -> circles in a
-            # plane parallel to the xy plane at z_offset.
+            # Per-projection z for helical scans: pitch drives a table feed
+            # (z_step_mm) per projection. The helix is centred on z_offset_mm
+            # (the volume's z centre) over n projections, so the first
+            # projection sits at the bottom of the volume and the last at the
+            # top. z_step_mm == 0.0 gives a circular scan (constant z).
+            n_for_centering = (
+                n_projections_total if n_projections_total > 0 else n_projs
+            )
+            z_pos = (
+                z_offset_mm
+                - (n_for_centering / 2.0) * z_step_mm
+                + idx_angle * z_step_mm
+            )
+
+            # Initial source position: (sid, 0, z) -> circles in a plane
+            # parallel to the xy plane at z.
             pos_source = torch.tensor(
-                [self.sid, 0.0, z_offset_mm], dtype=torch.float32, device=device
+                [self.sid, 0.0, z_pos], dtype=torch.float32, device=device
             )
 
             for idx_cols in range(n_cols):
@@ -193,7 +209,7 @@ class ConeBeamGeometry:
                             (n_rows,), float(col), dtype=torch.float32, device=device
                         ),
                         torch.as_tensor(
-                            pos_detector_rows + z_offset_mm,
+                            pos_detector_rows + z_pos,
                             dtype=torch.float32,
                             device=device,
                         ),

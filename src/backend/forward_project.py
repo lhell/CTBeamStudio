@@ -60,6 +60,7 @@ def forward_project(
     col_indices: Optional[List[int]] = None,
     proj_indices: Optional[List[int]] = None,
     n_projections: Optional[int] = None,
+    n_projections_total: Optional[int] = None,
     use_cuda: bool = True,
 ) -> ForwardProjectionResult:
     """Forward project a volume using parallelproj (or placeholder).
@@ -115,7 +116,13 @@ def forward_project(
     # Call the appropriate implementation
     if PARALLELPROJ_AVAILABLE and parallelproj is not None:
         return _forward_project_parallelproj(
-            volume, geometry, row_indices, col_indices, proj_indices, use_cuda
+            volume,
+            geometry,
+            row_indices,
+            col_indices,
+            proj_indices,
+            use_cuda,
+            n_projections_total=n_projections_total,
         )
     else:
         return _forward_project_placeholder(
@@ -175,6 +182,7 @@ def _forward_project_parallelproj(
     col_indices: List[int],
     proj_indices: List[int],
     use_cuda: bool,
+    n_projections_total: Optional[int] = None,
 ) -> ForwardProjectionResult:
     """Actual forward projection using parallelproj.
 
@@ -223,8 +231,20 @@ def _forward_project_parallelproj(
     # the same placement (see visualization.volume3d.get_trajectory_positions).
     z_center = origin_zyx[0] + 0.5 * (img_shape_zyx[0] - 1) * spacing_zyx[0]
 
+    # Helical table feed per projection (mm). Zero for a circular scan
+    # (pitch == 0), in which case every projection sits at z_center.
+    pitch = getattr(geometry, "pitch", 0.0) or 0.0
+    ppr = getattr(geometry, "projections_per_rotation", 2304) or 2304
+    n_rows = geometry.n_det_rows
+    row_spacing = geometry.det_row_spacing_mm
+    z_step = (pitch * n_rows * row_spacing / ppr) if pitch > 0 else 0.0
+
     pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
-        dev=dev, projection_indices=proj_indices, z_offset_mm=z_center
+        dev=dev,
+        projection_indices=proj_indices,
+        z_offset_mm=z_center,
+        z_step_mm=z_step,
+        n_projections_total=n_projections_total or 0,
     )
 
     projector = ConeBeamProjector(

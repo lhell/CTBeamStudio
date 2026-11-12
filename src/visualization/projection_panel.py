@@ -637,7 +637,15 @@ def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
         if original is not None:
             st.session_state["projection_geometry"] = original
             save_cached_geometry(original)
+            # Re-seed the edit-form widgets with the original values (not
+            # just drop them): dropping leaves Streamlit's persisted widget
+            # state in place, so after a dummy load the form kept showing the
+            # edited numbers and "Reset" looked like a no-op.
             clear_geometry_edit_state()
+            for field in EDITABLE_GEOMETRY_FIELDS:
+                st.session_state[f"geo_edit_{field.name}"] = getattr(
+                    original, field.name
+                )
             st.rerun()
 
     if submitted:

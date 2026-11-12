@@ -484,21 +484,65 @@ def render_measurement_sidebar() -> None:
 
 
 def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
-    """Show the loaded geometry and let the user edit its parameters."""
+    """Load a geometry file, show it, and let the user edit its parameters."""
     import streamlit as st
 
+    from backend.loaders.projection import load_projection_geometry
+
     st.subheader("Projection Geometry")
-    if geometry is None:
-        st.info(
-            "Load a geometry file (.txt or .yaml) in the sidebar to view and "
-            "edit its parameters."
+
+    # Geometry file loading lives here, next to the readouts and the edit
+    # form — the note about what is loaded belongs beside them, not in the
+    # sidebar.
+    geometry_file = st.file_uploader(
+        "Geometry file (.txt / .yaml)",
+        type=["txt", "yaml", "yml"],
+        key="geometry_tab_file",
+    )
+    if geometry_file is not None:
+        upload_key = (
+            getattr(geometry_file, "name", None),
+            getattr(geometry_file, "size", None),
         )
+        if st.session_state.get("last_loaded_geometry_key") != upload_key:
+            content = geometry_file.read().decode("utf-8")
+            suffix = Path(geometry_file.name).suffix.lower() or ".txt"
+
+            # Create temp file with the original suffix so the loader can
+            # auto-detect TXT vs YAML.
+            import os
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=suffix, delete=False
+            ) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            try:
+                loaded = load_projection_geometry(tmp_path)
+                st.session_state["projection_geometry"] = loaded
+                st.session_state["geometry_loaded_original"] = loaded
+                st.session_state["last_loaded_geometry_key"] = upload_key
+                st.session_state["geometry_is_default"] = False
+                save_cached_geometry(loaded)
+                clear_geometry_edit_state()
+                # The readouts and the form above already rendered with the
+                # old geometry this run, so rerun to show the loaded one.
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to load geometry: {e}")
+            finally:
+                os.unlink(tmp_path)
+
+    if geometry is None:
+        st.info("No geometry available — load a .txt or .yaml file above.")
         return
 
     if st.session_state.get("geometry_is_default"):
         st.caption(
             "No geometry file loaded — showing the default geometry. "
-            "Upload a .txt or .yaml file in the sidebar to replace it."
+            "Upload a .txt or .yaml file above to replace it."
         )
 
     # Derived values, kept as a compact caption: st.metric renders its value

@@ -711,6 +711,14 @@
 - **Akzeptanz:** „Load Measurements" lädt die ganze Datei (Load-Tests ohne Sample-Vorwahl grün, exakte Daten); `fp_run` mit Downsample-Defaults liefert (24, 16, 64) unabhängig vom Maschinen-Cache; Sample-Options-Caption nennt nur noch die FP. Volle Suite grün, 0 Skips.
 - **Status:** ✅ Done (Nov 12, 2026) — `test_sinogram_inspection_run_button_produces_simulation` läuft jetzt deterministisch in ~3 s (vorher 90-s-Timeout bzw. maschinenabhängige Shape).
 
+### `[x]` T-99 — Geometrie-Laden im Geometry-Tab statt der Sidebar; Trajectory-Settings nur Visualisierung
+- **Ziel:** Der Geometry-File-Upload (inkl. der Notes „Geometry loaded!"/„No geometry file loaded") lebte im Sidebar-Expander — die Notiz über die geladene Geometrie gehört neben die Readouts und das Editier-Formular im Geometry-Tab. Die Sidebar hält nur noch die Trajectory-Overlay-Settings („Projections", „Trajectory Downsample") — Visualisierung only, ohne Einfluss auf die Forward-Projektion (die die Sample options im Sinogram-Inspection-Tab nutzt).
+- **Dateien:** `src/visualization/projection_panel.py` (`render_geometry_tab`: Uploader + Load-Logik + Notes), `src/visualization/sidebar.py` (`_render_geometry_section` ohne Upload; Caption „3D geometry overlay only"; tote Imports entfernt)
+- **Abhängig von:** T-93, T-98
+- **Umsetzung:** Uploader + Upload-Dedup (`last_loaded_geometry_key`) + Temp-File-Pfad ziehen in `render_geometry_tab`; nach erfolgreichem Laden `st.rerun()` (Readouts/Formular oben haben im selben Run die alte Geometrie gerendert). Die Sidebar-Section behält „Projections"/„Trajectory Downsample" mit dem Caption „3D geometry overlay only — does not affect the forward projection. Load a geometry file in the Geometry tab." — beide Widgets speisen ausschließlich `get_trajectory_positions`/`add_trajectory_to_figure` (3D-Overlay), nie die FP.
+- **Akzeptanz:** UI-Smoke-Suite grün (Sidebar-Expander „Projection Geometry" bleibt, jetzt ohne Upload); Notes erscheinen im Geometry-Tab; Trajectory-Settings wirken nur auf das 3D-Overlay.
+- **Status:** ✅ Done (Nov 12, 2026) — `test_ui_smoke.py` + `test_demo_load.py` grün, flake8/black/isort sauber.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -727,7 +735,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅ bis T-98 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei) |
+| 13 | Mi, 12.11. | T-90 ✅ bis T-99 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei; Geometrie-Laden im Geometry-Tab) |
 
 ## Decision Log
 
@@ -788,6 +796,7 @@
 - ✅ T-96: Laden des Demo-Bildes erzeugt automatisch die kohärente Demo-Trio (Volumen + Dummy-Geometrie + synthetische Messung) — kein eigener Button-Klick nötig; der manuelle Generate-Button bleibt als Regeneration erhalten
 - ✅ T-97: Sinogram-Ansichten (gemessen/simuliert/Differenz) resampeln die Zeilenachse um das Detektor-Spacing (`to_isotropic`, wie die MPR-Ebenen) — ein 2 mm × 1 mm-Detektor zeigt das Phantom nicht mehr halb so hoch wie real
 - ✅ T-98: „Load Measurements" lädt die ganze Datei („All" statt Downsample-Default); die Sample options steuern nur noch die FP; der module-scoped „all"-Leak im UI-Test (90-s-Timeout bei 75 M Rays) ist behoben, die App-Fixture seedet jetzt auch die Default-Geometrie statt des maschinenabhängigen Geometry-Caches
+- ✅ T-99: Geometry-File-Upload (inkl. Notes) in den Geometry-Tab gezogen; die Sidebar hält nur die Trajectory-Overlay-Settings mit dem Caption „visualization only" — ohne Einfluss auf die Forward-Projektion
 
 ## Erledigt (2026-11-10)
 

@@ -1,19 +1,16 @@
 """Sidebar controls for CTBeamStudio."""
 
 import logging
-import tempfile
 import uuid
 from pathlib import Path
 
 import streamlit as st
 
 from backend.loaders.dicom import scan_series
-from backend.loaders.projection import load_projection_geometry
 from visualization.background_load import reset_job
 from visualization.geometry_cache import (
     clear_cached_geometry,
     default_geometry,
-    save_cached_geometry,
 )
 from visualization.projection_panel import (
     clear_geometry_edit_state,
@@ -208,7 +205,13 @@ def _render_image_section():
 
 
 def _render_geometry_section(projection_geometry):
-    """Render the projection-geometry section as a collapsible block.
+    """Render the 3D trajectory-overlay settings as a collapsible block.
+
+    The geometry file loading lives in the Geometry tab (T-99), next to the
+    readouts and the edit form. This section holds only the trajectory
+    settings the 3D view consumes — they are visualization-only and do not
+    affect the forward projection (which uses the Sample options in the
+    Sinogram Inspection tab).
 
     Args:
         projection_geometry: Currently active geometry, or None.
@@ -217,57 +220,12 @@ def _render_geometry_section(projection_geometry):
         tuple: (projection_geometry, n_projections, downsample)
     """
     with st.sidebar.expander("Projection Geometry", expanded=False):
-        geometry_file = st.file_uploader(
-            "Geometry file (.txt / .yaml)",
-            type=["txt", "yaml", "yml"],
-            key="sidebar_geometry_file",
-        )
-
-        # Load projection geometry (cache in session state, reload on new upload)
-        if geometry_file is not None:
-            upload_key = (
-                getattr(geometry_file, "name", None),
-                getattr(geometry_file, "size", None),
-            )
-            if st.session_state.get("last_loaded_geometry_key") != upload_key:
-                content = geometry_file.read().decode("utf-8")
-                suffix = Path(geometry_file.name).suffix.lower() or ".txt"
-
-                # Create temp file with the original suffix so the loader can
-                # auto-detect TXT vs YAML.
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=suffix, delete=False
-                ) as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
-
-                try:
-                    projection_geometry = load_projection_geometry(tmp_path)
-                    st.session_state["projection_geometry"] = projection_geometry
-                    st.session_state["geometry_loaded_original"] = projection_geometry
-                    st.session_state["last_loaded_geometry_key"] = upload_key
-                    st.session_state["geometry_is_default"] = False
-                    save_cached_geometry(projection_geometry)
-                    clear_geometry_edit_state()
-                    st.success("Geometry loaded!")
-                except Exception as e:
-                    st.error(f"Failed to load geometry: {e}")
-                finally:
-                    import os
-
-                    os.unlink(tmp_path)
-            else:
-                projection_geometry = st.session_state.get("projection_geometry")
-        else:
-            projection_geometry = st.session_state.get("projection_geometry")
-
         # Always show a geometry: restore the cached one or use the defaults.
         if projection_geometry is None:
             projection_geometry = default_geometry()
             st.session_state["projection_geometry"] = projection_geometry
             st.session_state["geometry_loaded_original"] = projection_geometry
             st.session_state["geometry_is_default"] = True
-            st.caption("No geometry file loaded — showing the default geometry.")
 
         # One full rotation by default: a circular scan acquires exactly
         # ``projections_per_rotation`` views. The widget has a key, so its
@@ -294,6 +252,10 @@ def _render_geometry_section(projection_geometry):
             index=downsample_options.index(100),
             format_func=lambda x: f"1/{x}",
             key="sidebar_downsample",
+        )
+        st.caption(
+            "3D geometry overlay only — does not affect the forward "
+            "projection. Load a geometry file in the Geometry tab."
         )
 
     return projection_geometry, n_projections, downsample
@@ -368,8 +330,6 @@ def load_demo_volume():
     st.session_state["sample_col_mode"] = "all"
     # New geometry: drop cached widget values so the geometry form prefills
     # the dummy values instead of stale ones.
-    from visualization.projection_panel import clear_geometry_edit_state
-
     clear_geometry_edit_state()
     st.toast("Loaded demo phantom with dummy measurement!")
     return dummy.volume

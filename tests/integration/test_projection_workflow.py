@@ -63,7 +63,6 @@ def test_measured_workflow_matches_forward_projection(tmp_path, geometry, volume
     metrics = compute_metrics(loaded.data, simulated.projections)
     assert metrics["mae"] == pytest.approx(0.0, abs=1e-5)
     assert metrics["rmse"] == pytest.approx(0.0, abs=1e-5)
-    assert metrics["correlation"] == pytest.approx(1.0, abs=1e-5)
     assert metrics["ssim"] == pytest.approx(1.0, abs=1e-5)
 
 

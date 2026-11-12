@@ -83,6 +83,7 @@ class ConeBeamGeometry:
         detector_offset_cols_mm: float = 0.0,
         dev: str = "cpu",
         projection_indices: Optional[Sequence[int]] = None,
+        z_offset_mm: float = 0.0,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Calculate LOR start/end points for all projections.
 
@@ -96,11 +97,13 @@ class ConeBeamGeometry:
         have shape ``(n_projections * n_det_rows * n_det_cols, 3)``, where the
         last axis is ``(x, y, z)`` world coordinates (parallelproj convention).
 
-        The source starts at ``(sid, 0, 0)`` (anterior, ``+x``) and circles the
-        isocenter around the ``z`` axis (CCW seen from ``+z``). The detector is
-        placed opposite the source at a distance ``sdd - sid`` from isocenter
-        and rotates together with it. The angle of projection ``i`` is
-        ``first_angle + i * angular_inc_degree``.
+        The source starts at ``(sid, 0, z_offset_mm)`` (anterior, ``+x``) and
+        circles the isocenter around the ``z`` axis (CCW seen from ``+z``).
+        The detector is placed opposite the source at a distance ``sdd - sid``
+        from isocenter and rotates together with it. The whole trajectory sits
+        in the plane ``z = z_offset_mm`` — pass the volume's z centre so the
+        scan intersects the volume even when its DICOM z origin is far from 0.
+        The angle of projection ``i`` is ``first_angle + i * angular_inc_degree``.
 
         Args:
             detector_offset_rows_mm: Detector row offset (mm).
@@ -112,6 +115,9 @@ class ConeBeamGeometry:
                 ``0 .. n_projections - 1`` are used. This allows non-contiguous
                 selections (e.g. a downsampled projection list) without
                 projecting the intermediate angles.
+            z_offset_mm: World z position of the scan plane (mm). ``0.0``
+                places the trajectory in the ``z = 0`` plane; pass the
+                volume's z centre to centre the scan on the volume.
 
         Returns:
             Tuple ``(pos_beam_start, pos_beam_end)``, each a float32 tensor of
@@ -166,9 +172,10 @@ class ConeBeamGeometry:
                 ]
             )
 
-            # Initial source position: (sid, 0, 0) -> circles in the xy plane.
+            # Initial source position: (sid, 0, z_offset) -> circles in a
+            # plane parallel to the xy plane at z_offset.
             pos_source = torch.tensor(
-                [self.sid, 0.0, 0.0], dtype=torch.float32, device=device
+                [self.sid, 0.0, z_offset_mm], dtype=torch.float32, device=device
             )
 
             for idx_cols in range(n_cols):
@@ -186,7 +193,9 @@ class ConeBeamGeometry:
                             (n_rows,), float(col), dtype=torch.float32, device=device
                         ),
                         torch.as_tensor(
-                            pos_detector_rows, dtype=torch.float32, device=device
+                            pos_detector_rows + z_offset_mm,
+                            dtype=torch.float32,
+                            device=device,
                         ),
                     ],
                     dim=1,

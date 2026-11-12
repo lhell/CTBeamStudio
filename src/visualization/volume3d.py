@@ -85,7 +85,7 @@ def get_detector_position(geometry, source_angle: float = 0.0, z_offset: float =
     return (x, y, base_z)
 
 
-def get_trajectory_positions(geometry, n_projections: int):
+def get_trajectory_positions(geometry, n_projections: int, z_offset: float = 0.0):
     """Generate source and detector positions for all projections.
 
     For helical scans, accounts for table feed (Z movement) during acquisition.
@@ -93,6 +93,10 @@ def get_trajectory_positions(geometry, n_projections: int):
     Args:
         geometry: ProjectionGeometry object
         n_projections: Total number of projections in the scan
+        z_offset: World z position the scan is centred on (mm). Pass the
+            volume's z centre — the same placement the forward projection
+            uses — so the drawn scan intersects the volume even when its
+            DICOM z origin is far from 0.
 
     Returns:
         (source_positions, detector_positions) as lists of (x,y,z) tuples
@@ -127,11 +131,11 @@ def get_trajectory_positions(geometry, n_projections: int):
     for i in range(n_projections):
         source_angle = (i / n_projections) * total_angle
 
-        # Z offset for helical: start at -total_z/2 to center the helix
-        z_offset = -total_z / 2 + i * z_step
+        # Z offset for helical: centred on z_offset (the volume's z centre)
+        z_pos = z_offset - total_z / 2 + i * z_step
 
-        src = get_source_position(geometry, source_angle, z_offset)
-        det = get_detector_position(geometry, source_angle, z_offset)
+        src = get_source_position(geometry, source_angle, z_pos)
+        det = get_detector_position(geometry, source_angle, z_pos)
 
         source_positions.append(src)
         detector_positions.append(det)
@@ -502,6 +506,8 @@ def downsample_volume(volume_array: np.ndarray, factor: int = 4) -> np.ndarray:
 def get_camera_preset(preset: str, bounds: tuple) -> dict:
     """Get camera position and direction for preset views.
 
+    Patient frame: +x = anterior, +y = patient left, z = longitudinal.
+
     Args:
         preset: Preset name ("iso", "front", "back", "left", "right", "top", "bottom")
         bounds: (xmin, xmax, ymin, ymax, zmin, zmax) of the volume
@@ -523,22 +529,22 @@ def get_camera_preset(preset: str, bounds: tuple) -> dict:
             "view_up": (0, 0, 1),
         },
         "front": {
-            "position": (center[0], center[1] + distance, center[2]),
+            "position": (center[0] + distance, center[1], center[2]),
             "focal_point": center,
             "view_up": (0, 0, 1),
         },
         "back": {
-            "position": (center[0], center[1] - distance, center[2]),
-            "focal_point": center,
-            "view_up": (0, 0, 1),
-        },
-        "left": {
             "position": (center[0] - distance, center[1], center[2]),
             "focal_point": center,
             "view_up": (0, 0, 1),
         },
+        "left": {
+            "position": (center[0], center[1] + distance, center[2]),
+            "focal_point": center,
+            "view_up": (0, 0, 1),
+        },
         "right": {
-            "position": (center[0] + distance, center[1], center[2]),
+            "position": (center[0], center[1] - distance, center[2]),
             "focal_point": center,
             "view_up": (0, 0, 1),
         },
@@ -1218,12 +1224,13 @@ def create_pyvista_volume(
     )
 
     # Set camera based on preset (using available methods)
+    # Patient frame: +x = anterior, +y = patient left, z = longitudinal.
     camera_views = {
         "iso": ("iso", 1),
-        "front": ("xz", 1),  # view from front (+Y)
-        "back": ("xz", -1),  # view from back (-Y)
-        "left": ("yz", -1),  # view from left (-X)
-        "right": ("yz", 1),  # view from right (+X)
+        "front": ("yz", 1),  # view from anterior (+X)
+        "back": ("yz", -1),  # view from posterior (-X)
+        "left": ("xz", 1),  # view from patient left (+Y)
+        "right": ("xz", -1),  # view from patient right (-Y)
         "top": ("xy", 1),  # view from top (+Z)
         "bottom": ("xy", -1),  # view from bottom (-Z)
     }

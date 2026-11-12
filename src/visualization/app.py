@@ -98,6 +98,16 @@ def render_empty_state() -> None:
         "Nothing to show — load image data in the sidebar, or use the demo phantom."
     )
 
+    from visualization.volume_cache import load_last_session
+
+    if load_last_session() is not None:
+        if st.button("↺ Restore last session", key="empty_restore"):
+            from visualization.sidebar import restore_last_session
+
+            with st.spinner("Restoring last session..."):
+                restore_last_session()
+            st.rerun()
+
     if st.button("Load Demo Phantom", key="empty_load_demo"):
         from visualization.sidebar import load_demo_volume
 
@@ -393,8 +403,18 @@ def render_viewer_tab(
                     get_trajectory_positions,
                 )
 
+                # The trajectory follows the volume's z position (its z
+                # centre), the same placement the forward projection uses,
+                # so the drawn scan intersects the volume even when the
+                # DICOM z origin is far from the world origin.
+                z_offset = 0.0
+                if origin is not None:
+                    z_offset = float(origin[2]) + 0.5 * (
+                        volume.array.shape[0] - 1
+                    ) * float(spacing[0])
+
                 src_positions, det_positions = get_trajectory_positions(
-                    projection_geometry, n_projections
+                    projection_geometry, n_projections, z_offset=z_offset
                 )
                 fig = add_trajectory_to_figure(
                     fig,
@@ -573,13 +593,64 @@ def render_viewer_tab(
             ):
                 with target:
                     st.markdown(f"**{name}**")
-                    st.image(images[plane], clamp=True, use_column_width=True)
+                    st.image(
+                        annotate_orientation(images[plane], plane),
+                        clamp=True,
+                        use_column_width=True,
+                    )
 
 
 STARTUP_FAILURE_MESSAGE = (
     "No cached image data found. Select image data in the sidebar or "
     "load the demo phantom."
 )
+
+# Edge letters per MPR view, matching the display orientation
+# (st.image: rows top -> bottom, cols left -> right). User-set convention:
+# posterior on top (axial), S on top everywhere; coronal carries LR and
+# sagittal AP on the horizontal axis (letters only — extraction unchanged).
+#   axial:    rows = x (posterior top -> anterior bottom), cols = y reversed (L left -> R right)
+#   coronal:  rows = z reversed (S top -> I bottom)
+#   sagittal: rows = z reversed (S top -> I bottom)
+MPR_EDGE_LETTERS = {
+    "axial": {"top": "P", "bottom": "A", "left": "L", "right": "R"},
+    "coronal": {"top": "S", "bottom": "I", "left": "L", "right": "R"},
+    "sagittal": {"top": "S", "bottom": "I", "left": "A", "right": "P"},
+}
+
+
+def annotate_orientation(image: np.ndarray, plane: str) -> np.ndarray:
+    """Draw orientation letters at the edge midpoints of one MPR view.
+
+    Red letters (A/P, L/R, S/I) on the image edges, so the axis directions
+    are readable on the view itself instead of only in the header.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    letters = MPR_EDGE_LETTERS[plane]
+    height, width = image.shape[:2]
+    pil = Image.fromarray(image).convert("RGB")
+    draw = ImageDraw.Draw(pil)
+    size = max(12, min(height, width) // 20)
+    try:
+        font = ImageFont.load_default(size=size)
+    except TypeError:  # Pillow < 10.1 has no sized default font
+        font = ImageFont.load_default()
+    margin = max(4, size // 3)
+
+    def draw_centered(letter: str, cx: int, cy: int) -> None:
+        bbox = draw.textbbox((0, 0), letter, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        draw.text((cx - tw // 2, cy - th // 2), letter, fill=(255, 60, 60), font=font)
+
+    draw_centered(letters["top"], width // 2, margin)
+    # Bottom letter: raise the center by half a letter size, so the letter
+    # sits fully inside the image edge instead of being clipped in half.
+    draw_centered(letters["bottom"], width // 2, height - margin - size // 2)
+    draw_centered(letters["left"], margin, height // 2)
+    draw_centered(letters["right"], width - margin, height // 2)
+    return np.asarray(pil)
 
 
 def _startup_job_name() -> str:

@@ -208,10 +208,6 @@ def _forward_project_parallelproj(
     cb_geometry = geometry_from_projection_geometry(geometry)
     cb_geometry.n_projections = n_projs
 
-    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
-        dev=dev, projection_indices=proj_indices
-    )
-
     # Volume is (z, y, x); origin is DICOM (x, y, z) -> reorder to (z, y, x).
     spacing_zyx = tuple(float(s) for s in volume.spacing)
     origin_zyx = (
@@ -220,6 +216,16 @@ def _forward_project_parallelproj(
         float(volume.origin[0]),
     )
     img_shape_zyx = volume.shape
+
+    # The scan follows the volume's z position: the trajectory is centred on
+    # the volume's z centre, so the first rotation intersects the volume even
+    # when its DICOM z origin is far from the world origin. The 3D view uses
+    # the same placement (see visualization.volume3d.get_trajectory_positions).
+    z_center = origin_zyx[0] + 0.5 * (img_shape_zyx[0] - 1) * spacing_zyx[0]
+
+    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
+        dev=dev, projection_indices=proj_indices, z_offset_mm=z_center
+    )
 
     projector = ConeBeamProjector(
         pos_beam_start,

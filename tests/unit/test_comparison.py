@@ -20,7 +20,6 @@ def test_identical_images_have_zero_error():
 
     assert metrics["mae"] == pytest.approx(0.0)
     assert metrics["rmse"] == pytest.approx(0.0)
-    assert metrics["correlation"] == pytest.approx(1.0)
     assert metrics["ssim"] == pytest.approx(1.0)
 
 
@@ -39,16 +38,6 @@ def test_shape_mismatch_raises():
         compute_metrics(np.zeros((2, 2)), np.zeros((2, 3)))
 
 
-def test_constant_image_correlation_is_zero_not_nan():
-    real = np.full((4, 4), 7.0)
-    sim = np.full((4, 4), 7.0)
-
-    metrics = compute_metrics(real, sim)
-
-    assert metrics["correlation"] == pytest.approx(0.0)
-    assert not np.isnan(metrics["correlation"])
-
-
 def test_difference_image_is_real_minus_simulated():
     real = np.array([[1.0, 2.0]])
     sim = np.array([[0.5, 0.5]])
@@ -64,7 +53,7 @@ def test_per_slice_matches_frame_metrics():
 
     per_slice = compute_metrics_per_slice(measured, simulated)
 
-    assert set(per_slice) == {"mae", "rmse", "correlation", "ssim"}
+    assert set(per_slice) == {"mae", "rmse", "ssim"}
     for values in per_slice.values():
         assert values.shape == (3,)
     for i in range(3):
@@ -91,7 +80,7 @@ def test_build_metric_figure_traces_and_marker():
 
     fig = build_metric_figure(per_slice, current_index=2)
 
-    assert [t.name for t in fig.data] == ["MAE", "RMSE", "Correlation", "SSIM"]
+    assert [t.name for t in fig.data] == ["MAE", "RMSE", "SSIM"]
     np.testing.assert_array_equal(fig.data[0].x, [0, 1, 2, 3])
     np.testing.assert_array_equal(fig.data[0].y, [0.0, 1.0, 2.0, 3.0])
     assert len(fig.layout.shapes) == 1
@@ -109,13 +98,11 @@ def test_build_metric_figure_accepts_proj_indices():
 
 
 def test_build_distribution_figure_histograms_overlay():
-    values = {
-        k: np.linspace(0.0, 1.0, 12) for k in ("mae", "rmse", "correlation", "ssim")
-    }
+    values = {k: np.linspace(0.0, 1.0, 12) for k in ("mae", "rmse", "ssim")}
 
     fig = build_distribution_figure(values)
 
-    assert [t.type for t in fig.data] == ["histogram"] * 4
-    assert [t.name for t in fig.data] == ["MAE", "RMSE", "Correlation", "SSIM"]
+    assert [t.type for t in fig.data] == ["histogram"] * 3
+    assert [t.name for t in fig.data] == ["MAE", "RMSE", "SSIM"]
     assert fig.layout.barmode == "overlay"
     assert all(t.opacity == 0.6 for t in fig.data)

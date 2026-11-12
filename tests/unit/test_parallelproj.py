@@ -93,6 +93,40 @@ def test_geometry_0deg_source_on_anterior():
     assert det_center[1] == pytest.approx(0.0, abs=1e-4)
 
 
+def test_geometry_z_offset_shifts_scan_plane():
+    """z_offset_mm moves the whole trajectory (source and detector) in z."""
+    g = ConeBeamGeometry(
+        sid=500.0,
+        sdd=1000.0,
+        n_projections=1,
+        angular_inc_degree=90.0,
+        n_det_rows=3,
+        n_det_cols=3,
+        det_row_spacing_mm=1.0,
+        det_col_spacing_mm=1.0,
+        first_angle=0.0,
+    )
+    start, end = g.calculate_xray_beam_list(dev="cpu")
+    shifted_start, shifted_end = g.calculate_xray_beam_list(
+        dev="cpu", z_offset_mm=120.0
+    )
+
+    # Source z sits at the offset instead of 0.
+    assert shifted_start[0].numpy()[2] == pytest.approx(120.0, abs=1e-4)
+    assert start[0].numpy()[2] == pytest.approx(0.0, abs=1e-4)
+
+    # Detector rows shift by the same amount: the central element of the
+    # middle row lands at z = offset, the neighbouring rows one spacing away.
+    assert shifted_end[1].numpy()[2] == pytest.approx(120.0, abs=1e-4)
+    assert shifted_end[0].numpy()[2] == pytest.approx(119.0, abs=1e-4)
+    assert shifted_end[2].numpy()[2] == pytest.approx(121.0, abs=1e-4)
+
+    # x/y positions are unchanged by the z offset.
+    np.testing.assert_allclose(
+        shifted_start[0].numpy()[:2], start[0].numpy()[:2], atol=1e-5
+    )
+
+
 def test_four_region_projection_order():
     """0° projection shows the four quadrants in order 1(top-left)..4(bottom-right)."""
     vol_zyx = _four_region_volume()

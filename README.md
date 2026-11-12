@@ -27,7 +27,7 @@ A web-based tool for exploring CT scanner geometry and generating **simulated pr
 Forward projection and simulated-vs-measured comparison are the long-term core utility of the tool. Parts are implemented in the backend; surfacing them in the app UI and the comparison workflow are planned next.
 
 - **Forward Projection Engine** *(backend done, UI planned)* — Generate simulated projections from a 3D volume for a given geometry, using [parallelproj](https://github.com/gschramm/parallelproj)'s cone-beam ray tracing (Joseph 3D). Supports CUDA when available, and partial detector row/column/projection selection.
-- **Simulated vs. Measured Comparison** *(planned)* — Compare forward-projected (simulated) projections against measured projection data with quantitative metrics (MAE, RMSE, SSIM, correlation) and side-by-side / difference visualization — the central utility of the tool for validating scanner geometry against real acquisitions.
+- **Simulated vs. Measured Comparison** *(planned)* — Compare forward-projected (simulated) projections against measured projection data with quantitative metrics (MAE, RMSE, SSIM) and side-by-side / difference visualization — the central utility of the tool for validating scanner geometry against real acquisitions.
 
 ## Supported Data
 

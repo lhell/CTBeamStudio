@@ -370,12 +370,31 @@ def render_measurement_sidebar() -> None:
             format_func=format_axis_order,
             key="sinogram_axis_order",
         )
-        # "Load Measurements" loads the whole file: the user picked it, so the
+        # "Load Measurements" loads the whole file by default (T-98): the
         # shape readout shows the true shape and an axis-order change can
-        # re-derive in memory. The Sample options in the tab govern the
-        # forward projection; to compare shapes against the full load, preset
-        # the FP to "all" (📐 Full projection geometry).
-        selection = build_selection_config()
+        # re-derive in memory. The sampling options below bring the per-axis
+        # selection back as an opt-in for big files — a sampled load reads
+        # only the selected subset (lazily for .npy/NIfTI), never silently.
+        # The Sample options in the tab govern the forward projection; to
+        # compare shapes against the full load, preset the FP to "all"
+        # (📐 Full projection geometry).
+        sample_on_load = st.checkbox(
+            "Sample instead of the whole file",
+            key="load_sample_on",
+            help=(
+                "Load only a subset of the file. Off: the whole file is "
+                "loaded. On: the per-axis selection below applies."
+            ),
+        )
+        if sample_on_load:
+            selection = render_selection_controls(
+                "load",
+                container=st,
+                default_proj_mode="downsample",
+                default_proj_step=10,
+            )
+        else:
+            selection = build_selection_config()
 
         clicked = st.button("Load Measurements", key="load_measurements")
         if clicked:
@@ -387,13 +406,28 @@ def render_measurement_sidebar() -> None:
                     st.error(f"Path not found: {path}")
                 else:
                     try:
-                        with st.spinner("Loading measurements..."):
+                        with st.spinner("Loading projections..."):
+                            # Loading bar with current/total projections, like
+                            # the DICOM image section: a spinner alone gives
+                            # no feedback on how far a big folder has come.
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+
+                            def update_progress(current: int, total: int):
+                                progress_bar.progress(current / total)
+                                status_text.text(
+                                    f"Loading {current}/{total} projections..."
+                                )
+
                             sinogram = load_sinogram(
                                 path,
                                 selection=selection,
                                 geometry=st.session_state.get("projection_geometry"),
                                 axis_order=axis_order,
+                                progress=update_progress,
                             )
+                            progress_bar.empty()
+                            status_text.empty()
                     except Exception as exc:  # noqa: BLE001 - surface loader errors
                         st.error(f"Failed to load measurements: {exc}")
                     else:
@@ -826,7 +860,6 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
         st.caption(
             f"Slice {shared + 1}: MAE {per_slice['mae'][shared]:.4g} · "
             f"RMSE {per_slice['rmse'][shared]:.4g} · "
-            f"Correlation {per_slice['correlation'][shared]:.4f} · "
             f"SSIM {per_slice['ssim'][shared]:.4f}"
         )
 

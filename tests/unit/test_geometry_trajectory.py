@@ -63,6 +63,29 @@ def test_get_trajectory_positions():
     assert src0[0] == pytest.approx(src3[0], rel=0.01)
 
 
+def test_get_trajectory_positions_with_z_offset():
+    """The trajectory follows the volume's z centre when z_offset is given.
+
+    The forward projection centres the scan plane on the volume's z centre
+    (see backend.forward_project), so the drawn trajectory must use the same
+    placement instead of always sitting at z = 0.
+    """
+    geo = ProjectionGeometry(sid=600.0)
+
+    src_positions, det_positions = get_trajectory_positions(
+        geo, n_projections=4, z_offset=85.0
+    )
+
+    assert all(pos[2] == pytest.approx(85.0, rel=0.01) for pos in src_positions)
+    assert all(pos[2] == pytest.approx(85.0, rel=0.01) for pos in det_positions)
+
+    # x/y are unchanged by the z offset.
+    src_plain, _ = get_trajectory_positions(geo, n_projections=4)
+    for src_a, src_b in zip(src_positions, src_plain):
+        assert src_a[0] == pytest.approx(src_b[0], rel=0.01)
+        assert src_a[1] == pytest.approx(src_b[1], rel=0.01)
+
+
 def test_get_source_position_with_offsets():
     """Test source position with offsets."""
     geo = ProjectionGeometry(sid=600.0, source_offset_x=10.0, source_offset_y=20.0)

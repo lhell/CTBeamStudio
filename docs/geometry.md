@@ -5,8 +5,8 @@ This document defines the coordinate system and geometry parameters used in CTBe
 ## Coordinate System
 
 - **Z-axis**: Patient longitudinal axis (table feed direction)
-- **X-axis**: Patient lateral direction (right/left when supine)
-- **Y-axis**: Anterior/posterior (front/back of patient)
+- **X-axis**: Anterior/posterior (front/back of patient); the source at 0° sits at +X
+- **Y-axis**: Patient lateral direction (left/right when supine)
 - **Source rotation**: Around the Z-axis in the transverse plane
 - **Source angle reference**: 0° = **anterior** (front of patient)
 - **Positive rotation direction**: Counter-clockwise when viewed from above
@@ -106,16 +106,18 @@ The detector can move **independently** of the source (detector shifts from its 
 
 The forward projection and the 3D volume view share one world frame:
 
-- **Rotation axis**: runs through the world origin (`0, 0, 0`), along **Z**.
-- **Source at 0°**: `(sid, 0, 0)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
+- **Rotation axis**: runs through `(0, 0, z_center)`, along **Z** — the scan
+  plane follows the volume's z centre (`Volume.origin[2] + (nz - 1) / 2 ×
+  z_spacing`), so the first rotation intersects the volume even when its DICOM
+  z origin is far from the world origin.
+- **Source at 0°**: `(sid, 0, z_center)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
 - **Detector**: opposite the source at `sdd - sid` from the isocenter (SDD is measured from the source, not from the rotation axis).
 - **Volume**: voxel `[0, 0, 0]` of the `(x, y, z)`-reordered grid sits at
   `Volume.origin` (DICOM `(x, y, z)`), voxel centres at `origin + index * spacing`.
-  A volume with origin `(0, 0, 0)` therefore sits entirely in the `+x/+y/+z`
-  octant — the central ray (z = 0 plane) clips its bottom edge, and the
-  phantom lands at the top of the detector. The demo phantom (and the dummy
+  The scan plane passes through the volume's z centre, so the central ray
+  crosses the middle of the phantom; the demo phantom (and the dummy
   measurement volume) centre their origin on the rotation axis instead, so
-  the central ray passes through the head centre.
+  their scan plane stays at `z = 0`.
 
 The 3D view (`src/visualization/volume3d.py`) draws the volume at its real
 origin in this frame, so what the plot shows is what the forward projection

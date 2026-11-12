@@ -6,11 +6,10 @@ import numpy as np
 import plotly.graph_objects as go
 
 # (dict key, display name, y-axis): MAE/RMSE share the left axis,
-# Correlation/SSIM share the right one.
+# SSIM uses the right one.
 _METRIC_ORDER = (
     ("mae", "MAE", "y"),
     ("rmse", "RMSE", "y"),
-    ("correlation", "Correlation", "y2"),
     ("ssim", "SSIM", "y2"),
 )
 
@@ -25,16 +24,6 @@ def difference_image(real: np.ndarray, simulated: np.ndarray) -> np.ndarray:
             f"{real.shape} and {simulated.shape}"
         )
     return real - simulated
-
-
-def _pearson_correlation(real: np.ndarray, simulated: np.ndarray) -> float:
-    """Pearson correlation, defined as 0.0 for constant input."""
-    real_centered = real - real.mean()
-    sim_centered = simulated - simulated.mean()
-    denom = np.sqrt(np.sum(real_centered**2) * np.sum(sim_centered**2))
-    if denom == 0:
-        return 0.0
-    return float(np.sum(real_centered * sim_centered) / denom)
 
 
 def _ssim(real: np.ndarray, simulated: np.ndarray, data_range: float) -> float:
@@ -67,10 +56,9 @@ def _ssim(real: np.ndarray, simulated: np.ndarray, data_range: float) -> float:
 
 
 def compute_metrics(real: np.ndarray, simulated: np.ndarray) -> Dict[str, float]:
-    """Compute MAE, RMSE, Pearson correlation and SSIM between two images.
+    """Compute MAE, RMSE and SSIM between two images.
 
-    Both inputs are converted to float64. For constant images where a
-    correlation is undefined, ``correlation`` is reported as ``0.0``.
+    Both inputs are converted to float64.
     """
     real = np.asarray(real, dtype=np.float64)
     simulated = np.asarray(simulated, dtype=np.float64)
@@ -83,7 +71,6 @@ def compute_metrics(real: np.ndarray, simulated: np.ndarray) -> Dict[str, float]
     diff = real - simulated
     mae = float(np.mean(np.abs(diff)))
     rmse = float(np.sqrt(np.mean(diff**2)))
-    correlation = _pearson_correlation(real, simulated)
 
     data_range = float(
         max(real.max(), simulated.max()) - min(real.min(), simulated.min())
@@ -93,7 +80,6 @@ def compute_metrics(real: np.ndarray, simulated: np.ndarray) -> Dict[str, float]
     return {
         "mae": mae,
         "rmse": rmse,
-        "correlation": correlation,
         "ssim": ssim,
     }
 
@@ -119,7 +105,7 @@ def compute_metrics_per_slice(
     per_frame = [compute_metrics(measured[i], simulated[i]) for i in range(n_proj)]
     return {
         key: np.asarray([frame[key] for frame in per_frame], dtype=np.float64)
-        for key in ("mae", "rmse", "correlation", "ssim")
+        for key in ("mae", "rmse", "ssim")
     }
 
 
@@ -130,7 +116,7 @@ def build_metric_figure(
 ) -> "go.Figure":
     """Line chart of every metric against the projection index.
 
-    MAE/RMSE use the left y-axis; Correlation/SSIM use the right one. A
+    MAE/RMSE use the left y-axis; SSIM uses the right one. A
     vertical line marks the projection currently shown in the views.
     ``proj_indices`` (the gantry indices actually computed) replaces the
     plain 0..n-1 x-axis when given.
@@ -175,7 +161,7 @@ def build_metric_figure(
         yaxis2=dict(
             overlaying="y",
             side="right",
-            title="Correlation / SSIM",
+            title="SSIM",
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
         margin=dict(l=10, r=10, t=30, b=10),

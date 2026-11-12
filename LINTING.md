@@ -5,6 +5,26 @@ exactly** — it matches the project's tooling and avoids reformat churn.
 
 ## Run order (MUST follow)
 
+Run **inside the conda env `ct-viewer`**. Every tool below is installed there via
+the `dev` extra, so there is one interpreter for lint and one for tests — no
+system/conda split.
+
+```powershell
+cmd /c "call C:\Users\hellwege\miniforge3\Scripts\activate.bat ct-viewer && python -m flake8 . --ignore=F841,E501,E402,F541,F401,W503,E203 && python -m black . && python -m isort ."
+```
+
+> **Windows/UTF-8:** this repo contains emoji and `→` in source and tests. With the
+> default cp1252 locale, `isort` prints `Unable to parse file ...` and **silently
+> skips** those files, so a clean run can mean "not checked". Run it with UTF-8 so
+> every file is really checked:
+>
+> ```powershell
+> $env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"
+> ```
+>
+> A correct run prints `Skipped 1 files` (that is `.git`) and no
+> `Unable to parse` lines.
+
 1. **flake8** — static lint check (reports issues; do not auto-fix)
 2. **black** — auto-format (code style, line length 88)
 3. **isort** — sort imports
@@ -37,12 +57,12 @@ python -m isort .
 
 ## Tool availability
 
-- `black`, `isort`, `flake8` are installed at the system level (Python 3.13),
-  NOT inside the `ct-viewer` conda env. Run them from the system Python or the
-  project venv, not from `ct-viewer`.
-- These tools are used for formatting even though the conda env is used for
-  running parallelproj-based tests.
+`flake8`, `black`, and `isort` are installed **inside the conda env `ct-viewer`**
+(they come from the `dev` extra that `environment.yml` pip-installs). Use that env
+for linting as well as for tests; do not reach for a separate system interpreter.
 
+The env is mandatory because `parallelproj` only exists on conda-forge (see
+`AGENTS.md`, `docs/local-environment.md`).
 ## Known flake8 findings (all acceptable)
 
 | Code | Meaning | Why it's fine |

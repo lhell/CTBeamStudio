@@ -2,6 +2,10 @@
 
 Recorded 2026-11-11. Reference for this workstation only; CI is separate.
 
+**This env is mandatory for all project work.** Every command that imports the
+project — the app, `pytest`, and the lint tools — runs inside `ct-viewer`. Rules
+live in [AGENTS.md](../AGENTS.md).
+
 ## Installed
 
 | Item | Path / value |
@@ -10,13 +14,30 @@ Recorded 2026-11-11. Reference for this workstation only; CI is separate.
 | conda | `C:\Users\hellwege\miniforge3\Scripts\conda.exe` |
 | **ct-viewer env** | `C:\Users\hellwege\miniforge3\envs\ct-viewer` |
 | env python | `...\envs\ct-viewer\python.exe` (Python 3.11.18) |
-| parallelproj | 1.10.2 (conda-forge, **CPU-only**) |
+| parallelproj | conda-forge, **CPU-only** |
 | parallelproj C lib | `...\envs\ct-viewer\Library\bin\parallelproj_c.dll` |
-| pytorch | 2.10.0 (`cpu_mkl_py311`) |
+| pytorch | `cpu_mkl_py311` |
 | Streamlit | 1.39.1 |
+| **nibabel** | installed (via the `nifti` extra) — keeps the NIfTI tests from skipping |
+| flake8 / black / isort | installed (via the `dev` extra) |
 
 No NVIDIA GPU on this machine (`nvidia-smi` absent), so CUDA is unavailable and
 `cuda_enabled` is `False` by design.
+
+## Running anything (activate first)
+
+```powershell
+# Tests — expect "301 passed, 0 skipped"
+cmd /c "call C:\Users\hellwege\miniforge3\Scripts\activate.bat ct-viewer && python -m pytest -q -rs"
+
+# Lint (order matters: flake8, black, isort)
+cmd /c "call C:\Users\hellwege\miniforge3\Scripts\activate.bat ct-viewer && python -m flake8 . --ignore=F841,E501,E402,F541,F401,W503,E203"
+cmd /c "call C:\Users\hellwege\miniforge3\Scripts\activate.bat ct-viewer && python -m black ."
+cmd /c "call C:\Users\hellwege\miniforge3\Scripts\activate.bat ct-viewer && python -m isort ."
+```
+
+`-rs` is not optional: it lists every skip, so a skip cannot disappear into the
+summary. The suite must report zero skips.
 
 ## Why Miniforge instead of Miniconda
 

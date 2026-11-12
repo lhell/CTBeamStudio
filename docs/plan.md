@@ -601,6 +601,36 @@
 - **Status:** ⚠️ Open (Research)
 - **Siehe auch:** `docs/research/phantomless-geometry-calibration-helix-cbct.md`
 
+### `[x]` T-90 — Sinogramm-Achsenreihenfolge wirkt auch für DICOM-Ordner und sofort
+
+- **Ziel:** Die Auswahl „File axis order" im Measurements-Panel muss das geladene Bild tatsächlich umorientieren — für jeden Formatpfad und ohne zweiten Klick auf „Load Measurements".
+- **Hintergrund (gemeldeter Fehler):** Bei einem DICOM-Projektionsordner änderte die Auswahl nichts. `_load_dicom` nahm `axis_order` entgegen, benutzte es aber nie und schrieb `source_axis_order=("proj","row","col")` fest; der Setter fiel danach in den Re-Read-Zweig, der wieder über `_load_dicom` lief — die Auswahl war an jeder Stelle wirkungslos. Bei `.npy`/NIfTI wurde die Reihenfolge korrekt angewandt, aber nur beim nächsten Klick auf „Load Measurements", weil der Selectbox-Wert ausschließlich im `if clicked:`-Zweig gelesen wurde.
+- **Umsetzung:**
+  1. `_load_dicom` reicht `axis_order` an `_finish_sinogram` weiter; der native DICOM-Stapel `(proj,row,col)` wird gemäß Deklaration transponiert (z. B. `proj → col → row` ⇒ Rahmen `(n_rows,n_cols)` → `(n_cols,n_rows)`). Die Zeilen-/Spaltenselektion bleibt kanonisch.
+  2. Lazy-Read bleibt erhalten, wenn `proj` auf der ersten Dateiachse liegt (dann wird die Projektionsauswahl weiterhin header-only aufgelöst); bei jeder anderen Reihenfolge liegen die „Projektionen" nicht mehr auf den Dateien, also werden alle Rahmen gelesen und die Auswahl kanonisch aufgelöst.
+  3. `apply_axis_order_change()` im UI wendet die Auswahl sofort über den vorhandenen `SinogramData.axis_order`-Setter an (In-Memory bei Volllast, sonst Re-Read) und ist bei unveränderter Reihenfolge ein No-op.
+  4. Setter um den Fall „kein Roharray, kein `path`" ergänzt (in-memory erzeugte Daten): reine Transposition zwischen alter und neuer Deklaration über `_reorder_canonical`.
+- **Dateien:** `src/backend/loaders/sinogram.py`, `src/visualization/projection_panel.py`, `tests/conftest.py` (Fixture-Variante `graded=True`), `tests/unit/test_sinogram_loader.py`, `tests/unit/test_projection_panel.py`, `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-64, T-65
+- **Akzeptanz:** Ein DICOM-Ordner mit deklarierter Reihenfolge `("proj","col","row")` liefert `data.shape == (n_proj, n_cols, n_rows)` und `source_axis_order` wie deklariert; ein Wechsel nach dem Laden orientiert um; die UI wendet die Auswahl ohne erneuten Lade-Klick an.
+- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Loader-Tests, 3 Helper-Tests, 1 UI-Test. Nachweis mit künstlichen DICOM-Serien (3 Rahmen, 4×6, je Rahmen ein eigener Gradient, damit eine Transposition sichtbar ist): `proj,row,col` → `(3,4,6)`, `proj,col,row` → `(3,6,4)`, Setter hin und zurück reversibel. `_reorder_canonical` zusätzlich gegen einen vollständigen Re-Derive über alle 36 Reihenfolge-Übergänge geprüft (0 Abweichungen). Volle Suite: 301 passed, 0 skipped.
+
+### `[x]` T-91 — Conda-Env `ct-viewer` verbindlich, keine übersprungenen Tests
+
+- **Ziel:** Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; die Suite meldet keine Skips mehr.
+- **Hintergrund:** `pytest` mit dem System-Python (3.13) übersprang die vier parallelproj-Tests, weil `parallelproj_c.dll` nur im aktivierten Env auf `PATH` liegt — die Tests *liefen* also nie, obwohl sie im Repo vorhanden sind. Zusätzlich behauptete `LINTING.md`, `flake8`/`black`/`isort` seien **nicht** im Env installiert und müssten vom System-Python laufen; tatsächlich sind sie über das `dev`-Extra im Env vorhanden.
+- **Umsetzung:**
+  1. Neu: `AGENTS.md` (auto-geladen) mit verbindlicher Env-Regel, exakten Aktivierungsbefehlen, Lint-Reihenfolge, Hard Rules und Test-Bar.
+  2. `LINTING.md`: falsche Tool-Verfügbarkeit korrigiert (alle drei im Env, ein Interpreter für Lint und Tests).
+  3. `pyproject.toml`: `nibabel` zusätzlich in `dev` — die Suite deckt NIfTI-Laden ab, ohne nibabel skippen diese vier Tests still. Damit genügt `.[dev]` für einen vollständigen Lauf; `nifti` bleibt das reine Laufzeit-Extra.
+  4. `environment.yml` und `.github/workflows/ci.yml`: bei `.[dev]` belassen (deckt nibabel jetzt ab).
+  5. `INSTALLATION.md`: die dokumentierten `.[cpu]`/`.[gpu]`-Befehle entfernt — diese Extras existieren in `pyproject.toml` **nie** (per `git log -S` geprüft) und `pip` akzeptiert `.[irgendwas]` ohne jede Warnung, installiert aber nichts; ersetzt durch die tatsächlichen conda-Befehle. Ebenso `parallelproj.__version__` (existiert nicht) und `parallelproj_core` (Modul existiert nicht) korrigiert zu `parallelproj.cuda_present`.
+  6. `docs/local-environment.md`, `docs/README.md`, `AGENTS.md`: Env als Pflicht dokumentiert, Test-/Lint-Befehle mit Aktivierung, Docs-Index ergänzt.
+- **Dateien:** `AGENTS.md` (neu), `LINTING.md`, `pyproject.toml`, `environment.yml`, `.github/workflows/ci.yml`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`
+- **Abhängig von:** T-69
+- **Akzeptanz:** `python -m pytest -q -rs` im Env `ct-viewer` endet mit „0 skipped"; `flake8` (Projekt-Ignore-Set), `black --check`, `isort --check-only` laufen im selben Env fehlerfrei.
+- **Status:** ✅ Done (Nov 12, 2026) — Env 3.11.18 mit parallelproj, torch, nibabel, flake8/black/isort. Suite: **301 passed, 0 skipped** (~25–40 s), vorher 293 passed / 2 skipped im System-Python bzw. 297/4 im Env ohne nibabel. `flake8 --count` = 0, `black --check` 60 Dateien unverändert, `isort --check-only` exit 0. Zusatzbefund: `.[cpu]`/`.[gpu]` waren nur in der Doku vorhanden, nie in `pyproject.toml`; `pip install -e ".[bogus]"` warnt nicht und installiert nichts — die Doku führt jetzt die conda-Befehle.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -617,6 +647,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
+| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips) |
 
 ## Decision Log
 
@@ -640,6 +671,10 @@
 | D-16 | 2026-11-10 | `VIEWER_HEIGHT_PX = 700` (nicht 900) + `SCENE_DOMAIN_Y = [0.2, 1]` | bei 900 px begann die Canvas 362 px unter dem Seitenanfang und die Szene lief aus dem Bild; Plotly zentriert 3D-Szenen sonst im Canvas |
 | D-17 | 2026-11-10 | MPR-Bilder mit `use_column_width=True`, kein fester Pixel-Cap | ein fester Cap läuft in einer schmalen Spalte über (gemessen: 260 px in 201 px); das 1:2-Verhältnis hält den Stapel stattdessen bei 685/700 px |
 | D-18 | 2026-11-10 | Kein eigener Fullscreen-Code — Streamlits `stFullScreenFrame` nutzen | `st.image` bringt „View fullscreen" mit, Streamlit injiziert denselben Mechanismus als Modebar-Button in `st.plotly_chart` (`modeBarButtonsToAdd`); 3D-Vollbild verifiziert (`399×700` → `1088×612`), Bild-Vollbild skaliert das Bild nicht mit |
+| D-19 | 2026-11-12 | `axis_order` gilt für alle Formate; ein DICOM-Ordner wird gemäß Deklaration transponiert statt ignoriert | Der Stapel `(proj,row,col)` ist strukturell eindeutig, aber wer die Detektorachse vertauscht gespeichert hat, muss das sagen können — sonst bleibt der einzige Weg zur Korrektur ein Umpacken der Dateien |
+| D-20 | 2026-11-12 | Achsenreihenfolge wird beim Ändern **sofort** angewandt, nicht erst beim nächsten Lade-Klick | Der Nutzer beurteilt die Auswahl am Bild; ein Regler, der scheinbar nichts tut, gilt als defekt (gemeldeter Fehler) |
+| D-21 | 2026-11-12 | Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; ein Skip im Testlauf gilt als Defekt | `parallelproj_c.dll` liegt nur im aktivierten Env auf `PATH` — ein System-Interpreter *überspringt* die parallelproj-Tests, statt sie laufen zu lassen; das sieht wie grün aus, ist aber verlorene Abdeckung |
+| D-22 | 2026-11-12 | `nibabel` steht in `dev` **und** in `nifti`; kein `cpu`/`gpu`-Extra | Die Suite deckt NIfTI ab, also muss die Test-Abhängigkeit `dev` sein — sonst skippt ein grüner Lauf still vier Tests. `parallelproj` ist conda-forge-only und kann kein pip-Extra sein; ein nicht existierendes Extra akzeptiert pip warnungslos und installiert nichts |
 
 ## Offene Fragen
 
@@ -659,6 +694,11 @@
 - T-23.8: Tests für volume3d.py
 - Mouse-Wheel-Scrolling über Bilder
 - T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
+
+## Erledigt (2026-11-12)
+
+- ✅ T-90: „File axis order" wirkt jetzt für DICOM-Ordner (Transposition des nativen Stapels statt Ignorieren) und beim Ändern sofort statt erst nach erneutem „Load Measurements"; 9 neue Tests, inkl. künstlicher DICOM-Serien mit Gradient pro Rahmen
+- ✅ T-91: Conda-Env `ct-viewer` verbindlich gemacht (`AGENTS.md`, `LINTING.md`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`), `nifti`-Extra in `environment.yml` und CI ergänzt — Suite jetzt **301 passed, 0 skipped**
 
 ## Erledigt (2026-11-10)
 

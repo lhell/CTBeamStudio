@@ -27,4 +27,5 @@ dependencies:
   # tensors with torch, so torch is required, not optional.
   - pytorch=*=cpu*
   - pip:
+      # [dev] pulls nibabel too, so the NIfTI tests run instead of skipping.
       - -e .[dev]

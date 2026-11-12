@@ -3,11 +3,15 @@
 ## 📁 Directory Structure
 
 ```
+AGENTS.md                      ← Agent instructions (env, commands, hard rules)
+LINTING.md                     ← Lint order, ignore set
+INSTALLATION.md                ← Installation, all platforms
 docs/
 ├── README.md                    ← This file
-├── plan.md                      ← Main implementation plan (T-01 to T-75)
+├── plan.md                      ← Main implementation plan (task ledger, German)
 ├── data.md                      ← Data documentation (AAPM challenge, etc.)
 ├── geometry.md                  ← Projection geometry definition
+├── local-environment.md        ← This workstation: conda paths, test/lint commands
 ├── testing-setup-hint.md       ← Testing setup hints
 ├── versioning.md               ← Git + Docker release versioning
 │
@@ -69,6 +73,10 @@ docs/
 ### Core Documentation
 | File | Description |
 |------|-------------|
+| `../AGENTS.md` | Agent instructions: mandatory conda env, commands, hard rules, test bar |
+| `../LINTING.md` | Lint tool order (flake8 → black → isort), ignore set |
+| `../INSTALLATION.md` | Installation for Docker, pip, and conda (conda required for parallelproj) |
+| `local-environment.md` | This workstation: Miniforge/conda paths, activate commands |
 | `data.md` | AAPM Challenge data documentation, citation requirements |
 | `geometry.md` | Projection geometry parameters, coordinate system |
 | `testing-setup-hint.md` | Testing setup hints |

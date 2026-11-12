@@ -38,6 +38,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Runtime extra: only needed to load NIfTI sinograms.
 nifti = ["nibabel>=5.0.0"]
 dev = [
     "pytest>=7.4.0",
@@ -46,6 +47,10 @@ dev = [
     "black>=23.10.0",
     "isort>=5.12.0",
     "mypy>=1.6.0",
+    # The suite covers NIfTI loading, so dev must install nibabel too. Without
+    # it those tests skip silently instead of running — a green run that quietly
+    # lost coverage. Keep this in sync with the nifti extra above.
+    "nibabel>=5.0.0",
 ]
 # NOTE: parallelproj MUST be installed via conda-forge, NOT pip!
 # See: docs/superpowers/specs/2026-10-30-forward-projection-spec.md

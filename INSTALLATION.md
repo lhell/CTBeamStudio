@@ -2,6 +2,13 @@
 
 This guide covers all installation options for CTBeamStudio.
 
+> **Working on this repo? Use the conda env.** All development commands — the
+> app, the test suite, and the lint tools — run inside the conda env `ct-viewer`.
+> See [AGENTS.md](AGENTS.md) for the agent-facing rules and
+> [docs/local-environment.md](docs/local-environment.md) for this workstation's
+> exact paths. The pip/venv option below is for running the viewer only; it
+> cannot run the parallelproj forward projection or the full test suite.
+
 ## Prerequisites
 
 - **Python 3.11+** (3.12 recommended for best compatibility)
@@ -70,11 +77,16 @@ it over Miniconda if `repo.anaconda.com` is unreachable on your network.
 bash Miniforge3-Linux-x86_64.sh -b -p "$HOME/miniforge3"
 
 # 3. Create the environment (CPU-only parallelproj)
+#    Installs the app with the dev extra, which includes nibabel, so the whole
+#    suite runs with zero skips.
 conda env create -f environment.yml
 conda activate ct-viewer
 
 # 4. Run the app
 streamlit run src/visualization/app.py
+
+# 5. Run the tests — must report "0 skipped"
+python -m pytest -q -rs
 ```
 
 #### Option 3b: Using environment.yml with Miniconda
@@ -114,12 +126,16 @@ streamlit run src/visualization/app.py
 ### Verify parallelproj GPU support
 
 ```python
-import parallelproj
-print(parallelproj.__version__)
-
-import parallelproj_core
-print(parallelproj_core.cuda_enabled)  # 1 = GPU, 0 = CPU
+import parallelproj  # prints the C-lib path and CUDA status on import
+print(parallelproj.cuda_present)          # False = CPU-only build
+print(parallelproj.lib_parallelproj_c_fname)  # path to parallelproj_c.dll
 ```
+
+Two corrections to the API names people commonly guess:
+- `parallelproj` has **no** `__version__` attribute (`AttributeError`); use
+  `importlib.metadata.version("parallelproj")`.
+- There is **no** `parallelproj_core` module; the CUDA flag is
+  `parallelproj.cuda_present`.
 
 ### Verify installation
 
@@ -146,7 +162,7 @@ conda-forge, so create and activate the `ct-viewer` env (Option 3) and start
 Streamlit from it:
 ```bash
 conda activate ct-viewer
-python -c "import parallelproj; print(parallelproj.__version__)"
+python -c "import parallelproj; print(parallelproj.cuda_present)"
 streamlit run src/visualization/app.py
 ```
 
@@ -176,34 +192,59 @@ conda install -c conda-forge parallelproj "libparallelproj=*=cpu*"
 
 ## Optional Dependencies
 
-### For development
+Extras are pip's optional dependency groups from `pyproject.toml`, installed with
+the `[extra]` suffix. Only two exist:
+
+| Extra | Contains | Use for |
+|---|---|---|
+| `dev` | pytest, pytest-cov, flake8, black, isort, mypy, **nibabel** | running the tests and the lint tools |
+| `nifti` | nibabel | loading `.nii`/`.nii.gz` sinograms at runtime only |
+
+`dev` includes nibabel on purpose: the suite covers NIfTI loading, and without
+nibabel those tests skip instead of running.
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"     # tests + lint (includes nibabel)
+pip install -e ".[nifti]"   # runtime NIfTI support, no test tooling
 ```
 
-Includes: pytest, black, isort, flake8, mypy
+There is deliberately **no** `cpu`/`gpu` extra — parallelproj cannot be installed
+from PyPI (see below).
 
 ### For Forward Projection (parallelproj + PyTorch)
 
-**CPU-only (keine GPU erforderlich):**
+There is **no pip extra for this**, and there cannot be: `parallelproj` ships
+compiled kernels and is published only on conda-forge. There is no `.[cpu]` or
+`.[gpu]` extra — naming a non-existent extra makes pip install the base package
+without any warning, so it looks like it worked. Use conda:
+
+**CPU-only (no GPU required):**
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install -e ".[cpu]"
+conda activate ct-viewer
+conda install -c conda-forge parallelproj "libparallelproj=*=cpu*" "pytorch=*=cpu*"
 ```
 
-**GPU (CUDA 12.1):**
+**GPU (CUDA):**
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install -e ".[gpu]"
+conda activate ct-viewer
+conda install -c conda-forge parallelproj pytorch cuda-toolkit
+```
+
+If the env was created from `environment.yml`, both are already installed and
+there is nothing to do. PyTorch alone can also come from pip (below), but
+`parallelproj` still has to come from conda, in that same environment:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+conda install -c conda-forge parallelproj "libparallelproj=*=cpu*"
 ```
 
 **Verify installation:**
 ```python
 import parallelproj
 import torch
-print(f"parallelproj: {parallelproj.__version__}")
 print(f"CUDA available: {torch.cuda.is_available()}")
+print(parallelproj)  # prints the C-lib and CUDA status on import
 ```
 
 ### For documentation

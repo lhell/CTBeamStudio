@@ -70,6 +70,8 @@ jobs:
       - name: Install the app and test dependencies
         shell: bash -el {0}
         run: |
+          # [dev] includes nibabel, so the NIfTI sinogram tests run instead of
+          # skipping: the suite is expected to report zero skips.
           pip install -e ".[dev]"
       - name: Run pytest
         shell: bash -el {0}

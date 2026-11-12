@@ -16,7 +16,12 @@ from visualization.projection_panel import (
     clear_geometry_edit_state,
     render_measurement_sidebar,
 )
-from visualization.volume_cache import load_volume_cached
+from visualization.volume_cache import (
+    KIND_DEMO,
+    load_last_session,
+    load_volume_cached,
+    save_last_demo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +295,39 @@ def create_demo_volume_job():
     return build
 
 
+def restore_last_session() -> None:
+    """Re-seed session state from the persisted last-session record.
+
+    A browser reload starts a new Streamlit session and wipes session_state:
+    the volume, geometry and demo state are gone even though the caches
+    survived. The empty state's "Restore last session" button calls this: a
+    DICOM record restores the volume from the in-memory cache (a reload keeps
+    the server process, so this is a cache hit), a demo record rebuilds the
+    coherent demo trio (its ideal forward projection is disk-cached).
+    """
+    record = load_last_session()
+    if record is None:
+        return
+    kind, files = record
+    if kind == KIND_DEMO:
+        load_demo_volume()
+        return
+
+    with st.spinner("Restoring last volume..."):
+        volume = load_volume_cached([str(f) for f in files])
+
+    st.session_state["volume"] = volume
+    st.session_state["series"] = _series_stub(
+        "Restored series", "Restored", volume.n_slices
+    )
+    st.session_state["loaded_files"] = files
+    st.session_state.pop("demo_mode", None)
+    # New volume: drop cached slice indices so clamp_slice_state re-centers.
+    for k in ("axial_slice", "coronal_slice", "sagittal_slice"):
+        st.session_state.pop(k, None)
+    st.toast(f"Restored last volume ({len(files)} slices)!")
+
+
 def should_startup_load() -> bool:
     """Whether the app loads data automatically on start.
 
@@ -332,4 +370,5 @@ def load_demo_volume():
     # the dummy values instead of stale ones.
     clear_geometry_edit_state()
     st.toast("Loaded demo phantom with dummy measurement!")
+    save_last_demo()
     return dummy.volume

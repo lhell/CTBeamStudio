@@ -7,6 +7,12 @@ from backend.loaders.dicom import load_dicom_series
 
 CACHE_FILE = Path("data/.last_loaded.json")
 
+# Session kinds persisted in CACHE_FILE: a DICOM volume (with its file
+# paths) or the demo phantom (rebuilt from the disk-cached forward
+# projection on restore, see sidebar.load_demo_volume).
+KIND_DICOM = "dicom"
+KIND_DEMO = "demo"
+
 # In-memory cache keyed by sorted tuple of file paths
 _volume_cache: dict[tuple, object] = {}
 
@@ -38,26 +44,52 @@ def load_volume_cached(
 
 def save_last_loaded(files: list) -> None:
     """Save last loaded file paths to cache file."""
+    _save_session_record(KIND_DICOM, files)
+
+
+def save_last_demo() -> None:
+    """Record that the last session used the demo phantom."""
+    _save_session_record(KIND_DEMO, [])
+
+
+def _save_session_record(kind: str, files: list) -> None:
+    """Write a ``{kind, files}`` record to the cache file."""
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     # Sort files to ensure consistent cache key
     sorted_files = sorted(files, key=lambda f: str(f))
-    CACHE_FILE.write_text(json.dumps({"files": [str(f) for f in sorted_files]}))
+    CACHE_FILE.write_text(
+        json.dumps({"kind": kind, "files": [str(f) for f in sorted_files]})
+    )
 
 
-def load_last_loaded() -> list | None:
-    """Load last saved file paths from cache file.
+def load_last_session() -> tuple[str, list] | None:
+    """Return ``(kind, files)`` of the last session, or None.
 
-    Only the first path is verified. Probing every slice of a large series
-    can block for a long time on slow (network) drives. Missing later files
-    surface as a load error, which callers handle with a demo fallback.
+    A record without a ``kind`` (written before the restore button existed)
+    is a DICOM volume. Only the first path is verified. Probing every slice
+    of a large series can block for a long time on slow (network) drives.
+    Missing later files surface as a load error, which callers handle with a
+    demo fallback.
     """
     if not CACHE_FILE.exists():
         return None
     try:
-        files = [Path(f) for f in json.loads(CACHE_FILE.read_text()).get("files", [])]
-        return files if files and files[0].exists() else None
+        record = json.loads(CACHE_FILE.read_text())
     except Exception:
         return None
+    files = [Path(f) for f in record.get("files", [])]
+    kind = record.get("kind", KIND_DICOM)
+    if kind == KIND_DICOM and (not files or not files[0].exists()):
+        return None
+    return (kind, files)
+
+
+def load_last_loaded() -> list | None:
+    """Load last saved DICOM file paths (None for a demo record)."""
+    record = load_last_session()
+    if record is None or record[0] != KIND_DICOM:
+        return None
+    return record[1]
 
 
 def clear_last_loaded() -> None:

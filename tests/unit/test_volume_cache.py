@@ -67,5 +67,42 @@ class TestLoadLastLoaded:
         assert volume_cache.load_last_loaded() is None
 
 
+class TestLastSessionRecord:
+    """The {kind, files} record behind the 'Restore last session' button."""
+
+    def test_demo_roundtrip(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
+
+        volume_cache.save_last_demo()
+
+        assert volume_cache.load_last_session() == ("demo", [])
+
+    def test_dicom_roundtrip_keeps_files(self, tmp_path, monkeypatch):
+        files = [tmp_path / f"slice_{i}.dcm" for i in range(2)]
+        for file in files:
+            file.write_text("dicom")
+        monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
+
+        volume_cache.save_last_loaded(files)
+
+        assert volume_cache.load_last_session() == ("dicom", files)
+
+    def test_legacy_record_without_kind_is_dicom(self, tmp_path, monkeypatch):
+        files = [tmp_path / "slice_0.dcm"]
+        files[0].write_text("dicom")
+        monkeypatch.setattr(volume_cache, "CACHE_FILE", _write_cache(tmp_path, files))
+
+        kind, restored = volume_cache.load_last_session()
+
+        assert kind == "dicom"
+        assert restored == files
+
+    def test_load_last_loaded_ignores_demo_record(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
+        volume_cache.save_last_demo()
+
+        assert volume_cache.load_last_loaded() is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

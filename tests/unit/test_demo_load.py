@@ -61,10 +61,13 @@ def _stub_dummy_measurement() -> DummyMeasurement:
     )
 
 
-def test_demo_load_seeds_the_coherent_trio(app, monkeypatch):
+def test_demo_load_seeds_the_coherent_trio(app, tmp_path, monkeypatch):
     """Loading the demo phantom generates the dummy measurement automatically:
     volume + dummy geometry + sinogram are seeded together and the sample
     selection is preset to "all", so the comparison is ready without a file."""
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
     monkeypatch.setattr(
         "visualization.phantom.create_dummy_measured_sinogram",
         _stub_dummy_measurement,
@@ -88,9 +91,12 @@ def test_demo_load_seeds_the_coherent_trio(app, monkeypatch):
     assert app.session_state["sample_col_mode"] == "all"
 
 
-def test_demo_load_replaces_previously_loaded_data(app, monkeypatch):
+def test_demo_load_replaces_previously_loaded_data(app, tmp_path, monkeypatch):
     """The demo trio is self-contained: it replaces whatever volume,
     geometry and measurement were in session state before."""
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
     app.session_state["volume"] = None
     app.session_state["sinogram"] = None
     app.session_state["projection_geometry"] = ProjectionGeometry(
@@ -109,3 +115,27 @@ def test_demo_load_replaces_previously_loaded_data(app, monkeypatch):
     assert list(app.exception) == []
     assert app.session_state["sinogram"].data.shape == (3, 4, 8)
     assert app.session_state["projection_geometry"].source == "dummy-test"
+
+
+def test_empty_state_restores_the_demo_session(app, tmp_path, monkeypatch):
+    """After a reload (new session, empty state) the restore button rebuilds
+    the demo trio from the persisted record."""
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
+    volume_cache.save_last_demo()
+    monkeypatch.setattr(
+        "visualization.phantom.create_dummy_measured_sinogram",
+        _stub_dummy_measurement,
+    )
+
+    app.session_state["volume"] = None
+    app.session_state["demo_mode"] = False
+    app.run()
+
+    app.button(key="empty_restore").click()
+    app.run()
+
+    assert list(app.exception) == []
+    assert app.session_state["sinogram"].data.shape == (3, 4, 8)
+    assert app.session_state["demo_mode"] is True

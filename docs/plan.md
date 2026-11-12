@@ -727,7 +727,32 @@
 - **Akzeptanz:** Difference-Bild startet auf derselben vertikalen Höhe wie Measured/Simulated; UI-Smoke-Suite grün.
 - **Status:** ✅ Done (Nov 12, 2026) — `test_ui_smoke.py` + `test_projection_panel.py` grün, Lint sauber.
 
-## Zeitplan
+### `[x]` T-101 — Shepp-Logan-Phantom um 90° gedreht: erste (anterior) Projektion zeigt das klassische aufrechte Oval
+- **Ziel:** Das 3D-Phantom legte die klassische Shepp-Logan-Scheibe in die Axialebene (klassisch-horizontal → x, klassisch-vertikal → y). Die erste Projektion (Quelle bei 0° = anterior, +X; Detektor-Spalten entlang y, Zeilen entlang z) zeigte das Phantom therefore um 90° gedreht (Tumoren links, „Top-Ellipse" rechts). Jetzt: die klassische Scheibe liegt in der Koronalebene — klassisch-horizontal → y (patient left-right), klassisch-vertikal → z, Tiefenachse → x (anterior-posterior). Die erste Projektion zeigt das aufrechte Oval (Schädel 138 mm breit × 184 mm hoch), die Kopfabmessungen sind anatomisch plausibel (A-P 180 mm > L-R 138 mm, S-I 184 mm).
+- **Dateien:** `src/visualization/phantom.py` (`ELLIPSOIDS_3D` zyklisch permutiert: (x0, y0, z0) → (z0, x0, y0), a/b/c folgen; `create_shepp_logan_3d` baut die klassische Ebene aus Zeilen (y) und Slices (z), Tiefenachse = Spalten (x); `DUMMY_CACHE_VERSION` 2 → 3, 2D-Docstring), `src/visualization/volume3d.py` (`get_camera_preset` + PyVista-`camera_views`: front = +X anterior, back = −X, left = +Y, right = −Y), `src/visualization/mpr.py` (Ebenen-Kommentare auf die Patient-Konvention umgestellt), `docs/geometry.md` (Coordinate-System-Section: X = anterior/posterior, Y = lateral — war inkonsistent mit dem Winkel-Diagramm und dem Code), `tests/test_phantom.py` (Head-Dimensions-Test auf die neue Achsenzuordnung)
+- **Abhängig von:** T-93, T-95
+- **Umsetzung:**
+  1. `ELLIPSOIDS_3D`: zyklische Permutation der Positionen (x0, y0, z0) → (z0, x0, y0) mit a entlang y, b entlang z, c entlang x; theta rotiert jetzt in der klassischen (y, z)-Ebene, die ±18°-Kammer-Tilts bleiben erhalten. Kommentare auf y-Vorzeichen-Labels umgestellt (+y = patient left).
+  2. `create_shepp_logan_3d`: das (V, U)-Gitter läuft über Slices (z) × Zeilen (y), die Ellipsen-Formel rotiert in dieser Ebene, die Füllschleife läuft über die Spalten (x). Shape-(num_slices, size, size)- und Spacing-Verträge unverändert.
+  3. `DUMMY_CACHE_VERSION` gebumpt — der Ideal-FP-Cache enthält die Phantom-Orientierung nicht im Fingerprint und würde sonst eine veraltete (ungedrehte) Projektion wiederverwenden.
+  4. Kamera-Presets: „front" blickt jetzt von +X (anterior, wie die FP bei 0°), „left" von +Y — vorher folgten die Namen der veralteten X=lateral-Konvention und waren zur FP-Richtung falsch.
+- **Akzeptanz:** Erste (anterior-)Projektion zeigt das aufrechte Oval (vorher: nahezu runder Blob mit seitlichen Tumoren — vorher/nachher als PNG verifiziert); Head-Dimensionen x≈180/y≈138/z≈184 mm; volle Suite 340 passed, 0 skipped; flake8/black/isort sauber.
+- **Status:** ✅ Done (Nov 12, 2026) — `DUMMY_FP_CACHE` wird durch den Versions-Bump automatisch invalidiert; erster Demo-Lauf rechnet die FP neu.
+
+### `[x]` T-102 — Geometry wird bei allen Messungsformaten mitgeführt; Default-Geometrie = Dummy-Phantom-Geometrie
+- **Ziel:** `load_sinogram` reichte `geometry` nur an den DICOM-Pfad durch — ein `.npy`/NIfTI-Messungs-Laden verlor die Geometrie still (`SinogramData.geometry = None`), obwohl die App die aktive Geometrie übergibt. Dadurch bekamen die Sinogram-Ansichten kein Detektor-Spacing und die Geometrie-Readouts waren inkohärent. Jetzt: alle drei Formate führen die Geometrie mit. Und: ohne Geometry-File ist die Default-Geometrie jetzt die **Dummy-Phantom-Geometrie** (`create_dummy_geometry()`, 60 Views, 512 × 1 mm Spalten, 192 × 2 mm Zeilen, SDD 1000 / SID 500, cone beam) statt der nackten Dataclass-Defaults — der Leerzustand und das Demo bleiben kohärent (gleicher Detektor, gleicher Scan).
+- **Dateien:** `src/backend/loaders/sinogram.py` (`_load_numpy`/`_load_nifti` mit `geometry`-Parameter, Forward an `_finish_sinogram`; `load_sinogram` reicht durch), `src/visualization/geometry_cache.py` (`default_geometry` → Cached oder `create_dummy_geometry()`), `tests/unit/test_sinogram_loader.py` (+1 Test: numpy-Laden mit Geometrie führt sie mit), `tests/unit/test_geometry_cache.py` (Fallback-Test auf die Dummy-Geometrie)
+- **Abhängig von:** T-98
+- **Umsetzung:** `_load_numpy`/`_load_nifti` nehmen `geometry` entgegen und geben es an `_finish_sinogram` weiter; `load_sinogram` reicht es an alle drei Pfade durch. `default_geometry()` fällt auf `create_dummy_geometry()` zurück (lazy Import, kein Zirkel). Eine Variante, `projections_per_rotation` aus der Projektionszahl der geladenen Datei abzuleiten, wurde verworfen: für Teil-Dateien (z. B. den 1-Projektions-Fall) wäre sie falsch, und sie leckte über die module-scoped UI-App-Fixture in Folgetests. Nachtrag: das Measurements-Expander bekommt die Sampling-Options als Opt-in zurück (T-98 lud immer die ganze Datei) — eine Checkbox „Sample instead of the whole file" (default aus) blendet die Per-Achsen-Auswahl ein (`render_selection_controls`, Prefix `load`, Proj-Default Downsample 10), ein gesampelter Load liest nur den gewählten Bereich (lazy für .npy/NIfTI), nie stillschweigend.
+- **Akzeptanz:** `.npy`-Laden mit `geometry=ProjectionGeometry()` → `sinogram.geometry is geometry` und `projections_per_rotation == 2304`; `default_geometry()` ohne Cache → `create_dummy_geometry()`; bestehende Loader-Tests (ohne Geometrie → `None`) unverändert grün; UI-Smoke-Suite grün (Checkbox aus per Default, Per-Achsen-Auswahl erscheint beim Anschalten); Lint sauber.
+- **Status:** ✅ Done (Nov 12, 2026) — Suite 341 passed, 0 skipped (die Korrelations-Metrik wurde separat entfernt).
+
+### `[ ]` T-103 — Restore last session button in empty state (Reload überleben)
+
+- **Ziel:** Nach einem Browser-Reload (neue Streamlit-Session) sind Volume, Geometrie und Demo-State aus der `session_state` weg, obwohl die Caches (`data/.last_loaded.json`, In-Memory `_volume_cache`, disk-cached Ideal-FP) überleben. Die Empty State bekommt jetzt einen „↺ Restore last session"-Button, der den letzten Stand wiederherstellt: DICOM-Volumen aus dem In-Memory-Cache (Reload = gleicher Server-Prozess → Cache-Hit), Demo-Trio neu aus dem disk-cached Forward-Projection.
+- **Dateien:** `src/visualization/volume_cache.py` (Record `{kind, files}`; `save_last_demo`, `load_last_session`; `load_last_loaded`-Kompatibilität), `src/visualization/sidebar.py` (`load_demo_volume` persistiert die Demo, `restore_last_session`), `src/visualization/app.py` (Restore-Button in `render_empty_state`)
+- **Abhängig von:** T-85, T-96
+- **Status:** ✅ Done (Nov 12, 2026) — Restore-Button erscheint nur, wenn ein gültiger Session-Record existiert; Clear Cache entfernt ihn (Cache-Datei gelöscht).
 
 | Tag | Datum | Tasks |
 |---|---|---|
@@ -744,6 +769,7 @@
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
 | 13 | Mi, 12.11. | T-90 ✅ bis T-99 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei; Geometrie-Laden im Geometry-Tab) |
+| 14 | Do, 12.11. | T-101 ✅ (Shepp-Logan-Phantom um 90° gedreht — klassische Scheibe in der Koronalebene, erste anterior-Projektion zeigt das aufrechte Oval; Kamera-Presets front=+X; geometry.md-Koordinaten-Section konsolidiert) + T-102 ✅ (Geometry auch bei .npy/NIfTI-Messungs-Laden mitgeführt — Default 2304 Projections/Rotation) |
 
 ## Decision Log
 

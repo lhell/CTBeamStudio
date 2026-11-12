@@ -135,13 +135,16 @@ def test_clear_cache_is_above_the_image_section(app):
     assert not any("Auto-load cache" in label for label in labels)
 
 
-def test_startup_shows_an_empty_state_with_both_load_actions():
+def test_startup_shows_an_empty_state_with_both_load_actions(tmp_path, monkeypatch):
     """A fresh start loads nothing automatically: the viewer shows "Nothing to
     show" and offers the sidebar plus the demo phantom as the two ways in.
 
     Uses its own AppTest (no seeded volume) because the shared fixture starts
     with a volume present.
     """
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "missing.json")
     at = AppTest.from_file(str(APP_PATH), default_timeout=90)
     at.run()
 
@@ -498,6 +501,15 @@ def test_measurements_panel_offers_dummy_measurement(app):
     assert DUMMY_BUTTON_LABEL in labels
 
 
+def test_measurements_panel_offers_opt_in_sampling(app):
+    """The Measurements expander carries the sampling options as an opt-in:
+    the checkbox renders off by default (the whole file loads), and turning
+    it on reveals the per-axis selection without another click."""
+    boxes = {c.label: c.value for c in app.sidebar.checkbox}
+    assert "Sample instead of the whole file" in boxes
+    assert boxes["Sample instead of the whole file"] is False
+
+
 def _stub_dummy_measurement() -> DummyMeasurement:
     """A tiny coherent stand-in for the (expensive) real generator."""
     geometry = ProjectionGeometry(
@@ -531,12 +543,15 @@ def _stub_dummy_measurement() -> DummyMeasurement:
     )
 
 
-def test_dummy_button_seeds_coherent_demo_pair(app, monkeypatch):
+def test_dummy_button_seeds_coherent_demo_pair(app, tmp_path, monkeypatch):
     """Clicking the dummy button seeds volume + geometry + measurement and
     presets the fp selection to "all", so a click on "Run Forward
     Projection" reproduces the measurement's shape exactly. The heavy
     generator is stubbed — its numerics are covered in
     tests/test_dummy_measurement.py."""
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
     monkeypatch.setattr(
         "visualization.phantom.create_dummy_measured_sinogram",
         _stub_dummy_measurement,
@@ -560,9 +575,12 @@ def test_dummy_button_seeds_coherent_demo_pair(app, monkeypatch):
     assert app.session_state["sample_col_mode"] == "all"
 
 
-def test_dummy_button_overrides_a_loaded_measurement(app, monkeypatch):
+def test_dummy_button_overrides_a_loaded_measurement(app, tmp_path, monkeypatch):
     """The dummy is a self-contained demo pair: it replaces whatever volume,
     geometry and measurement were in session state before."""
+    from visualization import volume_cache
+
+    monkeypatch.setattr(volume_cache, "CACHE_FILE", tmp_path / "last_loaded.json")
     _seed_measurements(app, shape=(5, 9, 11))
     monkeypatch.setattr(
         "visualization.phantom.create_dummy_measured_sinogram",

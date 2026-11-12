@@ -659,6 +659,23 @@
 - **Akzeptanz:** Der Generator liefert `(ppr, Zeilen, Spalten)` float32, endliche Werte, mit Seed reproduzierbar; `spr=0` ist reines Poisson-Rauschen um das ideale FP (Mittelwert ≈ 0), `spr>0` senkt die gemessenen Linienintegrale systematisch; Photonenmangel floort bei `ln(i0)`; Achsenwechsel transponiert in-memory reversibel; Cache-Roundtrip bit-identisch, invalidiert bei Geometrie-/Energie-Änderung, Custom-Volumes schreiben nie; UI-Button setzt das kohärente Trio und presetet die FP-Auswahl. Volle Suite grün, 0 Skips.
 - **Status:** ✅ Done (Nov 12, 2026) — 19 neue Tests (16 Unit + 3 UI-Stub). Nachgemessen in `ct-viewer` (CPU-only): erste Generierung 12,6 s (unkorrekter Origin) bzw. 19,5 s (zentriert, ganzer Kopf im Kegel), Cache-Treffer 3,2 s, Cache 4,0 MB komprimiert; Preview bestätigt zentrierten, rotierenden Kopf mit Schädelrand, Streu-Belag und Rauschkorn. Lint: flake8 0, black/isort sauber.
 
+### `[x]` T-94 — 3D-Ansicht: echtes Weltkoordinatensystem (Origin + Spacing der FP)
+- **Ziel:** Der 3D-Plot muss das Volumen im selben Weltkoordinatensystem zeichnen, in dem die Forward-Projektion rechnet — echter DICOM-Origin, echtes Spacing — sodass Geometrie-Overlay (Source-Pfad, Detektor-Ebene, Zentralstrahlen) und gerendertes Phantom mit den simulierten Projektionen übereinstimmen. Gemeldeter Fehler: der 3D-Plot zeigte den Zentralstrahl durch die Phantommitte, während die simulierte FP das Phantom oben am Detektor zeigte.
+- **Hintergrund:**
+  - `create_volume_figure()` positionierte das Volumen-Mesh schematisch zentriert auf den Weltsprungpunkt und ignorierte `Volume.origin` komplett; die FP platziert Voxel `[0, 0, 0]` (in `(x, y, z)`-Ordnung) am echten Origin. Mit dem Demo-Default-Origin (0,0,0) parkt der Kopf im `+x/+y/+z`-Oktanten: die FP sieht das Phantom oberhalb der Rotationsachse (Phantom oben am Detektor), der 3D-Plot tat so, als sei es zentriert — daher die Inkonsistenz.
+  - Zweitdiscrepanz: `get_detector_position()` zeichnete die Detektor-Ebene bei `-sdd` vom Isocenter, der Projektor platziert sie bei `-(sdd - sid)` (SDD ist ab Source gemessen, nicht ab Rotationsachse — siehe `backend.parallelproj.geometry`). Die gezeichnete Ebene lag `sid` mm zu weit außen, die Zentralstrahlen waren länger als die echten Rays (`sdd`).
+- **Umsetzung:**
+  1. `create_volume_figure(..., origin=None)`: `origin` = Weltposition `(x, y, z)` des ersten Voxels (DICOM-Origin, gleiche Konvention wie `Volume.origin`). Mesh (Iso-Modus) und Voxel-Wolke (Volume-Modus) werden am echten ersten-Voxel-Ort gezeichnet; die Kamera-Bounds umrahmen das zellzentrierte Gitter (Ausdehnung `n * spacing`). `None` behält die alte schematische Zentrierung (Rückwärtskompatibilität).
+  2. Downsample-Korrektheit: Mean-Pooling von `factor` Voxeln verschiebt die erste gezeichnete Voxelmitte um `0.5 * (factor - 1)` Source-Voxel in den Origin hinein; die Zeichenpfade (Iso: Gesamtfaktor `downsample`; Volume: `downsample * ds`) wenden den Shift an, sodass die Fläche exakt auf den Weltpositionen liegt, die der Projektor durchtraced. Der Legacy-Pfad (`origin=None`) bleibt unverändert.
+  3. `get_volume_center(..., origin=None)`: mit Origin die echte Gittermitte (`origin + halbe Ausdehnung`), ohne `(0, 0, 0)`.
+  4. `get_detector_position()`: Detektor-Ebene bei `did = sdd - sid` vom Isocenter — gleiche Konvention wie `backend.parallelproj.geometry`; Zentralstrahlen jetzt mit echter Länge `sdd`.
+  5. `app.py` reicht `volume.origin` an `create_volume_figure()` und `get_volume_center()` durch; Volumen ohne `origin`-Attribut fallen auf die Legacy-Zentrierung zurück.
+- **Dateien:** `src/visualization/volume3d.py`, `src/visualization/app.py`, `tests/unit/test_volume3d.py` (neu, 5 Tests), `tests/unit/test_geometry_trajectory.py`, `docs/geometry.md`, `docs/superpowers/specs/2026-11-12-3d-view-real-world-origin-design.md` (neu)
+- **Abhängig von:** T-55, T-93 (gemeldeter Fehler)
+- **Akzeptanz:** Iso-Mesh und Voxel-Wolke liegen bei `origin + index * spacing` (exakt getestet, auch nach Downsampling auf den gemergten Voxelzentren); Legacy-`origin=None`-Platzierung unverändert; Detektor-Ebene bei `sdd - sid` vom Isocenter. Demo-Volumen (Origin (0,0,0)): 3D-Ansicht zeigt den Kopf im `+`-Oktanten — genau wie die simulierte FP (Phantom oben am Detektor); Dummy-Messung (zentriert): 3D-Ansicht zentriert — passend zu ihrer FP. Volle Suite grün, 0 Skips.
+- **Bekannte Grenze (out of scope):** Der Projektor (`calculate_xray_beam_list`) modelliert einen zirkulären Scan und ignoriert `pitch`/`source_offset_z`/Tabellenvorschub — für Helix-Geometrien zeichnet der 3D-Plot eine Helix, die die FP nicht traced. Helix-FP ist ein eigener Task.
+- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Tests in `test_volume3d.py` (exakte Mesh-/Marker-Positionen, Legacy-Pfad, Downsampling), `test_get_detector_position` auf die `sdd - sid`-Konvention umgestellt. Bekannt: die FP zeigt für das Demo-Volumen den Phantomkopf oben am Detektor — das ist jetzt **gewollt sichtbar** (die Ansicht zeigt, was gerechnet wird); ob das Demo-Phantom auf die Rotationsachse zentriert wird, ist eine eigene Entscheidung.
+
 ## Zeitplan
 
 | Tag | Datum | Tasks |
@@ -675,7 +692,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom) |
+| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem) |
 
 ## Decision Log
 
@@ -704,6 +721,7 @@
 | D-21 | 2026-11-12 | Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; ein Skip im Testlauf gilt als Defekt | `parallelproj_c.dll` liegt nur im aktivierten Env auf `PATH` — ein System-Interpreter *überspringt* die parallelproj-Tests, statt sie laufen zu lassen; das sieht wie grün aus, ist aber verlorene Abdeckung |
 | D-22 | 2026-11-12 | `nibabel` steht in `dev` **und** in `nifti`; kein `cpu`/`gpu`-Extra | Die Suite deckt NIfTI ab, also muss die Test-Abhängigkeit `dev` sein — sonst skippt ein grüner Lauf still vier Tests. `parallelproj` ist conda-forge-only und kann kein pip-Extra sein; ein nicht existierendes Extra akzeptiert pip warnungslos und installiert nichts |
 | D-23 | 2026-11-12 | Dummy-Messung puffert nur das **ideale** FP auf Disk (`data/cache/`, gitignored); Streuung/Rauschen bleiben live; Phantom zentriert auf der Rotationsachse; FP-Auswahl wird auf „all" presetet | Der FP ist der einzige teure Schritt (~10–20 s CPU) — Puffer macht jeden weiteren Klick ~3,5 s; live-Streuung hält `spr`/`i0`/`seed` ohne Re-Projektion veränderbar; ohne Zentrierung parkt der Demo-Origin (0,0,0) den Kopf außerhalb von FOV und Kegel (gemessen); „all" lässt einen Klick auf „Run Forward Projection" die Messform exakt reproduzieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule) |
+| D-24 | 2026-11-12 | 3D-Ansicht positioniert das Volumen am **echten DICOM-Origin** im Weltkoordinatensystem der FP statt schematisch zentriert; Detektor-Ebene bei `sdd - sid` statt `-sdd` | Die Ansicht soll zeigen, was die FP tatsächlich rechnet (gemeldeter Fehler: 3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor). Mit Origin (0,0,0) parkt der Demo-Kopf im `+`-Oktanten — die Diskrepanz wird sichtbar statt versteckt; SDD ist ab Source gemessen, die Ebene lag `sid` mm zu weit außen |
 
 ## Offene Fragen
 
@@ -729,6 +747,7 @@
 - ✅ T-90: „File axis order" wirkt jetzt für DICOM-Ordner (Transposition des nativen Stapels statt Ignorieren) und beim Ändern sofort statt erst nach erneutem „Load Measurements"; 9 neue Tests, inkl. künstlicher DICOM-Serien mit Gradient pro Rahmen
 - ✅ T-91: Conda-Env `ct-viewer` verbindlich gemacht (`AGENTS.md`, `LINTING.md`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`), `nifti`-Extra in `environment.yml` und CI ergänzt — Suite jetzt **301 passed, 0 skipped**
 - ✅ T-92: Lazy Subset-Reads im Sinogram-Loader (`.npy` via mmap bei Subset, NIfTI via `dataobj`-Basic-Slices; `custom`/`.npz` weiterhin eager) — Subset-Loads lesen nur den gewählten Bereich, Vollauswahl und Fehlerverträge unverändert
+- ✅ T-94: 3D-Ansicht im echten FP-Weltkoordinatensystem (Volumen am echten DICOM-Origin statt schematisch zentriert; Downsample-Shift korrigiert; Detektor-Ebene bei `sdd - sid` statt `-sdd`) — der gemeldete Fehler „3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor" ist behoben, indem die Ansicht zeigt, was die FP rechnet
 
 ## Erledigt (2026-11-10)
 

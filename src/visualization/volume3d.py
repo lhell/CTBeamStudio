@@ -67,9 +67,14 @@ def get_detector_position(geometry, source_angle: float = 0.0, z_offset: float =
     """
     angle_rad = math.radians(source_angle)
 
-    # Detector is opposite to source on the central beam
-    base_x = -geometry.sdd * math.cos(angle_rad)
-    base_y = -geometry.sdd * math.sin(angle_rad)
+    # Detector is opposite to source on the central beam, at a distance
+    # sdd - sid from the isocenter: SDD is measured from the source, not
+    # from the rotation axis. This is the same convention the parallelproj
+    # forward projection uses (see backend.parallelproj.geometry), so the
+    # drawn detector plane sits where the projection really lands.
+    did = geometry.sdd - geometry.sid
+    base_x = -did * math.cos(angle_rad)
+    base_y = -did * math.sin(angle_rad)
     base_z = z_offset
 
     # Apply detector offsets (independent of source)
@@ -580,8 +585,18 @@ def create_volume_figure(
     camera_preset: str = "iso",
     n_iso_levels: int = 5,
     iso_threshold: tuple = None,
+    origin: tuple = None,
 ) -> go.Figure:
     """Create a Plotly figure with 3D volume rendering.
+
+    The volume is drawn in the same world coordinate system the forward
+    projection uses (see ``backend.parallelproj.geometry``): the rotation
+    axis runs through the world origin, ``z`` points up, and voxel
+    ``[0, 0, 0]`` of the ``(x, y, z)``-reordered grid sits at ``origin``
+    (the DICOM origin). The geometry overlay added on top of this figure
+    (``add_trajectory_to_figure``: source path, detector, central beams)
+    shares that frame, so what the plot shows is what the forward
+    projection actually computes.
 
     Args:
         volume_array: 3D numpy array (z, y, x)
@@ -594,11 +609,16 @@ def create_volume_figure(
         camera_preset: Camera preset ("iso", "front", "back", "left", "right", "top", "bottom")
         n_iso_levels: Number of iso-surface levels to extract
         iso_threshold: Tuple (min, max) HU values for iso-surface threshold
+        origin: World position ``(x, y, z)`` of the first voxel — the same
+            DICOM origin the forward projection places the volume at.
+            ``None`` keeps the legacy schematic placement centred on the
+            rotation axis, which ignores the real origin.
 
     Returns:
         Plotly figure
     """
     # Downsample for performance
+    base_spacing = tuple(float(s) for s in spacing)
     if downsample > 1:
         volume_array = downsample_volume(volume_array, downsample)
         # Adjust spacing to account for downsampling
@@ -606,17 +626,24 @@ def create_volume_figure(
 
     fig = go.Figure()
 
-    # Calculate physical bounds - center volume at origin
+    # Calculate physical bounds. The extent frames the cell-centred grid the
+    # projector sees: n voxels of ``spacing`` each, the first voxel centre at
+    # the real origin. ``origin=None`` keeps the legacy centred placement.
     z, y, x = volume_array.shape
     # Physical extent in mm
     extent_x = x * spacing[2]
     extent_y = y * spacing[1]
     extent_z = z * spacing[0]
 
-    # Center the volume at origin
-    origin_x = -extent_x / 2
-    origin_y = -extent_y / 2
-    origin_z = -extent_z / 2
+    if origin is None:
+        # Center the volume at origin
+        origin_x = -extent_x / 2
+        origin_y = -extent_y / 2
+        origin_z = -extent_z / 2
+    else:
+        # Real world placement: voxel [0, 0, 0] sits at the DICOM origin,
+        # exactly where the forward projection places the volume.
+        origin_x, origin_y, origin_z = (float(v) for v in origin)
 
     bounds = (
         origin_x,
@@ -626,6 +653,22 @@ def create_volume_figure(
         origin_z,
         origin_z + extent_z,
     )
+
+    def _draw_origin(factor: int) -> tuple:
+        """First drawn voxel centre after downsampling by ``factor``.
+
+        Mean-pooling ``factor`` voxels into one moves the merged grid's
+        first voxel centre ``0.5 * (factor - 1)`` source voxels in from the
+        origin, so the drawn surface/voxel cloud lands on the same world
+        positions the projector traces through — not half a block off.
+        """
+        if origin is None or factor <= 1:
+            return (origin_x, origin_y, origin_z)
+        return (
+            origin_x + 0.5 * (factor - 1) * base_spacing[2],
+            origin_y + 0.5 * (factor - 1) * base_spacing[1],
+            origin_z + 0.5 * (factor - 1) * base_spacing[0],
+        )
 
     # Get camera preset
     cam = get_camera_preset(camera_preset, bounds)
@@ -653,14 +696,19 @@ def create_volume_figure(
             f"rgb({int(g * 255)}, {int(g * 255)}, {int(g * 255)})" for g in gray_levels
         ]
 
+        # The drawn grid is ``downsample`` times coarser than the volume the
+        # projector traces; shift the first drawn voxel centre accordingly.
+        draw_x, draw_y, draw_z = _draw_origin(downsample if downsample > 1 else 1)
+
         for i, level in enumerate(levels):
             verts, faces = extract_isosurface(volume_array, level)
             if verts is not None and len(verts) > 0:
-                # Convert vertex indices to physical coordinates and offset to center at origin
-                # verts is (z, y, x) - need to convert to (x, y, z)
-                px = verts[:, 2] * spacing[2] + origin_x
-                py = verts[:, 1] * spacing[1] + origin_y
-                pz = verts[:, 0] * spacing[0] + origin_z
+                # Convert vertex indices to physical coordinates and offset to
+                # the first voxel's world position. verts is (z, y, x) - need
+                # to convert to (x, y, z)
+                px = verts[:, 2] * spacing[2] + draw_x
+                py = verts[:, 1] * spacing[1] + draw_y
+                pz = verts[:, 0] * spacing[0] + draw_z
 
                 # Get triangle indices
                 if len(faces) > 0:
@@ -695,10 +743,13 @@ def create_volume_figure(
         z, y, x = vol_ds.shape
         # Actual spacing after downsampling (in mm)
         vol_spacing = tuple(s * ds for s in spacing)
+        # The drawn cloud is ``downsample * ds`` times coarser than the volume
+        # the projector traces; shift the first drawn voxel centre accordingly.
+        draw_x, draw_y, draw_z = _draw_origin(downsample * ds)
         zz, yy, xx = np.meshgrid(
-            np.arange(z) * vol_spacing[0] + origin_z,
-            np.arange(y) * vol_spacing[1] + origin_y,
-            np.arange(x) * vol_spacing[2] + origin_x,
+            np.arange(z) * vol_spacing[0] + draw_z,
+            np.arange(y) * vol_spacing[1] + draw_y,
+            np.arange(x) * vol_spacing[2] + draw_x,
             indexing="ij",
         )
 
@@ -963,19 +1014,32 @@ def add_source_detector_figure(
 
 
 def get_volume_center(
-    volume_array: np.ndarray, spacing: tuple[float, float, float]
+    volume_array: np.ndarray,
+    spacing: tuple[float, float, float],
+    origin: tuple = None,
 ) -> tuple[float, float, float]:
-    """Calculate the center of a volume in physical coordinates.
+    """Calculate the center of a volume in world coordinates.
 
     Args:
         volume_array: 3D numpy array (z, y, x)
         spacing: Voxel spacing (z, y, x) in mm
+        origin: World position ``(x, y, z)`` of the first voxel — the same
+            DICOM origin the forward projection places the volume at.
+            ``None`` returns ``(0, 0, 0)``, the legacy assumption that the
+            volume is centred on the rotation axis.
 
     Returns:
-        (x, y, z) center position in mm - now returns (0,0,0) since volume is centered at origin
+        (x, y, z) center position in mm
     """
-    # Volume is now centered at origin, so center is (0, 0, 0)
-    return (0.0, 0.0, 0.0)
+    if origin is None:
+        # Legacy: volume assumed centred at the origin, so centre is (0, 0, 0)
+        return (0.0, 0.0, 0.0)
+    z, y, x = volume_array.shape
+    return (
+        float(origin[0]) + 0.5 * (x - 1) * float(spacing[2]),
+        float(origin[1]) + 0.5 * (y - 1) * float(spacing[1]),
+        float(origin[2]) + 0.5 * (z - 1) * float(spacing[0]),
+    )
 
 
 def get_dicom_geometry(series) -> dict:

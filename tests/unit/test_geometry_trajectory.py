@@ -34,13 +34,15 @@ def test_get_source_position_90_degrees():
 
 
 def test_get_detector_position():
-    """Test detector position calculation - opposite to source at SDD distance."""
+    """Test detector position - opposite the source at did = sdd - sid from
+    the isocenter (SDD is measured from the source, not from the rotation
+    axis; same convention as the parallelproj forward projection)."""
     geo = ProjectionGeometry(sid=600.0, sdd=1000.0)
 
-    # At 0°, detector should be at -X (posterior) at SDD distance
+    # At 0°, detector should be at -X (posterior) at sdd - sid distance
     pos = get_detector_position(geo, 0.0)
-    assert pos[0] == pytest.approx(-1000.0, rel=0.01)  # X = -sdd * cos(0) = -1000
-    assert pos[1] == pytest.approx(0.0, rel=0.01)  # Y = -sdd * sin(0) = 0
+    assert pos[0] == pytest.approx(-400.0, rel=0.01)  # X = -(sdd - sid) = -400
+    assert pos[1] == pytest.approx(0.0, rel=0.01)  # Y = 0
 
 
 def test_get_trajectory_positions():

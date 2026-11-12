@@ -342,6 +342,14 @@ def render_viewer_tab(
             except AttributeError:
                 spacing = (1.0, 1.0, 1.0)
 
+            # The 3D view draws the volume in the same world frame the
+            # forward projection uses: the real DICOM origin, so the
+            # geometry overlay (source path, central beams at the world
+            # origin) and the rendered phantom agree with the simulated
+            # projections. Volumes without an origin attribute fall back to
+            # the legacy schematic centred view.
+            origin = getattr(volume, "origin", None)
+
             # Use downsample from UI (set by selectbox above)
             volume_downsample = st.session_state.get("volume_downsample", 4)
 
@@ -360,6 +368,7 @@ def render_viewer_tab(
                 camera_preset=camera_preset,
                 n_iso_levels=n_iso_levels,
                 iso_threshold=iso_threshold,
+                origin=origin,
             )
 
             # Traces added from here on belong to the geometry overlay: the
@@ -369,7 +378,7 @@ def render_viewer_tab(
             n_base_traces = len(fig.data)
 
             if isocenter is None:
-                isocenter = get_volume_center(volume.array, spacing)
+                isocenter = get_volume_center(volume.array, spacing, origin=origin)
 
             # Add the trajectory whenever a geometry is loaded; without one
             # there is no path to draw, so fall back to the single

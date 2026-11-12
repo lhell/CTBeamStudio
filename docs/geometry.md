@@ -102,6 +102,23 @@ The detector can move **independently** of the source (detector shifts from its 
 
 > **Note:** Curved detector support is planned for a future version.
 
+## Volume Placement in World Coordinates
+
+The forward projection and the 3D volume view share one world frame:
+
+- **Rotation axis**: runs through the world origin (`0, 0, 0`), along **Z**.
+- **Source at 0°**: `(sid, 0, 0)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
+- **Detector**: opposite the source at `sdd - sid` from the isocenter (SDD is measured from the source, not from the rotation axis).
+- **Volume**: voxel `[0, 0, 0]` of the `(x, y, z)`-reordered grid sits at
+  `Volume.origin` (DICOM `(x, y, z)`), voxel centres at `origin + index * spacing`.
+  A volume with origin `(0, 0, 0)` therefore sits entirely in the `+x/+y/+z`
+  octant — the central ray (z = 0 plane) clips its bottom edge, and the
+  phantom lands at the top of the detector.
+
+The 3D view (`src/visualization/volume3d.py`) draws the volume at its real
+origin in this frame, so what the plot shows is what the forward projection
+computes.
+
 ## Source Data Example
 
 For Siemens SOMATOM cone-beam helical CT data:

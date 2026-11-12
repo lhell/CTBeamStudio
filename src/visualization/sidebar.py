@@ -339,14 +339,37 @@ def should_startup_load() -> bool:
 
 
 def load_demo_volume():
-    """Load the synthetic demo phantom into session state."""
-    from visualization.phantom import create_demo_volume
+    """Load the synthetic demo phantom with its coherent dummy measurement.
 
-    volume = create_demo_volume()
-    st.session_state["volume"] = volume
+    The demo is a self-contained trio (T-93): the Shepp-Logan phantom, a
+    dummy CBCT geometry that sees the whole head, and a synthetic measured
+    sinogram (forward projection + scatter + Poisson noise). Seeding them
+    together makes the Sinogram Inspection comparison live immediately,
+    without real scanner data. The ideal forward projection is disk-cached,
+    so this costs ~3.5 s after the first generation (~13-23 s fresh).
+    """
+    from visualization.phantom import create_dummy_measured_sinogram
+
+    dummy = create_dummy_measured_sinogram()
+    st.session_state["volume"] = dummy.volume
     st.session_state["demo_mode"] = True
     st.session_state["series"] = _series_stub(
-        "Demo Phantom (Shepp-Logan)", "Demo", volume.n_slices
+        "Demo Phantom (Shepp-Logan)", "Demo", dummy.volume.n_slices
     )
-    st.toast("Loaded demo phantom!")
-    return volume
+    st.session_state["projection_geometry"] = dummy.geometry
+    st.session_state["geometry_is_default"] = False
+    st.session_state["geometry_loaded_original"] = dummy.geometry
+    st.session_state["sinogram"] = dummy.sinogram
+    # The dummy is the full detector and every projection of its geometry,
+    # so "all" makes the simulated side reproduce it exactly: one click on
+    # "Run Forward Projection" yields matching shapes and a live comparison.
+    st.session_state["sample_proj_mode"] = "all"
+    st.session_state["sample_row_mode"] = "all"
+    st.session_state["sample_col_mode"] = "all"
+    # New geometry: drop cached widget values so the geometry form prefills
+    # the dummy values instead of stale ones.
+    from visualization.projection_panel import clear_geometry_edit_state
+
+    clear_geometry_edit_state()
+    st.toast("Loaded demo phantom with dummy measurement!")
+    return dummy.volume

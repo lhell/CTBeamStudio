@@ -15,10 +15,11 @@ per-slice metrics) can be exercised without real scanner data.
 
 - No reconstruction (FDK, T-76). The dummy is an input for the existing
   comparison workflow.
-- No change to the shared demo volume/geometry defaults. The pre-existing
-  quirk that `create_shepp_logan_hu()` uses origin `(0, 0, 0)` (which parks
-  the head in the +x/+y/+z octant relative to the parallelproj rotation axis)
-  is left for its own task; the dummy centers **its** copy instead.
+- No change to the shared demo volume/geometry defaults — at T-93 time.
+  The pre-existing quirk that `create_shepp_logan_hu()` used origin
+  `(0, 0, 0)` (which parks the head in the +x/+y/+z octant relative to the
+  parallelproj rotation axis) was fixed in T-95: the shared default origin
+  is now centred, and the dummy's private centred copy was removed.
 - No committed binary data files (`.npy`/`.npz` are gitignored and the CI
   data-guard fails on them).
 
@@ -93,6 +94,11 @@ difference column + per-slice metrics go live immediately.
 The sinogram is an in-memory `SinogramData` with `format="synthetic"`,
 `path=None`, canonical axes — the T-90 `axis_order` setter branch for
 file-less data transposes it in place, reversibly.
+
+> Follow-up (T-96): the dummy measurement is now generated **automatically**
+> when the demo image is loaded (`load_demo_volume()` seeds the whole trio,
+> including the "all" sample-mode preset), so no button click is needed.
+> The manual button remains as an explicit regeneration path.
 
 ## Tests
 

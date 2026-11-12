@@ -199,10 +199,22 @@ def create_shepp_logan_hu(
     """
     phantom = create_shepp_logan_3d(size, num_slices, spacing)
 
+    # Center the volume on the rotation axis: the parallelproj cone circles
+    # the world origin, so the first voxel sits at minus half the voxel-centre
+    # extent per axis (DICOM order x, y, z). Without this the head parks in
+    # the +x/+y/+z octant — outside the in-plane FOV and half outside the
+    # cone in z.
+    z_spacing, row_spacing, col_spacing = spacing
+    origin = (
+        -0.5 * (size - 1) * float(col_spacing),
+        -0.5 * (size - 1) * float(row_spacing),
+        -0.5 * (num_slices - 1) * float(z_spacing),
+    )
+
     return Volume(
         array=phantom,
         spacing=spacing,
-        origin=(0.0, 0.0, 0.0),
+        origin=origin,
         meta={"unit": "HU", "phantom": "shepp-logan"},
     )
 
@@ -338,28 +350,6 @@ def _save_cached_fp(
         pass  # a read-only data directory must not fail the generation
 
 
-def _centered_shepp_logan_hu() -> Volume:
-    """Standard-size Shepp-Logan head, centered on the rotation axis.
-
-    The parallelproj cone circles the isocenter at the world origin, and the
-    demo default origin (0, 0, 0) would park the whole head in the +x/+y/+z
-    octant — outside the in-plane FOV and half outside the cone in z. This
-    shifts the origin so the volume center sits on the axis; everything else
-    (HU values, spacing, size) matches :func:`create_shepp_logan_hu`.
-    """
-    from dataclasses import replace
-
-    volume = create_shepp_logan_hu()
-    nz, ny, nx = volume.shape
-    sz, sy, sx = volume.spacing
-    origin = (
-        -0.5 * (nx - 1) * float(sx),
-        -0.5 * (ny - 1) * float(sy),
-        -0.5 * (nz - 1) * float(sz),
-    )
-    return replace(volume, origin=origin, meta={**volume.meta, "origin": "centered"})
-
-
 def create_dummy_measured_sinogram(
     geometry: Optional[ProjectionGeometry] = None,
     *,
@@ -448,8 +438,9 @@ def create_dummy_measured_sinogram(
     cacheable = volume is None and use_cache
     if volume is None:
         # Standard physical size: ~138 x 184 x 180 mm head in a 192 mm FOV,
-        # centered on the rotation axis so the whole head is inside the cone.
-        volume = _centered_shepp_logan_hu()
+        # centered on the rotation axis so the whole head is inside the cone
+        # (create_shepp_logan_hu centers its origin since T-95).
+        volume = create_shepp_logan_hu()
 
     fingerprint = _fp_fingerprint(geometry, energy_kev) if cacheable else None
     ideal = _load_cached_fp(cache_file, fingerprint)

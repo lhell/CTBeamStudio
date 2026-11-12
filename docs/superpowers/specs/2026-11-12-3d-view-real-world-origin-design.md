@@ -73,6 +73,11 @@ All in `src/visualization/volume3d.py` unless noted:
   the 3D view shows the head centred on the rotation axis — matching its
   projection, whose central rows pass through the head centre.
 
+> Follow-up (T-95): the shared demo default is now centred as well, so the
+> demo volume is centred in both the 3D view and the projection — the
+> `+x/+y/+z`-octant case above applies only to volumes whose origin still
+> parks them off-axis (e.g. arbitrary DICOM origins).
+
 ## Known limitation (out of scope)
 
 The projector (`calculate_xray_beam_list`) models a **circular** scan:

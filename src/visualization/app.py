@@ -101,7 +101,9 @@ def render_empty_state() -> None:
     if st.button("Load Demo Phantom", key="empty_load_demo"):
         from visualization.sidebar import load_demo_volume
 
-        with st.spinner("Loading demo phantom..."):
+        with st.spinner(
+            "Loading demo phantom (forward projection + scatter + noise)..."
+        ):
             load_demo_volume()
         st.rerun()
 

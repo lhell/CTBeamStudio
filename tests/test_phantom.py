@@ -116,10 +116,26 @@ class TestSheppLogan3D:
         volume = create_shepp_logan_hu(**SMALL_GEOMETRY)
         assert volume.shape == (24, 96, 96)
         assert volume.spacing == (8.0, 2.0, 2.0)
-        assert volume.origin == (0.0, 0.0, 0.0)
+        # Centered on the rotation axis: origin = minus half the
+        # voxel-centre extent per axis (DICOM order x, y, z).
+        assert volume.origin == (-95.0, -95.0, -92.0)
         assert volume.array.dtype == np.int16
         assert volume.meta["unit"] == "HU"
         assert volume.meta["phantom"] == "shepp-logan"
+
+    def test_default_volume_center_sits_on_the_rotation_axis(self):
+        """Regression (T-95): the demo phantom's origin must center the
+        voxel grid on the world origin — the axis the parallelproj cone
+        circles — in every direction."""
+        volume = create_shepp_logan_hu()
+        nz, ny, nx = volume.shape
+        sz, sy, sx = volume.spacing
+        center = (
+            volume.origin[0] + 0.5 * (nx - 1) * float(sx),
+            volume.origin[1] + 0.5 * (ny - 1) * float(sy),
+            volume.origin[2] + 0.5 * (nz - 1) * float(sz),
+        )
+        assert center == pytest.approx((0.0, 0.0, 0.0), abs=1e-6)
 
     def test_head_dimensions_match_phantom_geometry(self):
         """Test physical head size is anisotropic-spacing correct (in mm)."""

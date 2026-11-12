@@ -113,7 +113,9 @@ The forward projection and the 3D volume view share one world frame:
   `Volume.origin` (DICOM `(x, y, z)`), voxel centres at `origin + index * spacing`.
   A volume with origin `(0, 0, 0)` therefore sits entirely in the `+x/+y/+z`
   octant — the central ray (z = 0 plane) clips its bottom edge, and the
-  phantom lands at the top of the detector.
+  phantom lands at the top of the detector. The demo phantom (and the dummy
+  measurement volume) centre their origin on the rotation axis instead, so
+  the central ray passes through the head centre.
 
 The 3D view (`src/visualization/volume3d.py`) draws the volume at its real
 origin in this frame, so what the plot shows is what the forward projection

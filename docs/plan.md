@@ -674,7 +674,23 @@
 - **Abhängig von:** T-55, T-93 (gemeldeter Fehler)
 - **Akzeptanz:** Iso-Mesh und Voxel-Wolke liegen bei `origin + index * spacing` (exakt getestet, auch nach Downsampling auf den gemergten Voxelzentren); Legacy-`origin=None`-Platzierung unverändert; Detektor-Ebene bei `sdd - sid` vom Isocenter. Demo-Volumen (Origin (0,0,0)): 3D-Ansicht zeigt den Kopf im `+`-Oktanten — genau wie die simulierte FP (Phantom oben am Detektor); Dummy-Messung (zentriert): 3D-Ansicht zentriert — passend zu ihrer FP. Volle Suite grün, 0 Skips.
 - **Bekannte Grenze (out of scope):** Der Projektor (`calculate_xray_beam_list`) modelliert einen zirkulären Scan und ignoriert `pitch`/`source_offset_z`/Tabellenvorschub — für Helix-Geometrien zeichnet der 3D-Plot eine Helix, die die FP nicht traced. Helix-FP ist ein eigener Task.
-- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Tests in `test_volume3d.py` (exakte Mesh-/Marker-Positionen, Legacy-Pfad, Downsampling), `test_get_detector_position` auf die `sdd - sid`-Konvention umgestellt. Bekannt: die FP zeigt für das Demo-Volumen den Phantomkopf oben am Detektor — das ist jetzt **gewollt sichtbar** (die Ansicht zeigt, was gerechnet wird); ob das Demo-Phantom auf die Rotationsachse zentriert wird, ist eine eigene Entscheidung.
+- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Tests in `test_volume3d.py` (exakte Mesh-/Marker-Positionen, Legacy-Pfad, Downsampling), `test_get_detector_position` auf die `sdd - sid`-Konvention umgestellt. Bekannt: die FP zeigt für das Demo-Volumen den Phantomkopf oben am Detektor — das ist jetzt **gewollt sichtbar** (die Ansicht zeigt, was gerechnet wird); ob das Demo-Phantom auf die Rotationsachse zentriert wird, ist eine eigene Entscheidung → T-95.
+
+### `[x]` T-95 — Demo-Phantom-Origin auf die Rotationsachse zentriert
+- **Ziel:** `create_shepp_logan_hu()` erzeugte das Demo-Phantom mit Origin (0,0,0) — der Kopf parkte im `+x/+y/+z`-Oktanten, außerhalb des in-plane-FOV und halb außerhalb des Kegels (der Quirk, den T-93 nur für die Dummy-Kopie umgangen hatte). Jetzt zentriert: der erste Voxel sitzt bei minus halber Voxelzentren-Ausdehnung pro Achse (DICOM-Ordnung x, y, z), die Gittermitte auf der Rotationsachse.
+- **Dateien:** `src/visualization/phantom.py`, `tests/test_phantom.py`
+- **Abhängig von:** T-94
+- **Umsetzung:** Origin in `create_shepp_logan_hu()` berechnet statt (0,0,0); der dadurch redundante `_centered_shepp_logan_hu`-Wrapper im Dummy-Generator entfernt — der Dummy nutzt jetzt direkt die geteilte Default-Volumen-Funktion. Der Ideal-FP-Disk-Cache bleibt gültig: die Weltposition des zentrierten Volumens ist identisch zur bisherigen Dummy-Kopie (gleicher Array, gleiches Spacing, gleicher Origin).
+- **Akzeptanz:** Regressionstest pinnt die Gittermitte ≈ (0,0,0) in allen Achsen; `test_hu_volume_metadata` pinnt den zentrierten Origin; FP und 3D-Ansicht stimmen überein (Phantom zentriert auf der Rotationsachse, Zentralstrahl durch die Kopfmitte).
+- **Status:** ✅ Done (Nov 12, 2026) — 1 neuer Regressionstest, Metadata-Test aktualisiert; 65 Tests der betroffenen Module grün.
+
+### `[x]` T-96 — Dummy-Messung wird automatisch mit dem Demo-Bild erzeugt
+- **Ziel:** Das Laden des Demo-Bildes („Load Demo Phantom" im Empty State) erzeugt automatisch die kohärente Demo-Trio — Volumen + Dummy-Geometrie + synthetische Messung — ohne eigenen Button-Klick (Nutzerentscheidung: „generate automatically when demo image is loaded").
+- **Dateien:** `src/visualization/sidebar.py` (`load_demo_volume`), `src/visualization/app.py` (Spinner-Text), `tests/unit/test_demo_load.py` (neu, 2 Tests)
+- **Abhängig von:** T-93, T-95
+- **Umsetzung:** `load_demo_volume()` ruft `create_dummy_measured_sinogram()` auf und setzt das Trio in den Session-State (Volumen, Dummy-Geometrie mit `geometry_is_default=False`, Sinogramm, Sample-Auswahl auf „all", `clear_geometry_edit_state`). Der manuelle „🎲 Generate dummy measurement"-Button bleibt als explizite Regeneration erhalten. Der Ideal-FP ist disk-gepuffert → ~3,5 s nach der ersten Generierung (~13–23 s frisch), der Spinner im Empty State nennt die Mess-Schritte.
+- **Akzeptanz:** AppTest (Generator per Stub, Numerics in `test_dummy_measurement.py`): Klick auf „Load Demo Phantom" setzt das kohärente Trio (Sinogramm format `"synthetic"`, Dummy-Geometrie, „all"-Preset) und überschreibt zuvor geladene Daten.
+- **Status:** ✅ Done (Nov 12, 2026) — 2 neue Tests in `tests/unit/test_demo_load.py` (eigenes Modul mit module-scoped `AppTest`, frische Session → Empty State).
 
 ## Zeitplan
 
@@ -692,7 +708,7 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem) |
+| 13 | Mi, 12.11. | T-90 ✅, T-91 ✅, T-92 ✅, T-93 ✅, T-94 ✅, T-95 ✅, T-96 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden) |
 
 ## Decision Log
 
@@ -722,6 +738,7 @@
 | D-22 | 2026-11-12 | `nibabel` steht in `dev` **und** in `nifti`; kein `cpu`/`gpu`-Extra | Die Suite deckt NIfTI ab, also muss die Test-Abhängigkeit `dev` sein — sonst skippt ein grüner Lauf still vier Tests. `parallelproj` ist conda-forge-only und kann kein pip-Extra sein; ein nicht existierendes Extra akzeptiert pip warnungslos und installiert nichts |
 | D-23 | 2026-11-12 | Dummy-Messung puffert nur das **ideale** FP auf Disk (`data/cache/`, gitignored); Streuung/Rauschen bleiben live; Phantom zentriert auf der Rotationsachse; FP-Auswahl wird auf „all" presetet | Der FP ist der einzige teure Schritt (~10–20 s CPU) — Puffer macht jeden weiteren Klick ~3,5 s; live-Streuung hält `spr`/`i0`/`seed` ohne Re-Projektion veränderbar; ohne Zentrierung parkt der Demo-Origin (0,0,0) den Kopf außerhalb von FOV und Kegel (gemessen); „all" lässt einen Klick auf „Run Forward Projection" die Messform exakt reproduzieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule) |
 | D-24 | 2026-11-12 | 3D-Ansicht positioniert das Volumen am **echten DICOM-Origin** im Weltkoordinatensystem der FP statt schematisch zentriert; Detektor-Ebene bei `sdd - sid` statt `-sdd` | Die Ansicht soll zeigen, was die FP tatsächlich rechnet (gemeldeter Fehler: 3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor). Mit Origin (0,0,0) parkt der Demo-Kopf im `+`-Oktanten — die Diskrepanz wird sichtbar statt versteckt; SDD ist ab Source gemessen, die Ebene lag `sid` mm zu weit außen |
+| D-25 | 2026-11-12 | Demo-Phantom-Origin zentriert auf die Rotationsachse (T-95); die Dummy-Messung wird automatisch beim Laden des Demo-Bildes erzeugt statt nur per Button (T-96) | Bei Origin (0,0,0) parkte der Demo-Kopf im `+`-Oktanten — seit T-94 zeigten FP und 3D-Ansicht ihn gewollt off-center; zentriert stimmen FP, 3D-Ansicht und MPR-Readout überein. Die Messung gehört zum Demo-Erlebnis: wer das Demo-Bild lädt, will den kompletten Vergleich ohne extra Klick (FP-Puffer macht den Auto-Pfad ~3,5 s) |
 
 ## Offene Fragen
 
@@ -748,6 +765,8 @@
 - ✅ T-91: Conda-Env `ct-viewer` verbindlich gemacht (`AGENTS.md`, `LINTING.md`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`), `nifti`-Extra in `environment.yml` und CI ergänzt — Suite jetzt **301 passed, 0 skipped**
 - ✅ T-92: Lazy Subset-Reads im Sinogram-Loader (`.npy` via mmap bei Subset, NIfTI via `dataobj`-Basic-Slices; `custom`/`.npz` weiterhin eager) — Subset-Loads lesen nur den gewählten Bereich, Vollauswahl und Fehlerverträge unverändert
 - ✅ T-94: 3D-Ansicht im echten FP-Weltkoordinatensystem (Volumen am echten DICOM-Origin statt schematisch zentriert; Downsample-Shift korrigiert; Detektor-Ebene bei `sdd - sid` statt `-sdd`) — der gemeldete Fehler „3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor" ist behoben, indem die Ansicht zeigt, was die FP rechnet
+- ✅ T-95: Demo-Phantom-Origin zentriert (erster Voxel bei minus halber Ausdehnung pro Achse, Gittermitte auf der Rotationsachse); der Dummy-Wrapper `_centered_shepp_logan_hu` entfällt — der Dummy nutzt die geteilte Default-Funktion; Ideal-FP-Cache bleibt gültig
+- ✅ T-96: Laden des Demo-Bildes erzeugt automatisch die kohärente Demo-Trio (Volumen + Dummy-Geometrie + synthetische Messung) — kein eigener Button-Klick nötig; der manuelle Generate-Button bleibt als Regeneration erhalten
 
 ## Erledigt (2026-11-10)
 

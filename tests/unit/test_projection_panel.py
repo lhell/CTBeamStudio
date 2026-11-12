@@ -7,6 +7,7 @@ from backend.geometry import ProjectionGeometry
 from backend.loaders.sinogram import SelectionConfig
 from visualization.projection_panel import (
     EDITABLE_GEOMETRY_FIELDS,
+    apply_axis_order_change,
     apply_geometry_updates,
     build_selection_config,
     clamp_index_state,
@@ -224,3 +225,40 @@ def test_prepare_projection_volume_handles_already_attenuated_volume():
 
     assert prepared is volume
     np.testing.assert_allclose(prepared.array, 0.02)
+
+
+def _sinogram(data=None, axis_order=("proj", "row", "col")):
+    from backend.loaders.sinogram import SinogramData
+
+    return SinogramData(
+        data=data,
+        geometry=None,
+        selection=SelectionConfig(),
+        original_shape=(3, 4, 5),
+        source_axis_order=axis_order,
+    )
+
+
+def test_apply_axis_order_change_reorients_loaded_sinogram():
+    sinogram = _sinogram(np.zeros((3, 4, 5), dtype=np.float32))
+
+    changed = apply_axis_order_change(sinogram, ("proj", "col", "row"))
+
+    assert changed is True
+    assert sinogram.axis_order == ("proj", "col", "row")
+    assert sinogram.data.shape == (3, 5, 4)
+
+
+def test_apply_axis_order_change_is_a_noop_for_the_current_order():
+    """Re-rendering on every rerun must not thrash the data or the disk."""
+    sinogram = _sinogram(np.zeros((3, 4, 5), dtype=np.float32))
+    before = sinogram.data
+
+    changed = apply_axis_order_change(sinogram, ("proj", "row", "col"))
+
+    assert changed is False
+    assert sinogram.data is before
+
+
+def test_apply_axis_order_change_without_sinogram_is_a_noop():
+    assert apply_axis_order_change(None, ("proj", "col", "row")) is False

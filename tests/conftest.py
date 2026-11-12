@@ -30,9 +30,13 @@ def create_projection_dicom():
     Calling it with a directory writes the series and returns the directory
     that contains the files. Projection frame i has pixel array
     ``np.full((4, 5), i * 10, uint16)`` so tests can verify selection.
+
+    Pass ``graded=True`` to give every frame a distinct row-major ramp instead
+    of a constant: a constant frame looks the same transposed, so only a graded
+    one can prove an axis-order transpose actually happened.
     """
 
-    def _create(tmp_path):
+    def _create(tmp_path, graded=False):
         import numpy as np
         import pydicom
         from pydicom.dataset import Dataset
@@ -73,6 +77,11 @@ def create_projection_dicom():
             ds.RescaleIntercept = 0.0
 
             ds.PixelData = np.full((n_rows, n_cols), i * 10, dtype=np.uint16).tobytes()
+            if graded:
+                ds.PixelData = (
+                    np.arange(n_rows * n_cols, dtype=np.uint16).reshape(n_rows, n_cols)
+                    + i * 100
+                ).tobytes()
             ds.save_as(d / f"proj_{i}.dcm", write_like_original=False)
 
         return d

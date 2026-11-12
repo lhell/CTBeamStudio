@@ -255,6 +255,39 @@ def test_load_measurements_from_npy(app):
     np.testing.assert_array_equal(loaded.data, expected)
 
 
+def test_changing_axis_order_reorients_without_reloading(app):
+    """Picking a different file axis order must redraw immediately.
+
+    The dropdown is the user's only way to say "the file is stored the other
+    way round", and they judge it by looking at the image. Requiring a second
+    click on Load Measurements makes the control appear broken.
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        sinogram_path = Path(tmp_dir) / "axis_order.npy"
+        np.save(sinogram_path, np.zeros((4, 6, 8), dtype=np.float32))
+
+        app.sidebar.text_input(key="sinogram_path").set_value(str(sinogram_path))
+        app.sidebar.button(key="load_measurements").click()
+        app.run()
+        assert app.session_state["sinogram"].data.shape == (4, 6, 8)
+
+        app.sidebar.selectbox(key="sinogram_axis_order").set_value(
+            ("proj", "col", "row")
+        )
+        app.run()
+
+        assert list(app.exception) == []
+        assert app.session_state["sinogram"].data.shape == (4, 8, 6)
+        assert app.session_state["sinogram"].axis_order == ("proj", "col", "row")
+
+        # The AppTest instance is module-scoped: restore the canonical order so
+        # later tests do not inherit this declaration for their seeded data.
+        app.sidebar.selectbox(key="sinogram_axis_order").set_value(
+            ("proj", "row", "col")
+        )
+        app.run()
+
+
 def test_sidebar_shows_absolute_path_of_loaded_measurements(app):
     """The Measurements panel must name the exact file it loaded, so a user
     can tell several sinograms apart without trusting the text input."""

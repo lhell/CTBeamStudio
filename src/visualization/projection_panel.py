@@ -327,6 +327,20 @@ def render_selection_controls(
     )
 
 
+def apply_axis_order_change(sinogram, axis_order: tuple[str, str, str]):
+    """Reorient ``sinogram`` to ``axis_order``; return True if it changed.
+
+    ``SinogramData`` already knows how to re-derive itself for a new order
+    (transpose in memory for a full load, re-read from disk otherwise), so
+    the UI only has to detect that the user picked something new. A ``None``
+    sinogram, or the order it already has, is left untouched.
+    """
+    if sinogram is None or tuple(sinogram.axis_order) == tuple(axis_order):
+        return False
+    sinogram.axis_order = axis_order
+    return True
+
+
 def render_measurement_sidebar() -> None:
     """Sidebar section for loading measured projection / sinogram data."""
     import streamlit as st
@@ -377,6 +391,18 @@ def render_measurement_sidebar() -> None:
                         )
                         st.success(f"Loaded measurements {shape}.")
                         st.toast("Measurements loaded!", icon="✅")
+        else:
+            # The axis-order dropdown is how the user says "the file is stored
+            # the other way round", and they judge it by looking at the image.
+            # Apply it to already-loaded data immediately: the loader can do
+            # this without another click (in memory for a full load, otherwise
+            # by re-reading), so a changed order must never look like a no-op.
+            try:
+                # The sidebar renders before the tabs, so the reoriented data
+                # is what the Sinogram Inspection tab draws this same run.
+                apply_axis_order_change(st.session_state.get("sinogram"), axis_order)
+            except Exception as exc:  # noqa: BLE001 - surface loader errors
+                st.error(f"Failed to apply axis order: {exc}")
 
         # Rendered after the load attempt so the success path shows the file
         # immediately, without waiting for a later rerun.

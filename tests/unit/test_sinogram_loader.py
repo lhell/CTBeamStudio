@@ -331,3 +331,61 @@ def test_load_numpy_records_the_single_file(tmp_path):
     s = load_sinogram(path)
 
     assert [Path(f).name for f in s.files] == ["sino.npy"]
+
+
+# --- DICOM honours the file axis order -------------------------------------
+#
+# A DICOM projection folder stacks its frames along a fixed axis, so the
+# native order is always (proj, row, col). A user who knows the detector is
+# stored transposed must still be able to say so, exactly as with .npy.
+
+
+def test_load_dicom_honours_transposed_axis_order(tmp_path, create_projection_dicom):
+    d = create_projection_dicom(tmp_path, graded=True)
+
+    s = load_sinogram(d, axis_order=("proj", "col", "row"))
+
+    # Declared order transposes each detector frame: (4, 5) -> (5, 4).
+    assert s.data.shape == (3, 5, 4)
+    assert s.source_axis_order == ("proj", "col", "row")
+    canonical = load_sinogram(d, axis_order=("proj", "row", "col"))
+    np.testing.assert_array_equal(s.data, canonical.data.transpose(0, 2, 1))
+
+
+def test_load_dicom_default_axis_order_is_untransposed(
+    tmp_path, create_projection_dicom
+):
+    d = create_projection_dicom(tmp_path, graded=True)
+
+    s = load_sinogram(d)
+
+    assert s.data.shape == (3, 4, 5)
+    assert s.source_axis_order == ("proj", "row", "col")
+
+
+def test_load_dicom_applies_row_col_selection_in_canonical_space(
+    tmp_path, create_projection_dicom
+):
+    """Row/col selection is canonical, so with a transposed order "rows" must
+    select along the axis the user calls rows — the file's columns."""
+    d = create_projection_dicom(tmp_path, graded=True)
+    sel = SelectionConfig(row_mode="range", row_range=(0, 2))
+
+    s = load_sinogram(d, selection=sel, axis_order=("proj", "col", "row"))
+
+    # canonical rows == the 5-long axis; none of it was cut by file columns
+    assert s.data.shape == (3, 2, 4)
+
+
+def test_dicom_axis_order_change_after_load_reorients(
+    tmp_path, create_projection_dicom
+):
+    """Changing the order after a DICOM load must reorient, not no-op."""
+    d = create_projection_dicom(tmp_path, graded=True)
+    s = load_sinogram(d)
+    assert s.data.shape == (3, 4, 5)
+
+    s.axis_order = ("proj", "col", "row")
+
+    assert s.data.shape == (3, 5, 4)
+    assert s.source_axis_order == ("proj", "col", "row")

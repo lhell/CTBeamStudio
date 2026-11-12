@@ -6,12 +6,15 @@ helpers for the sinogram loader. All output arrays are canonical
 order.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Literal, Optional
 
 import numpy as np
 import pydicom
+
+# Canonical axis order of every ``SinogramData.data`` array.
+CANONICAL: tuple[str, str, str] = ("proj", "row", "col")
 
 
 @dataclass
@@ -133,11 +136,22 @@ class SinogramData:
             raise ValueError(
                 f"axis_order must be a permutation of ('proj', 'row', 'col'), got {value!r}"
             )
+        previous = self._axis_order
         self._axis_order = value
         self.source_axis_order = value
         if self._raw_file_order is not None:
             # full in-memory load: re-derive via transpose + re-select (no disk read)
             self.data = _apply_selection(self._raw_file_order, self.selection, value)
+            self._loader = None
+        elif self.path is None:
+            # No file behind this data (built in memory, e.g. a seeded or
+            # derived sinogram). The canonical array is still valid, so the
+            # order change is exactly the relative transposition between the
+            # two declarations — no re-derivation from a source is possible.
+            if self.data is None and self._loader is not None:
+                self.data = self._loader()
+            if self.data is not None:
+                self.data = _reorder_canonical(self.data, previous, value)
             self._loader = None
         else:
             # partial / lazy subset (no raw held): re-read from path with new order
@@ -161,6 +175,25 @@ def _is_permutation(value: tuple[str, str, str]) -> bool:
     if not isinstance(value, tuple) or len(value) != 3:
         return False
     return set(value) == {"proj", "row", "col"}
+
+
+def _reorder_canonical(
+    data: np.ndarray,
+    previous: tuple[str, str, str],
+    value: tuple[str, str, str],
+) -> np.ndarray:
+    """Transpose canonical ``data`` from ``previous`` to ``value`` declaration.
+
+    Both orders describe the same underlying raw axes, so switching between
+    them is a pure transposition of the canonical array. Used when no raw
+    file-order array is held and there is no file to re-read.
+    """
+    # Canonical axis j holds the label CANONICAL[j]. Under ``value`` that label
+    # sits at ``value.index(label)``; under ``previous`` the raw axis there
+    # carries ``previous[...]``, which is canonical position ``CANONICAL.index``.
+    return data.transpose(
+        tuple(CANONICAL.index(previous[value.index(label)]) for label in CANONICAL)
+    )
 
 
 def _detect_format(path: Path) -> str:
@@ -218,15 +251,28 @@ def _finish_sinogram(
     axis_order: tuple[str, str, str],
     fmt: str,
     files: tuple[Path, ...] = (),
+    geometry: Optional[object] = None,
+    applied_selection: Optional[SelectionConfig] = None,
 ) -> SinogramData:
-    """Transpose ``raw`` to canonical (proj, row, col), apply selection."""
-    data = _apply_selection(raw, selection, axis_order)
+    """Transpose ``raw`` to canonical (proj, row, col), apply selection.
 
-    # A selection is "full" iff all three modes are "all". When full, hold the
-    # raw file-order array so an axis_order change re-derives in memory; else
-    # leave it as None so the change re-reads from `path`.
+    ``selection`` is the user's canonical selection and is recorded as-is.
+    ``applied_selection`` overrides what is applied to ``raw``, for callers
+    that already pruned ``raw`` themselves (the DICOM loader resolves the
+    projection subset against the headers before reading pixel data).
+    """
+    applied = selection if applied_selection is None else applied_selection
+    data = _apply_selection(raw, applied, axis_order)
+
+    # A selection is "full" iff all three modes are "all" and ``raw`` still
+    # holds the whole file, so that an axis_order change can re-derive it in
+    # memory; otherwise leave the raw array unheld so the change re-reads from
+    # `path`. A pre-pruned ``raw`` must never be treated as the whole file.
     is_full = (
-        selection.row_mode == "all"
+        applied.row_mode == "all"
+        and applied.col_mode == "all"
+        and applied.proj_mode == "all"
+        and selection.row_mode == "all"
         and selection.col_mode == "all"
         and selection.proj_mode == "all"
     )
@@ -234,7 +280,7 @@ def _finish_sinogram(
 
     return SinogramData(
         data=data,
-        geometry=None,
+        geometry=geometry,
         selection=selection,
         original_shape=original_shape,
         source_axis_order=axis_order,
@@ -324,50 +370,54 @@ def _load_dicom(path, selection, geometry, axis_order):
     info = scan_dicom_sinogram(path)
     files = info["files"]
     n_proj, n_rows, n_cols = info["n_proj"], info["n_rows"], info["n_cols"]
-    # Resolve proj selection in canonical space first (cheap, header-only) and
-    # read ONLY the selected projections' pixel arrays (lazy per-request).
-    proj_canonical = resolve_indices(
-        selection.proj_mode,
-        n_proj,
-        selection.proj_range,
-        selection.proj_downsample,
-        selection.proj_custom,
-    )
-    # Resolve row/col selection once (same per frame).
-    row_idx = resolve_indices(
-        selection.row_mode,
-        n_rows,
-        selection.row_range,
-        selection.row_downsample,
-        selection.row_custom,
-    )
-    col_idx = resolve_indices(
-        selection.col_mode,
-        n_cols,
-        selection.col_range,
-        selection.col_downsample,
-        selection.col_custom,
-    )
+    # A DICOM folder stacks its frames along a fixed axis, so its native order
+    # is (proj, row, col). ``axis_order`` still has to be honoured: a user who
+    # knows the detector was stored transposed must be able to say so, exactly
+    # as with .npy. It is applied as a transposition of that native stack.
+    #
+    # Only when the order keeps projections on the file's first axis can the
+    # projection subset be resolved against the headers and read lazily; any
+    # other order moves projections onto a detector axis, where the requested
+    # "projections" are not frames at all, so every frame is read and
+    # ``_finish_sinogram`` resolves the selection in canonical space.
+    proj_on_first_axis = axis_order[0] == "proj"
+    if proj_on_first_axis:
+        # Resolve proj selection in canonical space first (cheap, header-only)
+        # and read ONLY the selected projections' pixel arrays.
+        proj_canonical = resolve_indices(
+            selection.proj_mode,
+            n_proj,
+            selection.proj_range,
+            selection.proj_downsample,
+            selection.proj_custom,
+        )
+    else:
+        proj_canonical = list(range(n_proj))
+
     frames = []
     for idx in proj_canonical:
         ds = pydicom.dcmread(files[idx])
-        frame = np.asarray(ds.pixel_array).astype(np.float32)
-        # Apply row/col selection to the 2D frame BEFORE stacking (canonical
-        # (row, col) in each DICOM frame), then stack along axis 0.
-        frame = frame[np.ix_(row_idx, col_idx)]
-        frames.append(frame)
-    raw = np.stack(frames, axis=0)  # canonical (n_sel_proj, n_sel_row, n_sel_col)
+        frames.append(np.asarray(ds.pixel_array).astype(np.float32))
+    # Native stack: (n_sel_proj, n_rows, n_cols) in the folder's own order.
+    raw = np.stack(frames, axis=0)
 
-    return SinogramData(
-        data=raw,
-        geometry=geometry,
-        selection=selection,
-        original_shape=(n_proj, n_rows, n_cols),
-        source_axis_order=("proj", "row", "col"),
-        path=path,
-        format="dicom",
-        lazy=False,
+    if proj_on_first_axis:
+        # Proj selection is already applied to ``raw``; keep it out of the
+        # shared path so the row/col selection and transposition still run.
+        applied = replace(selection, proj_mode="all")
+    else:
+        applied = selection
+
+    return _finish_sinogram(
+        raw,
+        (n_proj, n_rows, n_cols),
+        path,
+        selection,
+        axis_order,
+        "dicom",
         files=tuple(files[idx] for idx in proj_canonical),
+        geometry=geometry,
+        applied_selection=applied,
     )
 
 

@@ -16,6 +16,9 @@ Streamlit CT viewer with forward-projection comparison (repo dir: CTOrientationV
   T-numbers, acceptance criteria, decision log).
 - Check `docs/superpowers/specs/` and `docs/superpowers/plans/` for existing design
   docs on the area you touch.
+- Check `docs/audit-2026-11-13-findings.md` for open audit findings before
+  starting work on the area you touch; update an item's Status there when you
+  fix it.
 
 ## Environments — the conda env is mandatory
 

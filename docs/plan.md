@@ -15,6 +15,28 @@
 | Viewer ohne Torch | separate Dependency-Gruppen |
 | Datenintern HU | Normalisierung nur in der Darstellung |
 
+## Tasks by functional area (index)
+
+Chronological phases above stay the source of truth; this index groups the same tasks by area for navigation.
+
+| Area | Tasks |
+|---|---|
+| License, hygiene, data guards | T-01, T-02, T-03, T-04 |
+| Core data model (`Volume`) | T-10 |
+| Loaders (DICOM, NPY, projection, sinogram) | T-11, T-12, T-54, T-64, T-65, T-66, T-90, T-92, T-98, T-102 |
+| Windowing & MPR | T-13, T-14 |
+| Projection geometry | T-50, T-51, T-52, T-53, T-55, T-56 |
+| Forward projection | T-61, T-62, T-63, T-79, T-104 |
+| Attenuation / display units (HU ↔ μ) | T-80 |
+| Backend restructure | T-78 |
+| Comparison (synthetic vs measured) | T-67, T-68, T-69 |
+| 3D visualization | T-23, T-55, T-82, T-84, T-86, T-87, T-94 |
+| App / UI (viewer, sidebar, panels) | T-20, T-21, T-22, T-56, T-70, T-81, T-83, T-85, T-88, T-89, T-93, T-96, T-97, T-99, T-100, T-101, T-103 |
+| Tests & fixtures | T-30, T-31, T-32, T-69, T-81 |
+| Deploy / Docker / CI | T-40, T-41, T-42, T-43, T-44, T-71, T-72, T-73, T-74 |
+| Environment / tooling | T-91 |
+| Future / research / shelved | T-56a, T-75, T-76, T-77, T-82, T-87 |
+
 ## Phase 0 — Lizenz & Hygiene (Tag 1–2)
 
 ### `[x]` T-01 — Lizenzdateien
@@ -155,7 +177,7 @@
 | T-23.5 | Röntgenquelle & Detektor visualisieren | T-23.4 | ✅ Done |
 | T-23.6 | Interaktion: Rotation/Zoom | T-23.3 | ✅ Done |
 | T-23.7 | Integration in Streamlit-App | T-20 | ✅ Done |
-| T-23.8 | Tests für volume3d.py | T-30 | ⚠️ Open |
+| T-23.8 | Tests für volume3d.py | T-30 | ✅ Done (Nov 13, 2026) — durch T-94 abgedeckt (`tests/unit/test_volume3d.py`, 5 Tests: Origin-Platzierung, Downsample-Shift, Detektor-Konvention, Legacy-Pfad) |
 
 #### Technische Entscheidungen
 
@@ -304,6 +326,8 @@
   # Replace st.text_input("DICOM Folder") with DirPicker
   ```
 
+- **Status:** ❌ Dropped (Nov 13, 2026) — `st.text_input` bleibt; Demo-/Restore-Flows verringern den Bedarf, keine neue Dependency (`streamlit-explorer`).
+
 ### `[ ]` T-75 — Desktop App Wrapper (Future)
 - **Ziel:** Streamlit als Desktop-App ohne Browser starten.
 - **Dateien:** `src/visualization/desktop_launcher.py`
@@ -318,7 +342,7 @@
   ```
 - **Status:** ⚠️ Research
 
-## Phase 7 — Docker Self-Deployment (Build blocked - no Docker installed)
+## Phase 7 — Docker Self-Deployment (Nov 13: CI-Route statt lokalem Docker)
 
 ### `[x]` T-71 — Review/Update Dockerfile
 - **Ziel:** Dockerfile für Self-Deployment vorbereiten.
@@ -335,12 +359,12 @@
 - **Akzeptanz:** Keine .dcm, .npy, __pycache__, .git im Image.
 - **Status:** ✅ Done (Oct 29, 2026) — zusätzlich docs, tests, scripts, IDE/Cloud-Ordner ausgeschlossen
 
-### `[ ]` T-73 — Build and Test Docker Image
-- **Ziel:** Docker-Image bauen und verifizieren.
-- **Dateien:** –
+### `[ ]` T-73 — Docker-Image in CI bauen und verifizieren
+- **Ziel:** Das Image verifizieren, ohne Docker lokal zu installieren (Route-Entscheidung Nov 13, 2026).
+- **Dateien:** `.github/workflows/ci.yml`
 - **Abhängig von:** T-71, T-72
-- **Akzeptanz:** Image < 400 MiB, Container startet, App erreichbar auf Port 8501.
-- **Status:** ⚠️ Blocked (Docker nicht installiert; Build/Health-Check nicht ausgeführt)
+- **Akzeptanz:** CI-Job startet das Image (`docker run -d -p 8501:8501`), prüft, dass Port 8501 antwortet, und hält das Image unter 400 MiB. Kein lokaler Build nötig — der GHCR-Push auf `main` läuft bereits (T-41).
+- **Status:** ⚠️ Open (Nov 13, 2026) — Route entschieden: CI statt lokaler Installation; bis dahin ungebaut.
 
 ### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
@@ -356,7 +380,7 @@
 - **Dateien:** `requirements.txt` oder `pyproject.toml`
 - **Abhängig von:** –
 - **Akzeptanz:** `import parallelproj` funktioniert.
-- **Status:** ⚠️ Teilweise — Hinweis in `pyproject.toml` (conda-forge), aktive Installation nur im conda-Env `ct-viewer`.
+- **Status:** ✅ Done by design (Nov 13, 2026) — `parallelproj` ist conda-forge-only und kann kein pip-Extra sein (D-22); verbindlich dokumentiert in `AGENTS.md`/`environment.yml`, Installation nur im Env `ct-viewer`.
 
 ### `[x]` T-62 — Forward Projection Module
 - **Ziel:** Forward-Projection-Funktion mit parallelproj.
@@ -577,30 +601,6 @@
 - **Akzeptanz:** Kein Verweis mehr auf `plot_slot`, „Expander" oder „plot above options"; die Viewer-Notes beschreiben `All`/`2D`/`3D` und die Popovers.
 - **Status:** ✅ Done (Nov 10, 2026) — die drei Stellen korrigiert, zusätzlich zwei Risikozeilen (Stapel-Überlauf, 3D unter dem Fold) und ein „Erledigt (2026-11-10)"-Block ergänzt.
 
-### `[ ]` T-76 — FDK / Analytische Rekonstruktion
-- **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
-- **Dateien:** `src/reconstruction/fdk.py`
-- **Abhängig von:** T-61
-- **Implementierung:**
-  1. Pre-Weighting (FDK weight)
-  2. FFT-basierte Filterung (Ram-Lak, Shepp-Logan)
-  3. Parker weighting für short-scan
-  4. Cone-beam backprojection
-- **Optionen:** ASTRA (bestehend), TomoPy, oder eigene Implementierung
-- **Status:** ⚠️ Open (Future)
-
-### `[ ]` T-77 — Phantomlose Geometrie-Kalibrierung
-- **Ziel:** Geometrie aus Projektionsdaten schätzen ohne Kalibrierphantom.
-- **Dateien:** `src/calibration/geometry_calibration.py`
-- **Abhängig von:** T-63, T-76
-- **Implementierung:**
-  1. Merkmalsextraktion (Kanten, Features)
-  2. Feature-Tracking über Projektionen
-  3. Bundle Adjustment: Geometrie + 3D-Punkte optimieren
-  4. DCC-basierte Regularisierung
-- **Status:** ⚠️ Open (Research)
-- **Siehe auch:** `docs/research/phantomless-geometry-calibration-helix-cbct.md`
-
 ### `[x]` T-90 — Sinogramm-Achsenreihenfolge wirkt auch für DICOM-Ordner und sofort
 
 - **Ziel:** Die Auswahl „File axis order" im Measurements-Panel muss das geladene Bild tatsächlich umorientieren — für jeden Formatpfad und ohne zweiten Klick auf „Load Measurements".
@@ -673,7 +673,7 @@
 - **Dateien:** `src/visualization/volume3d.py`, `src/visualization/app.py`, `tests/unit/test_volume3d.py` (neu, 5 Tests), `tests/unit/test_geometry_trajectory.py`, `docs/geometry.md`, `docs/superpowers/specs/2026-11-12-3d-view-real-world-origin-design.md` (neu)
 - **Abhängig von:** T-55, T-93 (gemeldeter Fehler)
 - **Akzeptanz:** Iso-Mesh und Voxel-Wolke liegen bei `origin + index * spacing` (exakt getestet, auch nach Downsampling auf den gemergten Voxelzentren); Legacy-`origin=None`-Platzierung unverändert; Detektor-Ebene bei `sdd - sid` vom Isocenter. Demo-Volumen (Origin (0,0,0)): 3D-Ansicht zeigt den Kopf im `+`-Oktanten — genau wie die simulierte FP (Phantom oben am Detektor); Dummy-Messung (zentriert): 3D-Ansicht zentriert — passend zu ihrer FP. Volle Suite grün, 0 Skips.
-- **Bekannte Grenze (out of scope):** Der Projektor (`calculate_xray_beam_list`) modelliert einen zirkulären Scan und ignoriert `pitch`/`source_offset_z`/Tabellenvorschub — für Helix-Geometrien zeichnet der 3D-Plot eine Helix, die die FP nicht traced. Helix-FP ist ein eigener Task.
+- **Bekannte Grenze (Update Nov 13, 2026):** Der Helix-Vorschub ist inzwischen implementiert (`b7b7279` — z-feed pro Projektion, `z_step = pitch * n_rows * row_spacing / ppr`); der Projektor wendet `pitch` als Tabellenvorschub an. Offen: Verifikations-Tests und Doku-Sync → T-104.
 - **Status:** ✅ Done (Nov 12, 2026) — 5 neue Tests in `test_volume3d.py` (exakte Mesh-/Marker-Positionen, Legacy-Pfad, Downsampling), `test_get_detector_position` auf die `sdd - sid`-Konvention umgestellt. Bekannt: die FP zeigt für das Demo-Volumen den Phantomkopf oben am Detektor — das ist jetzt **gewollt sichtbar** (die Ansicht zeigt, was gerechnet wird); ob das Demo-Phantom auf die Rotationsachse zentriert wird, ist eine eigene Entscheidung → T-95.
 
 ### `[x]` T-95 — Demo-Phantom-Origin auf die Rotationsachse zentriert
@@ -754,6 +754,22 @@
 - **Abhängig von:** T-85, T-96
 - **Status:** ✅ Done (Nov 12, 2026) — Restore-Button erscheint nur, wenn ein gültiger Session-Record existiert; Clear Cache entfernt ihn (Cache-Datei gelöscht).
 
+## Phase 12 — Release Readiness (Nov 13, 2026)
+
+Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden schließen (T-73 CI-Route), Plan-Hygiene und Helix-FP-Verifikation. Nutzerentscheidung: Helix-FP gehört **in** den Meilenstein, nicht danach.
+
+### `[ ]` T-104 — Helix-FP-Verifikation und Doku-Sync
+- **Ziel:** Die Helix-Vorschub-Implementierung (z-feed pro Projektion, `b7b7279`) durch Tests absichern und die veraltete Doku korrigieren.
+- **Hintergrund:** `src/backend/forward_project.py` rechnet seit `b7b7279` einen Helix-Vorschub (`z_step = pitch * n_rows * row_spacing / ppr`); `src/backend/parallelproj/geometry.py` wendet per-Projektion-z an. Die frühere T-94-Notiz („Projektor ignoriert pitch/Tabellenvorschub") ist damit veraltet.
+- **Dateien:** `tests/unit/test_forward_project.py` (Helix-Tests), `src/backend/forward_project.py` (nur falls die Tests eine Lücke zeigen), `docs/geometry.md`, `docs/plan.md` (T-94-Notiz), Spec in `docs/superpowers/specs/` (vor Umsetzung)
+- **Abhängig von:** T-63, T-79
+- **Umsetzung:**
+  1. Spec schreiben (Workflow: brainstorm → spec → plan), bevor die Tests umgesetzt werden.
+  2. Tests: `pitch > 0` verschiebt Projektionen entlang z messbar und reproduzierbar (`z_step`-Formel gepinnt); `pitch = 0` bleibt exakt zirkulär (identisch zum bisherigen Pfad); Helix-FP und 3D-Trajektorie (`get_trajectory_positions` mit `pitch > 0`) stimmen überein.
+  3. Doku-Sync: `docs/geometry.md` Helix-Abschnitt ergänzen/angleichen.
+- **Akzeptanz:** Helix-Tests grün; `pitch = 0` verhält sich bit-identisch zum bisherigen Verhalten; `docs/geometry.md` und die T-94-Notiz beschreiben den Ist-Zustand; Suite grün, 0 Skips.
+- **Status:** ⚠️ Open (Nov 13, 2026) — z-feed-Kern gelandet (`b7b7279`); offen: Verifikations-Tests und Doku-Sync.
+
 | Tag | Datum | Tasks |
 |---|---|---|
 | 1 | Mi, 14.10. | T-01 bis T-04 ✅ |
@@ -768,8 +784,37 @@
 | 10 | | T-61 bis T-70 ⚠️ (Parallelproj Forward Projection) |
 | 11 | Fr, 06.11. | T-67 ✅, T-68 ✅, T-69 ✅, T-70a–d ✅, T-79 ✅ (Backend in App + Verhalten getestet) |
 | 12 | Mo, 09.11. | T-83 ✅, T-84 ✅, T-85 ✅ (Hintergrund-Start, In-Canvas-Geometrie-Schalter, Empty State; T-82 shelved) |
-| 13 | Mi, 12.11. | T-90 ✅ bis T-99 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei; Geometrie-Laden im Geometry-Tab) |
+| 13 | Do, 12.11. | T-90 ✅ bis T-99 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei; Geometrie-Laden im Geometry-Tab) |
 | 14 | Do, 12.11. | T-101 ✅ (Shepp-Logan-Phantom um 90° gedreht — klassische Scheibe in der Koronalebene, erste anterior-Projektion zeigt das aufrechte Oval; Kamera-Presets front=+X; geometry.md-Koordinaten-Section konsolidiert) + T-102 ✅ (Geometry auch bei .npy/NIfTI-Messungs-Laden mitgeführt — Default 2304 Projections/Rotation) |
+| 15 | Fr, 13.11. | Grilling-Round (plan.md): T-104 geplant (Helix-FP-Verifikation; z-feed gelandet in `b7b7279`), Teil des Release-Readiness-Meilensteins; T-73 → CI-Route (Smoke + < 400 MiB in CI, kein lokales Docker); T-23.8 ✅ durch T-94; T-61 ✅ by design (conda-only); T-56a ❌ dropped; Mouse-Wheel → Backlog; T-76/T-77 → Research-Backlog; Erledigt-Sektionen dedupliziert, Tag-13-Datum korrigiert |
+
+## Research-Backlog (Nov 13, 2026 — nicht eingeplant)
+
+T-76 und T-77 sind aus dem aktuellen Projektumfang genommen (Grilling-Round vom 13.11.2026); die T-Nummern bleiben referenzierbar. Reaktivierung über einen eigenen Spec (Workflow: brainstorm → spec → plan).
+
+### `[ ]` T-76 — FDK / Analytische Rekonstruktion
+- **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
+- **Dateien:** `src/reconstruction/fdk.py` (bei Reaktivierung prüfen: numerical Code gehört nach D-9 nach `src/backend/`)
+- **Abhängig von:** T-61
+- **Implementierung:**
+  1. Pre-Weighting (FDK weight)
+  2. FFT-basierte Filterung (Ram-Lak, Shepp-Logan)
+  3. Parker weighting für short-scan
+  4. Cone-beam backprojection
+- **Optionen:** ASTRA (bestehend), TomoPy, oder eigene Implementierung
+- **Status:** ⚠️ Research-Backlog (Nov 13, 2026) — aus dem aktuellen Umfang genommen; Reaktivierung mit eigenem Spec.
+
+### `[ ]` T-77 — Phantomlose Geometrie-Kalibrierung
+- **Ziel:** Geometrie aus Projektionsdaten schätzen ohne Kalibrierphantom.
+- **Dateien:** `src/calibration/geometry_calibration.py`
+- **Abhängig von:** T-63, T-76
+- **Implementierung:**
+  1. Merkmalsextraktion (Kanten, Features)
+  2. Feature-Tracking über Projektionen
+  3. Bundle Adjustment: Geometrie + 3D-Punkte optimieren
+  4. DCC-basierte Regularisierung
+- **Status:** ⚠️ Research-Backlog (Nov 13, 2026) — aus dem aktuellen Umfang genommen; hängt an T-76.
+- **Siehe auch:** `docs/research/phantomless-geometry-calibration-helix-cbct.md`
 
 ## Decision Log
 
@@ -816,64 +861,10 @@
   - Viewer-Layout `All`/`2D`/`3D` mit gestapelten MPR-Ebenen — T-86
 
 ### Noch offen
-- T-23.8: Tests für volume3d.py
-- Mouse-Wheel-Scrolling über Bilder
-- T-61: parallelproj Dependency (teilweise — conda-env `ct-viewer`, nicht als pip-Dep)
-
-## Erledigt (2026-11-12)
-
-- ✅ T-90: „File axis order" wirkt jetzt für DICOM-Ordner (Transposition des nativen Stapels statt Ignorieren) und beim Ändern sofort statt erst nach erneutem „Load Measurements"; 9 neue Tests, inkl. künstlicher DICOM-Serien mit Gradient pro Rahmen
-- ✅ T-91: Conda-Env `ct-viewer` verbindlich gemacht (`AGENTS.md`, `LINTING.md`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`), `nifti`-Extra in `environment.yml` und CI ergänzt — Suite jetzt **301 passed, 0 skipped**
-- ✅ T-92: Lazy Subset-Reads im Sinogram-Loader (`.npy` via mmap bei Subset, NIfTI via `dataobj`-Basic-Slices; `custom`/`.npz` weiterhin eager) — Subset-Loads lesen nur den gewählten Bereich, Vollauswahl und Fehlerverträge unverändert
-- ✅ T-94: 3D-Ansicht im echten FP-Weltkoordinatensystem (Volumen am echten DICOM-Origin statt schematisch zentriert; Downsample-Shift korrigiert; Detektor-Ebene bei `sdd - sid` statt `-sdd`) — der gemeldete Fehler „3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor" ist behoben, indem die Ansicht zeigt, was die FP rechnet
-- ✅ T-95: Demo-Phantom-Origin zentriert (erster Voxel bei minus halber Ausdehnung pro Achse, Gittermitte auf der Rotationsachse); der Dummy-Wrapper `_centered_shepp_logan_hu` entfällt — der Dummy nutzt die geteilte Default-Funktion; Ideal-FP-Cache bleibt gültig
-- ✅ T-96: Laden des Demo-Bildes erzeugt automatisch die kohärente Demo-Trio (Volumen + Dummy-Geometrie + synthetische Messung) — kein eigener Button-Klick nötig; der manuelle Generate-Button bleibt als Regeneration erhalten
-- ✅ T-97: Sinogram-Ansichten (gemessen/simuliert/Differenz) resampeln die Zeilenachse um das Detektor-Spacing (`to_isotropic`, wie die MPR-Ebenen) — ein 2 mm × 1 mm-Detektor zeigt das Phantom nicht mehr halb so hoch wie real
-- ✅ T-98: „Load Measurements" lädt die ganze Datei („All" statt Downsample-Default); die Sample options steuern nur noch die FP; der module-scoped „all"-Leak im UI-Test (90-s-Timeout bei 75 M Rays) ist behoben, die App-Fixture seedet jetzt auch die Default-Geometrie statt des maschinenabhängigen Geometry-Caches
-- ✅ T-99: Geometry-File-Upload (inkl. Notes) in den Geometry-Tab gezogen; die Sidebar hält nur die Trajectory-Overlay-Settings mit dem Caption „visualization only" — ohne Einfluss auf die Forward-Projektion
-
-## Erledigt (2026-11-10)
-
-- ✅ T-86: Viewer-Layout `All`/`2D`/`3D`, gestapelte MPR-Ebenen (700 px, `border=False`), 2×2-Raster in `2D`, beide Options-Panels als `st.popover`, Slice-/Spacing-Readout ins Panel verschoben, 3D-Build in `2D` übersprungen; `streamlit>=1.37` (`b0687d2`)
-- ⚠️ T-87: Fullscreen — 3D voll nutzbar (`399×700` → `1088×612`), Bild-Vollbild füllt den Viewport (`1112×670`), skaliert das Bild aber **nicht** hoch (bleibt 256 px). Entscheidung offen.
-- ✅ T-88: Readout-Konsistenz beim Volumenwechsel geprüft und per Test gepinnt (`test_switching_to_a_smaller_volume_keeps_indices_valid`)
-- ✅ T-89: Plan-Notizen (`plot_slot`, „Expander", „plot above options") korrigiert
-
-## Erledigt (2026-11-09)
-
-- ✅ T-83: Background-Startup-Load (Job-Registry, `st.fragment`-Polling, Deadline, `reset_job` bei Clear Cache)
-- ✅ T-84: Geometrie-Overlay als In-Canvas-On/Off-Buttons; „Show Trajectory" entfernt; PyVista aus der UI genommen (T-82)
-- ✅ T-85: Kein Auto-Load + Empty State, englische UI, Zirkulärscan-Defaults (`pitch=0.0`, 2304 Projektionen, 1/100 Downsample), sichtbare Richtungspfeile (`sizemode="raw"`, `ARROW_LENGTH_MM`)
-- ⚠️ T-82: PyVista-Render-Modus shelved (statisches PNG kann keinen In-Canvas-Schalter tragen)
-- ✅ T-81: Smoke-Test-Modul jetzt bei ~5 s (vorher 22 s) — die Beseitigung des PyVista-Imports aus dem Startpfad hat das Laufzeit-Ziel erreicht
-
-## Erledigt (2026-11-06)
-
-- ✅ T-67: Comparison Module (`visualization/comparison.py`)
-- ✅ T-68: Real-vs-Simulated-Ansicht mit Differenzbild
-- ✅ T-69: End-to-End-Integrationstest mit echtem parallelproj
-- ✅ T-70a: Messdaten-Auswahl/‑Load in der Sidebar
-- ✅ T-70b: Geometry-Tab (Parameter lesen + anpassen)
-- ✅ T-70c: Real-vs-Simulated-Tab (Forward Projection + Metriken)
-- ✅ T-70d: Headless-UI-Tests via Streamlit `AppTest` — ⚠️ entfernt (zu langsam, siehe T-81)
-- ✅ T-79: Non-contiguous Projection-Selection-Fix
-
-## Erledigt
-
-### Projection Geometry (Phase 5)
-- ✅ T-50: ProjectionGeometry dataclass mit Validierung
-- ✅ T-51: YAML Loader (load_geometry_from_yaml)
-- ✅ T-52: TXT Loader (load_geometry_from_txt) - Mayo Clinic Format
-- ✅ T-53: Unit Tests für Geometry (test_geometry.py, test_geometry_yaml.py, test_geometry_txt.py, test_geometry_trajectory.py)
-
-### Projection Geometry 3D Visualization (Phase 6)
-- ✅ T-54: Geometry Loader für User-Dateien (loaders/projection.py)
-- ✅ T-55: 3D Trajectory Funktionen: get_source_position, get_detector_position, get_trajectory_positions
-
-### Phase 1-4
-- Alle Tasks T-01 bis T-44 ✅
-- T-23: 3D-Visualisierung ✅ (Oct 24)
-- Docker deferred to T-71-74 (T-71, T-72 ✅ done; T-73 ⚠️ blocked; T-74 script ⚠️ started)
+- ~~T-23.8: Tests für volume3d.py~~ — ✅ durch T-94 abgedeckt (`tests/unit/test_volume3d.py`, 5 Tests; Nov 13, 2026)
+- Mouse-Wheel-Scrolling über Bilder — ⚠️ Backlog (Nov 13, 2026), UX-Polish zusammen mit T-87
+- ~~T-61: parallelproj Dependency~~ — ✅ Done by design (Nov 13, 2026): conda-only, verbindlich dokumentiert (`AGENTS.md`, `environment.yml`)
+- T-104: Helix-FP-Verifikation und Doku-Sync (z-feed gelandet, Tests/Doku offen)
 
 ## Implementation Notes
 

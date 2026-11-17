@@ -66,6 +66,36 @@ Where:
 - < 1.0 = overlapping scans
 - > 1.0 = gaps between scans
 
+### Helix Implementation (Forward Projection and 3D View)
+
+The forward projection (`src/backend/forward_project.py`) and the 3D
+trajectory (`visualization/volume3d.py::get_trajectory_positions`) share one
+placement:
+
+```
+collimation_width = n_det_rows × det_row_spacing_mm
+z_step            = pitch × collimation_width / projections_per_rotation   [mm/projection]
+z(i)              = z_center − (N / 2) × z_step + i × z_step               [mm]
+```
+
+- `z_center` = the volume's z centre
+  (`Volume.origin[2] + (n_z − 1) / 2 × z_spacing`).
+- `N` = total number of projections of the scan. The forward projection
+  passes the full scan size (`n_projections_total`), so a downsampled or
+  range selection keeps the z position of its *original* angle index.
+- `i` = original projection (angle) index, not the position inside the
+  selection.
+- The detector rides on the table feed: its rows are offset by `z(i)`, so
+  the whole detector plane translates with the helix.
+- `pitch = 0` → `z_step = 0` → circular scan at constant `z_center` (the
+  default, decision D-12).
+
+The helix is centred on the volume's z centre over the whole scan: the first
+projection sits `N/2 × z_step` below the volume centre, the last one
+`(N/2 − 1) × z_step` above it. Both the projection and the 3D view draw the
+same positions, so the rendered trajectory shows what the projector
+computes.
+
 ## Offsets
 
 ### Source Offsets (Detector Follows)
@@ -109,7 +139,10 @@ The forward projection and the 3D volume view share one world frame:
 - **Rotation axis**: runs through `(0, 0, z_center)`, along **Z** — the scan
   plane follows the volume's z centre (`Volume.origin[2] + (nz - 1) / 2 ×
   z_spacing`), so the first rotation intersects the volume even when its DICOM
-  z origin is far from the world origin.
+  z origin is far from the world origin. For a helical scan (`pitch > 0`) the
+  trajectory is a helix instead of a plane: the source and detector advance
+  by `z_step` per projection, centred on `z_center` over the full scan (see
+  *Helix Implementation* above).
 - **Source at 0°**: `(sid, 0, z_center)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
 - **Detector**: opposite the source at `sdd - sid` from the isocenter (SDD is measured from the source, not from the rotation axis).
 - **Volume**: voxel `[0, 0, 0]` of the `(x, y, z)`-reordered grid sits at

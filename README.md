@@ -47,9 +47,13 @@ For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 **Docker (Recommended):**
 ```bash
-docker build -t ct-viewer .
-docker run -p 8501:8501 ct-viewer
+docker build -t ct-viewer:full --target full .
+docker run -p 8501:8501 -v /path/to/dicom:/data:ro ct-viewer:full
 ```
+The `full` target includes parallelproj and torch, so the forward projection
+works. `docker build -t ct-viewer .` builds `slim` (viewer only, ~350 MB, no
+projection). To hand the image to a customer:
+[docs/customer-docker-guide.md](docs/customer-docker-guide.md).
 
 **Local with pip:**
 ```bash

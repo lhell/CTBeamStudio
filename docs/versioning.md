@@ -94,11 +94,15 @@ Annotated tags (`-a`) record author, date and message. Lightweight tags
 
 ### Step 3 - build the image
 
+Releases ship the `full` target (parallelproj + torch, forward projection
+works). Add `slim` as a second, smaller image if the bare viewer is needed.
+
 ```powershell
 docker build `
   -t ct-viewer:1.0.0 `
   -t ct-viewer:1.0 `
   -t ct-viewer:latest `
+  --target full `
   --label org.opencontainers.image.title=ct-viewer `
   --label org.opencontainers.image.version=1.0.0 `
   --label org.opencontainers.image.revision=$(git rev-parse HEAD) `
@@ -132,7 +136,7 @@ Create a release for the tag `v1.0.0` and paste the image digest into the notes.
 Never spend a version number on a build that is not a release:
 
 ```powershell
-docker build -t ct-viewer:dev -t ct-viewer:sha-$(git rev-parse --short HEAD) .
+docker build -t ct-viewer:dev -t ct-viewer:sha-$(git rev-parse --short HEAD) --target full .
 ```
 
 ---

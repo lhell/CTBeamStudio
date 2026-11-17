@@ -229,6 +229,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Dateien:** `.github/workflows/ci.yml`
 - **Abhängig von:** T-31, T-40
 - **Akzeptanz:** Lint + Tests bei jedem PR; Daten-Guard läuft; Push nach GHCR nur auf `main` und Tags; PRs bauen ohne Push.
+- **Status:** ⚠️ Teilweise (Nov 17, 2026) — Lint, Tests und Daten-Guard laufen; ein GHCR-Push-Job existiert in `ci.yml` **nicht**. Veröffentlichung siehe T-105.
 
 ### `[x]` T-42 - README
 - **Dateien:** `README.md`
@@ -361,17 +362,27 @@ Chronological phases above stay the source of truth; this index groups the same 
 
 ### `[ ]` T-73 — Docker-Image in CI bauen und verifizieren
 - **Ziel:** Das Image verifizieren, ohne Docker lokal zu installieren (Route-Entscheidung Nov 13, 2026).
-- **Dateien:** `.github/workflows/ci.yml`
+- **Dateien:** `.github/workflows/ci.yml`, `Dockerfile`
 - **Abhängig von:** T-71, T-72
-- **Akzeptanz:** CI-Job startet das Image (`docker run -d -p 8501:8501`), prüft, dass Port 8501 antwortet, und hält das Image unter 400 MiB. Kein lokaler Build nötig — der GHCR-Push auf `main` läuft bereits (T-41).
-- **Status:** ⚠️ Open (Nov 13, 2026) — Route entschieden: CI statt lokaler Installation; bis dahin ungebaut.
+- **Akzeptanz:**
+  - `:slim` (`docker build .`, Viewer ohne Projektion) startet, Port 8501 antwortet, Image < 400 MiB.
+  - `:full` (`--target full`, Kunden-Image mit parallelproj + torch CPU) startet, Port 8501 antwortet, und der Build bricht ab, wenn `PARALLELPROJ_AVAILABLE` nicht `True` ist (Smoke-Test im Dockerfile). Größe ~1,6 GB, also gilt die 400-MiB-Grenze nur für `:slim`.
+  - Kein lokaler Build nötig.
+- **Status:** ⚠️ Open (Nov 17, 2026) — Dockerfile hat jetzt die Targets `slim`/`full` inkl. Build-Zeit-Smoke-Test, aber **unverifiziert**: auf diesem Rechner ist kein Docker installiert, und der CI-Job fehlt noch.
+
+### `[ ]` T-105 — Image veröffentlichen (GHCR + Tarball)
+- **Ziel:** Kunden kommen an das `:full`-Image, ohne das Repo zu klonen oder Docker zu bauen.
+- **Dateien:** `.github/workflows/ci.yml`, `scripts/export-image.sh`
+- **Abhängig von:** T-73
+- **Akzeptanz:** CI baut `:full` und `:slim` und pusht beide auf `main`/Tags nach GHCR; `docker save`-Tarball ist als Release-Asset verfügbar (Offline-Weg).
+- **Status:** ⚠️ Open (Nov 17, 2026) — es gibt aktuell **keinen** Push-Job; `ci.yml` enthält nur Daten-Guard, Lint und Tests.
 
 ### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
-- **Dateien:** `scripts/run-docker.sh`
+- **Dateien:** `scripts/run-docker.sh`, `scripts/run-docker.ps1`
 - **Abhängig von:** T-73
-- **Akzeptanz:** Script startet Container auf Port 8501.
-- **Status:** ⚠️ Script erstellt und ausführbar (Oct 29, 2026), aber Inbetriebnahme unverifiziert (T-73 blocked)
+- **Akzeptanz:** Script baut `--target full`, mountet ein Datenverzeichnis read-only und startet den Container auf Port 8501.
+- **Status:** ⚠️ Beide Scripts liegen (Nov 17, 2026); `run-docker.ps1` baut `full`, mountet `-v <daten>:/data:ro` und pollt `/_stcore/health` — Syntax geprüft, Lauf gegen echtes Docker steht aus (kein Docker auf dem Rechner).
 
 ## Phase 8 — Forward Projection with Parallelproj (Oct 27, 2026)
 
@@ -673,7 +684,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Dateien:** `src/visualization/volume3d.py`, `src/visualization/app.py`, `tests/unit/test_volume3d.py` (neu, 5 Tests), `tests/unit/test_geometry_trajectory.py`, `docs/geometry.md`, `docs/superpowers/specs/2026-11-12-3d-view-real-world-origin-design.md` (neu)
 - **Abhängig von:** T-55, T-93 (gemeldeter Fehler)
 - **Akzeptanz:** Iso-Mesh und Voxel-Wolke liegen bei `origin + index * spacing` (exakt getestet, auch nach Downsampling auf den gemergten Voxelzentren); Legacy-`origin=None`-Platzierung unverändert; Detektor-Ebene bei `sdd - sid` vom Isocenter. Demo-Volumen (Origin (0,0,0)): 3D-Ansicht zeigt den Kopf im `+`-Oktanten — genau wie die simulierte FP (Phantom oben am Detektor); Dummy-Messung (zentriert): 3D-Ansicht zentriert — passend zu ihrer FP. Volle Suite grün, 0 Skips.
-- **Bekannte Grenze (Update Nov 13, 2026):** Der Helix-Vorschub ist inzwischen implementiert (`b7b7279` — z-feed pro Projektion, `z_step = pitch * n_rows * row_spacing / ppr`); der Projektor wendet `pitch` als Tabellenvorschub an. Offen: Verifikations-Tests und Doku-Sync → T-104.
+- **Bekannte Grenze (Update Nov 13, 2026):** Der Helix-Vorschub ist inzwischen implementiert (`b7b7279` — z-feed pro Projektion, `z_step = pitch * n_rows * row_spacing / ppr`); der Projektor wendet `pitch` als Tabellenvorschub an. Verifikations-Tests und Doku-Sync: ✅ T-104 (Nov 17, 2026).
 - **Status:** ✅ Done (Nov 12, 2026) — 5 neue Tests in `test_volume3d.py` (exakte Mesh-/Marker-Positionen, Legacy-Pfad, Downsampling), `test_get_detector_position` auf die `sdd - sid`-Konvention umgestellt. Bekannt: die FP zeigt für das Demo-Volumen den Phantomkopf oben am Detektor — das ist jetzt **gewollt sichtbar** (die Ansicht zeigt, was gerechnet wird); ob das Demo-Phantom auf die Rotationsachse zentriert wird, ist eine eigene Entscheidung → T-95.
 
 ### `[x]` T-95 — Demo-Phantom-Origin auf die Rotationsachse zentriert
@@ -768,7 +779,7 @@ Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden sch
   2. Tests: `pitch > 0` verschiebt Projektionen entlang z messbar und reproduzierbar (`z_step`-Formel gepinnt); `pitch = 0` bleibt exakt zirkulär (identisch zum bisherigen Pfad); Helix-FP und 3D-Trajektorie (`get_trajectory_positions` mit `pitch > 0`) stimmen überein.
   3. Doku-Sync: `docs/geometry.md` Helix-Abschnitt ergänzen/angleichen.
 - **Akzeptanz:** Helix-Tests grün; `pitch = 0` verhält sich bit-identisch zum bisherigen Verhalten; `docs/geometry.md` und die T-94-Notiz beschreiben den Ist-Zustand; Suite grün, 0 Skips.
-- **Status:** ⚠️ Open (Nov 13, 2026) — z-feed-Kern gelandet (`b7b7279`); offen: Verifikations-Tests und Doku-Sync.
+- **Status:** ✅ Done (Nov 17, 2026) — 5 neue Tests in `test_forward_project.py` (Slab-Shift: nur die z=0-Projektion trifft die attenuierende Ebene, reproduzierbar; `pitch = 0` zirkulär und gleich; exakte z-Formel inkl. `n_projections_total` und Original-Index-Selektion, Detektor reitet auf z; `z_step = 0` = Pre-Helix-Pfad; FP ↔ `get_trajectory_positions`, Quellen und zentrale Detektor-Pixel, atol 1e-2 mm). Helix-Sektion in `docs/geometry.md`; Test-Bar 351 → 356. Keine Produktionsänderung nötig — die Tests bestätigen den Ist-Zustand. Spec: `docs/superpowers/specs/2026-11-17-helix-fp-verification-design.md`, Plan: `docs/superpowers/plans/2026-11-17-helix-fp-verification.md`.
 
 | Tag | Datum | Tasks |
 |---|---|---|
@@ -787,6 +798,7 @@ Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden sch
 | 13 | Do, 12.11. | T-90 ✅ bis T-99 ✅ (Achsenreihenfolge für DICOM + sofortige Anwendung; Env-Pflicht, 0 Skips; Lazy Subset-Reads für Sinogramme; Dummy-Messung fürs Demo-Phantom; 3D-Ansicht im echten FP-Weltkoordinatensystem; Demo-Origin zentriert; Auto-Dummy-Messung beim Demo-Bild-Laden; Sinogram-Ansichten im korrekten Spacing; Messungs-Laden lädt die ganze Datei; Geometrie-Laden im Geometry-Tab) |
 | 14 | Do, 12.11. | T-101 ✅ (Shepp-Logan-Phantom um 90° gedreht — klassische Scheibe in der Koronalebene, erste anterior-Projektion zeigt das aufrechte Oval; Kamera-Presets front=+X; geometry.md-Koordinaten-Section konsolidiert) + T-102 ✅ (Geometry auch bei .npy/NIfTI-Messungs-Laden mitgeführt — Default 2304 Projections/Rotation) |
 | 15 | Fr, 13.11. | Grilling-Round (plan.md): T-104 geplant (Helix-FP-Verifikation; z-feed gelandet in `b7b7279`), Teil des Release-Readiness-Meilensteins; T-73 → CI-Route (Smoke + < 400 MiB in CI, kein lokales Docker); T-23.8 ✅ durch T-94; T-61 ✅ by design (conda-only); T-56a ❌ dropped; Mouse-Wheel → Backlog; T-76/T-77 → Research-Backlog; Erledigt-Sektionen dedupliziert, Tag-13-Datum korrigiert |
+| 16 | Di, 17.11. | T-104 ✅ (Helix-FP-Verifikation: 5 neue Tests — Slab-Shift mit `z_step = 3 mm`, `pitch = 0` zirkulär, exakte z-Formel inkl. Original-Index, `z_step = 0` = Pre-Helix-Pfad, FP ↔ 3D-Trajektorie; `docs/geometry.md` Helix-Sektion; Test-Bar 351 → 356) |
 
 ## Research-Backlog (Nov 13, 2026 — nicht eingeplant)
 
@@ -864,7 +876,7 @@ T-76 und T-77 sind aus dem aktuellen Projektumfang genommen (Grilling-Round vom 
 - ~~T-23.8: Tests für volume3d.py~~ — ✅ durch T-94 abgedeckt (`tests/unit/test_volume3d.py`, 5 Tests; Nov 13, 2026)
 - Mouse-Wheel-Scrolling über Bilder — ⚠️ Backlog (Nov 13, 2026), UX-Polish zusammen mit T-87
 - ~~T-61: parallelproj Dependency~~ — ✅ Done by design (Nov 13, 2026): conda-only, verbindlich dokumentiert (`AGENTS.md`, `environment.yml`)
-- T-104: Helix-FP-Verifikation und Doku-Sync (z-feed gelandet, Tests/Doku offen)
+- ~~T-104: Helix-FP-Verifikation und Doku-Sync~~ — ✅ Done (Nov 17, 2026): 5 Helix-Tests, `docs/geometry.md` Helix-Sektion, Test-Bar 356
 
 ## Implementation Notes
 

@@ -20,16 +20,34 @@ This guide covers all installation options for CTBeamStudio.
 ### Option 1: Docker (Recommended for quick setup)
 
 > Release tagging and registry conventions: see [docs/versioning.md](docs/versioning.md).
+> Handing the image to someone who does not develop this project? Use
+> [docs/customer-docker-guide.md](docs/customer-docker-guide.md) instead — it
+> covers loading the image, mounting data, and troubleshooting without any
+> Python or conda.
+
+The Dockerfile has two targets:
+
+| Target | Contains | Projection | Size |
+|---|---|---|---|
+| `slim` | viewer only | returns zeros + warning | ~350 MB |
+| `full` | + parallelproj + torch (CPU) | works | ~1.6 GB |
 
 ```bash
-# Build the image
-docker build -t ct-viewer .
+# Full image — this is the one that can forward-project
+docker build -t ct-viewer:full --target full .
 
-# Run the container
-docker run -p 8501:8501 ct-viewer
+# Mount your DICOM folder; the app reads it from the container path /data
+docker run -p 8501:8501 -v C:\data\ct:/data:ro ct-viewer:full
 ```
 
-Open http://localhost:8501 in your browser.
+Open http://localhost:8501 in your browser, then enter `/data/<your-study>` in
+the sidebar's **DICOM Folder** field.
+
+The `full` target installs conda-forge's `parallelproj` via micromamba **inside
+the image**. Nothing has to be installed on the host, and conda is not required
+on the machine that runs the container — it is build-time machinery only.
+
+Plain `docker build -t ct-viewer .` builds `slim`, the smallest image.
 
 ---
 
@@ -277,14 +295,27 @@ Note: You'll need all dependencies installed in your environment.
 ### With volume mount for local data
 
 ```bash
-docker run -p 8501:8501 -v C:\data\ct:/data ct-viewer
+docker run -p 8501:8501 -v C:\data\ct:/data:ro ct-viewer:full
 ```
+
+The container never writes to the mounted folder. The sidebar path field expects
+the container path (`/data/...`), not the host path.
 
 ### Build with custom tag
 
 ```bash
-docker build -t ct-viewer:1.0.0 .
+docker build -t ct-viewer:full --target full .
+docker build -t ct-viewer:1.0.0 --target full .
 ```
+
+### Hand the image to a non-developer
+
+```bash
+docker save ct-viewer:full -o ct-viewer-full.tar   # on your machine
+docker load -i ct-viewer-full.tar                  # on the target machine
+```
+
+Full instructions: [docs/customer-docker-guide.md](docs/customer-docker-guide.md).
 
 ### Check container logs
 

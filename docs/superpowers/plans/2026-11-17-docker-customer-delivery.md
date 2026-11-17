@@ -26,8 +26,16 @@ on a real machine, not assumed.
   local target. All docs now say ~1.43 GB.
 - Images/containers/tarballs are named `ctbeamstudio` (T-106); this file's
   commands were updated accordingly.
+- **Step 3 (full) executed and verified 2026-11-17:** build exit 0 with
+  release tags + OCI labels; container `ctbeamstudio:1.0.0` answers
+  `/_stcore/health` → `ok`; `PARALLELPROJ_AVAILABLE == True`;
+  `cuda_present == False`; `torch 2.15.0+cpu`; logs clean. Measured size
+  **3.05 GiB** (not ~1.6 GB — docs corrected). Remaining Step-3 item: one
+  real forward projection in the browser against a mounted DICOM study.
 - CI has no Docker push job yet (T-105). `release.yml` (T-106) covers the
-  `v*.*.*` release path; the push-on-main/PR job from T-105 is still open.
+  `v*.*.*` release path (lockstep check → build → tag+push via
+  `scripts/release_push.sh` → digest → gzip'd tarball ≤2 GiB → GitHub
+  Release); the push-on-main/PR job from T-105 is still open.
 
 ## Steps
 
@@ -111,8 +119,9 @@ GHCR on `main` and on tags. Until then the customer path is the tarball.
 - [x] `:slim` reports `PARALLELPROJ_AVAILABLE == False`. Size: **1.43 GiB**,
       not under 400 MiB — see Current state; criterion superseded by T-106
       (slim is never published).
-- [ ] `--target full` succeeds; `PARALLELPROJ_AVAILABLE == True`; `cuda_present
-      == False`; container answers on `/_stcore/health`.
+- [x] `--target full` succeeds; `PARALLELPROJ_AVAILABLE == True`; `cuda_present
+      == False`; container answers on `/_stcore/health`. (2026-11-17, size
+      3.05 GiB)
 - [ ] One real forward projection in the browser returns a non-zero projection.
 - [ ] Mounted DICOM folder is readable, and nothing is written into it (`:ro`).
 - [ ] `ctbeamstudio-full.tar` loads on a second machine and starts there.

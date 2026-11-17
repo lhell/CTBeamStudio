@@ -6,6 +6,10 @@ A web-based tool for exploring CT scanner geometry and generating **simulated pr
 
 <img width="1347" height="797" alt="image" src="https://github.com/user-attachments/assets/09dd9bb6-3514-47c9-bf6a-b8fe68dada42" />
 
+**Demo (synthetic phantom):** loading the demo data, toggling 2D/3D views, inspecting the projection geometry, running the forward projection, and comparing simulated vs. measured sinograms with MAE/RMSE/SSIM:
+
+![CTBeamStudio demo — demo phantom, 2D/3D views, geometry, forward projection, sinogram comparison](ctbeam_demo.gif)
+
 ## Features
 
 ### Core Workflow

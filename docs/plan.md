@@ -377,6 +377,13 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** CI baut `:full` und `:slim` und pusht beide auf `main`/Tags nach GHCR; `docker save`-Tarball ist als Release-Asset verfügbar (Offline-Weg).
 - **Status:** ⚠️ Open (Nov 17, 2026) — es gibt aktuell **keinen** Push-Job; `ci.yml` enthält nur Daten-Guard, Lint und Tests.
 
+### `[ ]` T-106 — Image-Name `ctbeamstudio` und Release-Versionierung
+- **Ziel:** Ein Commit baut zwei Images; trotzdem muss „Release 1.0.0" genau ein Image bedeuten. Dazu kommen Name, Tag-Schema und ein automatisierter Release.
+- **Dateien:** `Dockerfile`, `README.md`, `INSTALLATION.md`, `docs/versioning.md`, `docs/customer-docker-guide.md`, `scripts/run-docker.sh`, `scripts/run-docker.ps1`, `.github/workflows/release.yml` (neu)
+- **Abhängig von:** T-73, T-105
+- **Akzeptanz:** Image heißt `ctbeamstudio` (Container `ctbeamstudio`, Volume `ctbeamstudio-cache`, Tarball `ctbeamstudio-1.0.0-full.tar`); Conda-Env und Python-Distribution bleiben `ct-viewer`; `1.0.0`/`1.0`/`latest` zeigen alle auf `full` und denselben Digest; `release.yml` bricht ab, wenn `pyproject.toml`-Version und `v*`-Tag auseinanderlaufen, und hängt Digest + Tarball an das GitHub-Release.
+- **Status:** ⚠️ Open (Nov 17, 2026) — Entscheidung für `ctbeamstudio` gefallen, Plan liegt in `docs/superpowers/plans/2026-11-17-docker-image-versioning.md`; Umsetzung (Rename + Release-Workflow) steht aus.
+
 ### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
 - **Dateien:** `scripts/run-docker.sh`, `scripts/run-docker.ps1`

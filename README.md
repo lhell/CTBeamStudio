@@ -47,12 +47,13 @@ For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 **Docker (Recommended):**
 ```bash
-docker build -t ct-viewer:full --target full .
-docker run -p 8501:8501 -v /path/to/dicom:/data:ro ct-viewer:full
+docker build -t ctbeamstudio:full --target full .
+docker run -p 8501:8501 -v /path/to/dicom:/data:ro ctbeamstudio:full
 ```
 The `full` target includes parallelproj and torch, so the forward projection
-works. `docker build -t ct-viewer .` builds `slim` (viewer only, ~350 MB, no
-projection). To hand the image to a customer:
+works. `docker build -t ctbeamstudio:slim --target slim .` builds `slim`
+(viewer only, no projection; ~1.43 GiB — see the Dockerfile header for the
+size breakdown). To hand the image to a customer:
 [docs/customer-docker-guide.md](docs/customer-docker-guide.md).
 
 **Local with pip:**

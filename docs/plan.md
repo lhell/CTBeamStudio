@@ -382,7 +382,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Dateien:** `Dockerfile`, `README.md`, `INSTALLATION.md`, `docs/versioning.md`, `docs/customer-docker-guide.md`, `scripts/run-docker.sh`, `scripts/run-docker.ps1`, `.github/workflows/release.yml` (neu)
 - **Abhängig von:** T-73, T-105
 - **Akzeptanz:** Image heißt `ctbeamstudio` (Container `ctbeamstudio`, Volume `ctbeamstudio-cache`, Tarball `ctbeamstudio-1.0.0-full.tar`); Conda-Env und Python-Distribution bleiben `ct-viewer`; `1.0.0`/`1.0`/`latest` zeigen alle auf `full` und denselben Digest; `release.yml` bricht ab, wenn `pyproject.toml`-Version und `v*`-Tag auseinanderlaufen, und hängt Digest + Tarball an das GitHub-Release.
-- **Status:** ⚠️ Open (Nov 17, 2026) — Entscheidung für `ctbeamstudio` gefallen, Plan liegt in `docs/superpowers/plans/2026-11-17-docker-image-versioning.md`; Umsetzung (Rename + Release-Workflow) steht aus.
+- **Status:** ✅ Done (Nov 17, 2026) — Rename auf `ctbeamstudio` umgesetzt (Dockerfile-Header, README, INSTALLATION-Docker-Sektionen, `docs/versioning.md`, Customer-Guide, Delivery-Plan, beide `run-docker`-Scripts); Tag-Schema `1.0.0`/`1.0`/`latest` = `full`, `slim` nie veröffentlicht. Neu: `scripts/check_release_tag.py` (+ 6 Tests, im Docker-Python verifiziert, 6/6 grün) und `.github/workflows/release.yml` (v*.*.*: Lockstep-Check → Build `--target full` mit OCI-Labels → GHCR-Push → Release mit Digest + Tarball). Lokal `ct-viewer:slim` → `ctbeamstudio:slim` retagged; slim real 1,43 GiB (pip-Dep-Tree ~790 MB, alte 350-MB-Schätzung korrigiert). Offen bis zum ersten `v*.*.*`-Push: erster echter Workflow-Lauf, GHCR-Immutable-Tags, Pull-ohne-Auth.
 
 ### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.

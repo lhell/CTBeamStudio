@@ -5,8 +5,8 @@
 #   ./scripts/run-docker.sh /path/to/dicom  # mounts that folder instead
 set -euo pipefail
 
-CONTAINER_NAME="ct-viewer"
-IMAGE="ct-viewer:full"
+CONTAINER_NAME="ctbeamstudio"
+IMAGE="ctbeamstudio:full"
 # Host folder holding the DICOM series; exposed as /data inside the container.
 DATA_DIR="${1:-$(pwd)/data}"
 

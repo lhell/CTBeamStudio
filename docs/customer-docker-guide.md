@@ -4,9 +4,9 @@ This is the operator-facing guide for running CTBeamStudio as a container. It
 assumes no Python, no conda, and no network access after the image is on the
 machine. Everything the app needs is inside the image.
 
-The image tag to use is **`ct-viewer:full`**. The `:slim` variant renders
-volumes and geometry but cannot forward-project (see
-[Troubleshooting](#troubleshooting)).
+The image to use is **`ctbeamstudio:1.0.0`** — version tags always mean the
+`full` variant, the one with forward projection. `slim` is a local build
+target only and is never published (see [Troubleshooting](#troubleshooting)).
 
 ## 1. What you need
 
@@ -24,20 +24,19 @@ No internet connection is needed after the image has been loaded once.
 **From a tarball** (works offline, no registry account):
 
 ```bash
-docker load -i ct-viewer-full.tar
+docker load -i ctbeamstudio-1.0.0-full.tar
 ```
 
 **From the registry** (once the publish job exists, see `docs/plan.md` T-105):
 
 ```bash
-docker pull ghcr.io/lhell/ctorientationviewer:full
-docker tag ghcr.io/lhell/ctorientationviewer:full ct-viewer:full
+docker pull ghcr.io/lhell/ctbeamstudio:1.0.0
 ```
 
 Confirm it arrived:
 
 ```bash
-docker images ct-viewer
+docker images ctbeamstudio
 ```
 
 ## 3. Start the container
@@ -49,28 +48,28 @@ data:
 **Windows (PowerShell)**
 
 ```powershell
-docker run -d --name ct-viewer -p 8501:8501 `
+docker run -d --name ctbeamstudio -p 8501:8501 `
   -v "C:\data\ct:/data:ro" `
-  -v ct-viewer-cache:/app/data `
+  -v ctbeamstudio-cache:/app/data `
   --restart unless-stopped `
-  ct-viewer:full
+  ctbeamstudio:1.0.0
 ```
 
 **Linux / macOS**
 
 ```bash
-docker run -d --name ct-viewer -p 8501:8501 \
+docker run -d --name ctbeamstudio -p 8501:8501 \
   -v /data/ct:/data:ro \
-  -v ct-viewer-cache:/app/data \
+  -v ctbeamstudio-cache:/app/data \
   --restart unless-stopped \
-  ct-viewer:full
+  ctbeamstudio:1.0.0
 ```
 
 | Flag | Why |
 |---|---|
 | `-p 8501:8501` | the web UI on http://localhost:8501 |
 | `-v <host>:/data:ro` | your DICOM data, read-only |
-| `-v ct-viewer-cache:/app/data` | keeps the app's own cache across container restarts |
+| `-v ctbeamstudio-cache:/app/data` | keeps the app's own cache across container restarts |
 | `--restart unless-stopped` | comes back after a reboot |
 | `-d` | runs in the background |
 
@@ -92,34 +91,35 @@ this machine unless you publish the port on a network interface.
 ## 5. Stop, update, remove
 
 ```bash
-docker stop ct-viewer          # stop (data untouched)
-docker start ct-viewer         # start again
-docker logs ct-viewer          # see what the app printed
-docker rm -f ct-viewer         # remove the container
-docker load -i ct-viewer-full-newer.tar && \
-  docker rm -f ct-viewer &&  # then run the docker run command from step 3
+docker stop ctbeamstudio          # stop (data untouched)
+docker start ctbeamstudio         # start again
+docker logs ctbeamstudio          # see what the app printed
+docker rm -f ctbeamstudio         # remove the container
+docker load -i ctbeamstudio-1.0.1-full.tar && \
+  docker rm -f ctbeamstudio &&  # then run the docker run command from step 3
 ```
 
-To ship the image to another machine, export it there:
+To ship the image to another machine, export it there (versioned with the
+release number):
 
 ```bash
-docker save ct-viewer:full -o ct-viewer-full.tar
+docker save ctbeamstudio:1.0.0 -o ctbeamstudio-1.0.0-full.tar
 ```
 
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
-| `parallelproj not available. Forward projection will return zeros.` | You are running `ct-viewer:slim`. Switch to `:full`. |
+| `parallelproj not available. Forward projection will return zeros.` | You are not on the `full` variant. Use the version-tagged image (`ctbeamstudio:1.0.0`); `slim` is a local build target only. |
 | `Ports are not available: 8501` | Something else uses 8501. Map another port: `-p 8502:8501`, then open port 8502. |
-| The DICOM folder path shows no series | Path must be the **container** path (`/data/...`), not `C:\...`. Check the mount with `docker exec ct-viewer ls /data`. |
+| The DICOM folder path shows no series | Path must be the **container** path (`/data/...`), not `C:\...`. Check the mount with `docker exec ctbeamstudio ls /data`. |
 | `No DICOM files found` | Point at the folder that holds the `.dcm`/`.ima` files directly; the scanner does not descend into subfolders. |
-| Browser cannot connect | Container not running (`docker ps`) or still starting (~10 s). `docker logs ct-viewer` shows the reason. |
-| Permission denied writing `/app/data` | A host folder was mounted there instead of the named volume. Use `-v ct-viewer-cache:/app/data`. |
+| Browser cannot connect | Container not running (`docker ps`) or still starting (~10 s). `docker logs ctbeamstudio` shows the reason. |
+| Permission denied writing `/app/data` | A host folder was mounted there instead of the named volume. Use `-v ctbeamstudio-cache:/app/data`. |
 
 ## Your data stays local
 
 The container reads the mounted folder and writes nothing to it (`:ro`). The
-only state it keeps is its own cache volume (`ct-viewer-cache`). No upload, no
+only state it keeps is its own cache volume (`ctbeamstudio-cache`). No upload, no
 telemetry, no connection to the developers — patient data never leaves the
 machine you run it on.

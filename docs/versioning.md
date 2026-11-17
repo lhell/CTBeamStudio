@@ -3,7 +3,7 @@
 How this project numbers releases, tags commits, builds images, and keeps the two
 systems from drifting apart.
 
-Last reviewed: 2026-10-29 (after Docker/WSL setup, image `ct-viewer:1.0.0`).
+Last reviewed: 2026-11-17 (image renamed to `ctbeamstudio`, T-106).
 
 ---
 
@@ -28,7 +28,7 @@ forward-project, so a customer who pulled it would get an image whose main
 feature silently returns zeros. `slim` stays a local build target:
 
 ```powershell
-docker build -t ct-viewer:slim --target slim .   # local only, never pushed
+docker build -t ctbeamstudio:slim --target slim .   # local only, never pushed
 ```
 
 If `slim` ever ships, the variant becomes part of the tag and the plain version
@@ -73,9 +73,9 @@ OCI label instead.
 3. **Version tags are history.** Do not rebuild over an existing version tag.
    Bump instead. Enable immutable tags in the registry so this is enforced.
 4. **Development builds use commit tags**, not version numbers:
-   `ct-viewer:dev`, `ct-viewer:sha-a1b2c3d`.
+   `ctbeamstudio:dev`, `ctbeamstudio:sha-a1b2c3d`.
 5. **Deploy by digest**, not by tag:
-   `ct-viewer@sha256:...`. The tag is for humans; the digest is for tooling.
+   `ctbeamstudio@sha256:...`. The tag is for humans; the digest is for tooling.
 6. **The git tag is the source of truth** for a release; Docker tags are derived
    from it (manually today, by CI later).
 
@@ -122,14 +122,15 @@ works). Add `slim` as a second, smaller image if the bare viewer is needed.
 
 ```powershell
 docker build `
-  -t ct-viewer:1.0.0 `
-  -t ct-viewer:1.0 `
-  -t ct-viewer:latest `
+  -t ctbeamstudio:1.0.0 `
+  -t ctbeamstudio:1.0 `
+  -t ctbeamstudio:latest `
   --target full `
-  --label org.opencontainers.image.title=ct-viewer `
+  --label org.opencontainers.image.title=ctbeamstudio `
   --label org.opencontainers.image.version=1.0.0 `
   --label org.opencontainers.image.revision=$(git rev-parse HEAD) `
-  --label org.opencontainers.image.source=https://github.com/lhell/CTOrientationViewer `
+  --label org.opencontainers.image.source=https://github.com/lhell/CTBeamStudio `
+  --label com.ctbeamstudio.variant=full `
   .
 ```
 
@@ -139,11 +140,11 @@ docker build `
 ### Step 4 - verify, then push
 
 ```powershell
-docker inspect ct-viewer:1.0.0 --format '{{index .Config.Labels "org.opencontainers.image.version"}}'
-docker push ghcr.io/lhell/ct-viewer:1.0.0
-docker push ghcr.io/lhell/ct-viewer:1.0
-docker push ghcr.io/lhell/ct-viewer:latest
-docker inspect --format='{{index .RepoDigests 0}}' ct-viewer:1.0.0
+docker inspect ctbeamstudio:1.0.0 --format '{{index .Config.Labels "org.opencontainers.image.version"}}'
+docker push ghcr.io/lhell/ctbeamstudio:1.0.0
+docker push ghcr.io/lhell/ctbeamstudio:1.0
+docker push ghcr.io/lhell/ctbeamstudio:latest
+docker inspect --format='{{index .RepoDigests 0}}' ctbeamstudio:1.0.0
 ```
 
 Record the digest from the last command in the release notes.
@@ -159,7 +160,7 @@ Create a release for the tag `v1.0.0` and paste the image digest into the notes.
 Never spend a version number on a build that is not a release:
 
 ```powershell
-docker build -t ct-viewer:dev -t ct-viewer:sha-$(git rev-parse --short HEAD) --target full .
+docker build -t ctbeamstudio:dev -t ctbeamstudio:sha-$(git rev-parse --short HEAD) --target full .
 ```
 
 ---
@@ -199,7 +200,7 @@ can always retag.
 |------|-------|
 | `pyproject.toml` version | `1.0.0` |
 | Git release tags | none (`archive/MPR` exists and is a **tag**, not a branch) |
-| Local image tags | `ct-viewer:latest`, `ct-viewer:v1.0.0` (pre-dates the two-target split) |
+| Local image tags | `ctbeamstudio:slim` (retagged 2026-11-17, T-73/T-106); stale `ct-viewer:latest`, `ct-viewer:v1.0.0` from pre-split builds still on disk |
 | Docker tag convention | use `1.0.0` (no `v`); `v1.0.0` is a git-style spelling |
 | Dockerfile targets | `full` (customer, published) and `slim` (local only) |
 | Published images | none — no Docker job in CI, see T-73/T-105 in `docs/plan.md` |
@@ -208,23 +209,30 @@ can always retag.
 
 Known follow-ups:
 
-- Retag the local image from `v1.0.0` to `1.0.0`.
-- Create annotated git tag `v1.0.0` when the release commit is ready.
-- Update `README.md` and `INSTALLATION.md` commands to use `ct-viewer:1.0.0`.
+- Remove or retag the stale local images `ct-viewer:latest` / `ct-viewer:v1.0.0`
+  (pre-dates the two-target split; `docker rmi` when no longer needed).
+- Create annotated git tag `v1.0.0` when the release commit is ready — the
+  first `v*.*.*` push exercises `release.yml`.
 
 ---
 
-## 10. Automating the lockstep (outline)
+## 10. Automating the lockstep
 
-A `.github/workflows/release.yml` triggered on `v*.*.*` should:
+`.github/workflows/release.yml` (T-106) implements this for real, triggered on
+`v*.*.*`:
 
-1. check out the tagged commit,
-2. fail if `pyproject.toml` version != tag without the leading `v`,
-3. build the image from that commit with version, minor alias and `latest` tags,
-4. push to the registry with OCI labels,
-5. create the GitHub Release with the resulting digest.
+1. checks out the tagged commit,
+2. fails if `pyproject.toml` version != tag without the leading `v`
+   (via `scripts/check_release_tag.py`, tested in
+   `tests/unit/test_release_tag_check.py`),
+3. builds the image from that commit with version, minor alias and `latest`
+   tags, plus the OCI labels,
+4. pushes to `ghcr.io/lhell/ctbeamstudio`,
+5. creates the GitHub Release with the resulting digest,
+6. uploads the `docker save` tarball as the offline asset.
 
-Until that exists, the manual procedure in section 5 is the contract.
+The first `v*.*.*` tag push is the workflow's first real run; until then the
+manual procedure in section 5 is the contract (and the fallback).
 
 ---
 
@@ -235,10 +243,10 @@ git status                                  # must be clean before tagging
 git tag -a v1.0.0 -m "CTBeamStudio 1.0.0"
 git push origin main --follow-tags
 
-docker build -t ct-viewer:1.0.0 -t ct-viewer:latest --target full .
-docker tag  ct-viewer:1.0.0 ghcr.io/lhell/ct-viewer:1.0.0
-docker push ghcr.io/lhell/ct-viewer:1.0.0
-docker inspect --format='{{index .RepoDigests 0}}' ct-viewer:1.0.0
+docker build -t ctbeamstudio:1.0.0 -t ctbeamstudio:latest --target full .
+docker tag  ctbeamstudio:1.0.0 ghcr.io/lhell/ctbeamstudio:1.0.0
+docker push ghcr.io/lhell/ctbeamstudio:1.0.0
+docker inspect --format='{{index .RepoDigests 0}}' ctbeamstudio:1.0.0
 ```
 
 Related: [`INSTALLATION.md`](../INSTALLATION.md) for setup, [`README.md`](../README.md)

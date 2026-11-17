@@ -1,7 +1,11 @@
 # CTBeamStudio Dockerfile — two targets from one build.
 #
-#   docker build -t ct-viewer:slim .                # viewer only, ~350 MB
-#   docker build -t ct-viewer:full --target full .  # + forward projection, ~1.6 GB
+#   docker build -t ctbeamstudio:slim .                # viewer only, no projection
+#   docker build -t ctbeamstudio:full --target full .  # + forward projection, ~1.6 GB
+#
+# Measured 2026-11-17 (T-73): slim is ~1.43 GiB — the viewer dependency set
+# (streamlit/pyarrow, scipy, plotly, pandas) alone is ~790 MB installed, so the
+# old "~350 MB" estimate was never reachable. Only `full` is published.
 #
 # `slim` installs plain pip packages. It renders volumes, MPR and geometry, but
 # "Run Forward Projection" returns zeros with a warning, because parallelproj

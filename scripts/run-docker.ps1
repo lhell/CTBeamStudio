@@ -13,8 +13,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$container = if ($Slim) { "ct-viewer-slim" } else { "ct-viewer" }
-$image = if ($Slim) { "ct-viewer:slim" } else { "ct-viewer:full" }
+$container = if ($Slim) { "ctbeamstudio-slim" } else { "ctbeamstudio" }
+$image = if ($Slim) { "ctbeamstudio:slim" } else { "ctbeamstudio:full" }
 $target = if ($Slim) { "slim" } else { "full" }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {

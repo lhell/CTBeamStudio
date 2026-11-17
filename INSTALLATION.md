@@ -29,15 +29,15 @@ The Dockerfile has two targets:
 
 | Target | Contains | Projection | Size |
 |---|---|---|---|
-| `slim` | viewer only | returns zeros + warning | ~350 MB |
+| `slim` | viewer only | returns zeros + warning | ~1.43 GB |
 | `full` | + parallelproj + torch (CPU) | works | ~1.6 GB |
 
 ```bash
 # Full image — this is the one that can forward-project
-docker build -t ct-viewer:full --target full .
+docker build -t ctbeamstudio:full --target full .
 
 # Mount your DICOM folder; the app reads it from the container path /data
-docker run -p 8501:8501 -v C:\data\ct:/data:ro ct-viewer:full
+docker run -p 8501:8501 -v C:\data\ct:/data:ro ctbeamstudio:full
 ```
 
 Open http://localhost:8501 in your browser, then enter `/data/<your-study>` in
@@ -47,7 +47,9 @@ The `full` target installs conda-forge's `parallelproj` via micromamba **inside
 the image**. Nothing has to be installed on the host, and conda is not required
 on the machine that runs the container — it is build-time machinery only.
 
-Plain `docker build -t ct-viewer .` builds `slim`, the smallest image.
+Plain `docker build -t ctbeamstudio:slim --target slim .` builds `slim`, the
+viewer-only image (no projection; ~1.43 GB — the viewer dependency set is the
+bulk, see the Dockerfile header).
 
 ---
 
@@ -295,7 +297,7 @@ Note: You'll need all dependencies installed in your environment.
 ### With volume mount for local data
 
 ```bash
-docker run -p 8501:8501 -v C:\data\ct:/data:ro ct-viewer:full
+docker run -p 8501:8501 -v C:\data\ct:/data:ro ctbeamstudio:full
 ```
 
 The container never writes to the mounted folder. The sidebar path field expects
@@ -304,15 +306,15 @@ the container path (`/data/...`), not the host path.
 ### Build with custom tag
 
 ```bash
-docker build -t ct-viewer:full --target full .
-docker build -t ct-viewer:1.0.0 --target full .
+docker build -t ctbeamstudio:full --target full .
+docker build -t ctbeamstudio:1.0.0 --target full .
 ```
 
 ### Hand the image to a non-developer
 
 ```bash
-docker save ct-viewer:full -o ct-viewer-full.tar   # on your machine
-docker load -i ct-viewer-full.tar                  # on the target machine
+docker save ctbeamstudio:1.0.0 -o ctbeamstudio-1.0.0-full.tar   # on your machine
+docker load -i ctbeamstudio-1.0.0-full.tar                     # on the target machine
 ```
 
 Full instructions: [docs/customer-docker-guide.md](docs/customer-docker-guide.md).
@@ -320,7 +322,7 @@ Full instructions: [docs/customer-docker-guide.md](docs/customer-docker-guide.md
 ### Check container logs
 
 ```bash
-docker logs ct-viewer
+docker logs ctbeamstudio
 ```
 
 ---

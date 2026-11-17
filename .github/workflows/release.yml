@@ -1,0 +1,93 @@
+# Release workflow (T-106): build the customer image from a v*.*.* tag,
+# push it to GHCR, and attach the digest + offline tarball to the GitHub
+# Release. Contract: docs/versioning.md; work plan:
+# docs/superpowers/plans/2026-11-17-docker-image-versioning.md §5.
+#
+# Only `full` is ever published: a bare version tag must never resolve to a
+# `slim` image (docs/versioning.md §1, variant axis).
+#
+# A bare `docker build` is used instead of buildx so the workflow mirrors the
+# manual procedure in docs/versioning.md §5 step by step. linux/amd64 only
+# (§6); arm64 waits for a conda-forge libparallelproj aarch64 build.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ctbeamstudio
+  REGISTRY: ghcr.io/lhell/ctbeamstudio
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. The tagged commit (checkout defaults to the tag that triggered us).
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 2. Lockstep check: abort unless pyproject.toml version == tag (sans v).
+      - name: Check tag/version lockstep
+        run: python scripts/check_release_tag.py "${{ github.ref_name }}"
+
+      - name: Derive the version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Build --target full with the release tags and OCI labels.
+      - name: Build the full image
+        run: |
+          docker build \
+            -t ${IMAGE}:${VERSION} \
+            -t ${IMAGE}:${VERSION%.*} \
+            -t ${IMAGE}:latest \
+            --target full \
+            --label org.opencontainers.image.title=ctbeamstudio \
+            --label org.opencontainers.image.version=${VERSION} \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            --label org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }} \
+            --label com.ctbeamstudio.variant=full \
+            .
+
+      # 4. Push X.Y.Z, X.Y and latest. Immutable tags in the package settings
+      #    make a second push to X.Y.Z fail instead of silently replacing it.
+      - name: Push to GHCR
+        run: |
+          docker push ${REGISTRY}:${VERSION}
+          docker push ${REGISTRY}:${VERSION%.*}
+          docker push ${REGISTRY}:latest
+
+      - name: Record the digest
+        run: |
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE}:${VERSION})
+          {
+            echo "Image: \`${REGISTRY}:${VERSION}\`"
+            echo "Digest: \`${DIGEST}\`"
+            echo "Variant: full (\`com.ctbeamstudio.variant=full\`)"
+          } > release-notes.md
+          cat release-notes.md
+
+      # 5. GitHub Release with the digest, 6. plus the offline tarball.
+      - name: Export the offline tarball
+        run: docker save ${IMAGE}:${VERSION} -o ctbeamstudio-${VERSION}-full.tar
+
+      - name: Create the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: ctbeamstudio-${VERSION}-full.tar

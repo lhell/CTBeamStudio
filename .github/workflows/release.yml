@@ -64,13 +64,14 @@ jobs:
             --label com.ctbeamstudio.variant=full \
             .
 
-      # 4. Push X.Y.Z, X.Y and latest. Immutable tags in the package settings
-      #    make a second push to X.Y.Z fail instead of silently replacing it.
-      - name: Push to GHCR
-        run: |
-          docker push ${REGISTRY}:${VERSION}
-          docker push ${REGISTRY}:${VERSION%.*}
-          docker push ${REGISTRY}:latest
+      # 4. Tag to the registry names (a workflow must never push names it did
+      #    not create) and push. Moving aliases tolerate a rejected push —
+      #    GHCR immutable tags are package-wide — while the version push is
+      #    last and hard-fails the release. Pre-release tags push the version
+      #    tag only: latest must never point at an RC. Tested in
+      #    tests/unit/test_release_push.py; logic in scripts/release_push.sh.
+      - name: Tag and push to GHCR
+        run: bash scripts/release_push.sh "${VERSION}" "${REGISTRY}"
 
       - name: Record the digest
         run: |
@@ -83,11 +84,24 @@ jobs:
           cat release-notes.md
 
       # 5. GitHub Release with the digest, 6. plus the offline tarball.
+      #    The image is ~3.05 GiB, so the raw docker-save tarball exceeds
+      #    GitHub's 2 GiB release-asset cap: gzip it and upload only if the
+      #    result fits. Otherwise the GHCR image is the distribution path.
       - name: Export the offline tarball
-        run: docker save ${IMAGE}:${VERSION} -o ctbeamstudio-${VERSION}-full.tar
+        id: tarball
+        run: |
+          docker save ${IMAGE}:${VERSION} | gzip > ctbeamstudio-${VERSION}-full.tar.gz
+          SIZE=$(stat -c%s ctbeamstudio-${VERSION}-full.tar.gz)
+          CAP=$((2 * 1024 * 1024 * 1024))
+          if [ "${SIZE}" -le "${CAP}" ]; then
+            echo "path=ctbeamstudio-${VERSION}-full.tar.gz" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::tarball is ${SIZE} bytes, above the 2 GiB GitHub release-asset cap — asset skipped; customers pull ghcr.io/lhell/ctbeamstudio:${VERSION}"
+          fi
 
       - name: Create the GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: release-notes.md
-          files: ctbeamstudio-${VERSION}-full.tar
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: ${{ steps.tarball.outputs.path }}

@@ -30,7 +30,7 @@ The Dockerfile has two targets:
 | Target | Contains | Projection | Size |
 |---|---|---|---|
 | `slim` | viewer only | returns zeros + warning | ~1.43 GB |
-| `full` | + parallelproj + torch (CPU) | works | ~1.6 GB |
+| `full` | + parallelproj + torch (CPU) | works | ~3.05 GB |
 
 ```bash
 # Full image — this is the one that can forward-project

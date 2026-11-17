@@ -1,11 +1,14 @@
 # CTBeamStudio Dockerfile — two targets from one build.
 #
 #   docker build -t ctbeamstudio:slim .                # viewer only, no projection
-#   docker build -t ctbeamstudio:full --target full .  # + forward projection, ~1.6 GB
+#   docker build -t ctbeamstudio:full --target full .  # + forward projection, ~3.0 GiB
 #
 # Measured 2026-11-17 (T-73): slim is ~1.43 GiB — the viewer dependency set
 # (streamlit/pyarrow, scipy, plotly, pandas) alone is ~790 MB installed, so the
-# old "~350 MB" estimate was never reachable. Only `full` is published.
+# old "~350 MB" estimate was never reachable. full is ~3.05 GiB (micromamba
+# env + torch-cpu 2.15), so its docker-save tarball exceeds GitHub's 2 GiB
+# release-asset cap — GHCR is the distribution path, see release.yml. Only
+# `full` is published.
 #
 # `slim` installs plain pip packages. It renders volumes, MPR and geometry, but
 # "Run Forward Projection" returns zeros with a warning, because parallelproj

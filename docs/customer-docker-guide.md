@@ -14,7 +14,7 @@ target only and is never published (see [Troubleshooting](#troubleshooting)).
 |---|---|
 | Docker | Docker Desktop (Windows 10/11, macOS) or Docker Engine (Linux) |
 | RAM | 8 GB minimum, 16 GB+ for large CT series |
-| Free disk | ~2 GB for the image, plus space for your DICOM data |
+| Free disk | ~4 GB for the image, plus space for your DICOM data |
 | GPU | not required — the image ships the CPU build of parallelproj |
 
 No internet connection is needed after the image has been loaded once.

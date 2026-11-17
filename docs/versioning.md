@@ -72,6 +72,13 @@ OCI label instead.
    the version and `latest`. Never deploy `latest`.
 3. **Version tags are history.** Do not rebuild over an existing version tag.
    Bump instead. Enable immutable tags in the registry so this is enforced.
+   GHCR's immutable-tags switch is package-wide: it would also reject a
+   repoint of `X.Y` and `latest`, which is by design a repoint. Therefore
+   `scripts/release_push.sh` pushes the aliases first with a *tolerated*
+   failure (warning only) and the version tag `X.Y.Z` last, so a rejected
+   alias can never abort the release identity. Pre-release versions (a `-`
+   suffix, e.g. `1.1.0-rc.1`) push the version tag only — `latest` must never
+   point at an RC, and `X.Y`-aliases of a suffixed version are bogus.
 4. **Development builds use commit tags**, not version numbers:
    `ctbeamstudio:dev`, `ctbeamstudio:sha-a1b2c3d`.
 5. **Deploy by digest**, not by tag:
@@ -227,9 +234,14 @@ Known follow-ups:
    `tests/unit/test_release_tag_check.py`),
 3. builds the image from that commit with version, minor alias and `latest`
    tags, plus the OCI labels,
-4. pushes to `ghcr.io/lhell/ctbeamstudio`,
+4. pushes to `ghcr.io/lhell/ctbeamstudio` (aliases tolerated, version tag
+   last — see section 3; pre-release tags push the version tag only),
 5. creates the GitHub Release with the resulting digest,
-6. uploads the `docker save` tarball as the offline asset.
+6. gzips the `docker save` tarball and uploads it as the offline asset —
+   but only if it fits GitHub's 2 GiB release-asset cap (the `full` image
+   measures ~3.05 GiB, so realistically the asset is skipped and customers
+   pull from GHCR; the tarball path stays available for slim or future
+   smaller builds and for `docker save` directly to removable media).
 
 The first `v*.*.*` tag push is the workflow's first real run; until then the
 manual procedure in section 5 is the contract (and the fallback).

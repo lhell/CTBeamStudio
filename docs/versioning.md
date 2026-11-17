@@ -21,6 +21,29 @@ If they disagree, the version number is decoration rather than information.
 
 Semantic versioning: `MAJOR.MINOR.PATCH`.
 
+### Variant axis
+
+The Dockerfile has two targets, but only `full` is published. `slim` cannot
+forward-project, so a customer who pulled it would get an image whose main
+feature silently returns zeros. `slim` stays a local build target:
+
+```powershell
+docker build -t ct-viewer:slim --target slim .   # local only, never pushed
+```
+
+If `slim` ever ships, the variant becomes part of the tag and the plain version
+keeps pointing at `full` — a bare `1.0.0`/`latest` must never be the crippled
+image:
+
+| Tag | Image |
+|---|---|
+| `1.0.0`, `1.0`, `latest` | `full` (parallelproj + torch) |
+| `1.0.0-slim` (only if published) | `slim` |
+
+Two published variants mean two digests per release; record both. The version
+alone no longer identifies the artifact, so the variant also goes into an OCI
+label (`com.ctbeamstudio.variant=full`).
+
 ---
 
 ## 2. Git tags vs Docker tags
@@ -170,16 +193,18 @@ can always retag.
 
 ---
 
-## 9. State of this repository (2026-10-29)
+## 9. State of this repository (2026-11-17)
 
 | Item | State |
 |------|-------|
 | `pyproject.toml` version | `1.0.0` |
 | Git release tags | none (`archive/MPR` exists and is a **tag**, not a branch) |
-| Local image tags | `ct-viewer:latest`, `ct-viewer:v1.0.0` |
+| Local image tags | `ct-viewer:latest`, `ct-viewer:v1.0.0` (pre-dates the two-target split) |
 | Docker tag convention | use `1.0.0` (no `v`); `v1.0.0` is a git-style spelling |
+| Dockerfile targets | `full` (customer, published) and `slim` (local only) |
+| Published images | none — no Docker job in CI, see T-73/T-105 in `docs/plan.md` |
 | CI | `.github/workflows/ci.yml` - data guard, flake8/black/isort, pytest |
-| Container release | not automated; no Docker job in CI |
+| Container release | not automated |
 
 Known follow-ups:
 
@@ -210,8 +235,9 @@ git status                                  # must be clean before tagging
 git tag -a v1.0.0 -m "CTBeamStudio 1.0.0"
 git push origin main --follow-tags
 
-docker build -t ct-viewer:1.0.0 -t ct-viewer:latest .
-docker push  ct-viewer:1.0.0
+docker build -t ct-viewer:1.0.0 -t ct-viewer:latest --target full .
+docker tag  ct-viewer:1.0.0 ghcr.io/lhell/ct-viewer:1.0.0
+docker push ghcr.io/lhell/ct-viewer:1.0.0
 docker inspect --format='{{index .RepoDigests 0}}' ct-viewer:1.0.0
 ```
 

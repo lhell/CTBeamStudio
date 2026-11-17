@@ -143,9 +143,15 @@ of shipping a broken arm64 image.
       `environment.yml`, `ci.yml`, `docs/local-environment.md`) and the suite
       still runs with that env name.
 - [ ] `ctbeamstudio:1.0.0`, `:1.0`, `:latest` are the same digest.
-- [ ] `ghcr.io/lhell/ctbeamstudio` is pullable without authentication.
-- [ ] `release.yml` fails when `pyproject.toml` and the tag disagree.
-- [ ] Release notes carry the digest and the tarball asset.
+- [x] `ghcr.io/lhell/ctbeamstudio` is pullable without authentication.
+      (v1.0.0: `docker manifest inspect` succeeds logged-out)
+- [x] `release.yml` fails when `pyproject.toml` and the tag disagree.
+- [x] Release notes carry the digest and the tarball asset.
+      (v1.0.0: digest `sha256:c62b760ce38f385199ec0c91be1fd43daecd43eb1441a1a0d62e37d0fa696ee8`,
+      asset `ctbeamstudio-1.0.0-full.tar.gz`, 735 MB)
+
+Remaining manual step: enable **immutable tags** in the package settings
+(GitHub → Packages → ctbeamstudio → Package settings).
 
 ## 8. Risks
 

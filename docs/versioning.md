@@ -237,11 +237,9 @@ Known follow-ups:
 4. pushes to `ghcr.io/lhell/ctbeamstudio` (aliases tolerated, version tag
    last — see section 3; pre-release tags push the version tag only),
 5. creates the GitHub Release with the resulting digest,
-6. gzips the `docker save` tarball and uploads it as the offline asset —
-   but only if it fits GitHub's 2 GiB release-asset cap (the `full` image
-   measures ~3.05 GiB, so realistically the asset is skipped and customers
-   pull from GHCR; the tarball path stays available for slim or future
-   smaller builds and for `docker save` directly to removable media).
+6. gzips the `docker save` tarball and uploads it as the offline asset when
+   it fits GitHub's 2 GiB release-asset cap (v1.0.0 actual: **735 MB** gz —
+   the 3.05 GiB image compresses well; the cap skip is a fallback only).
 
 The first `v*.*.*` tag push is the workflow's first real run; until then the
 manual procedure in section 5 is the contract (and the fallback).

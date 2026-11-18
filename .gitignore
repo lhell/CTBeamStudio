@@ -51,6 +51,14 @@ venv/
 # Images
 *.png
 
+# Generated voiceover artifacts (TTS clips, frame timelines, silent renders)
+media/demo/work/
+
+# Voiceover build outputs: regenerable from scenes.json + ctbeam_demo.gif, and
+# rewriting a 5 MB blob on every re-render would bloat history
+media/demo/*.mp4
+media/demo/*.srt
+
 # Exported agent session transcripts / JSON dumps (large, local-only)
 docs/*.json
 

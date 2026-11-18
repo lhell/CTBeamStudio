@@ -8,11 +8,11 @@
   "scenes": [
     {
       "id": "S1",
-      "title": "Empty state / Load Demo Phantom",
+      "title": "Demo Mode already loaded",
       "gif_t0": 0.0,
       "gif_t1": 1.5,
       "extra_hold": 0.0,
-      "text": "This is CT Beam Studio. Load the demo phantom."
+      "text": "This is CT Beam Studio. Here is the workflow for the demo phantom."
     },
     {
       "id": "S2",

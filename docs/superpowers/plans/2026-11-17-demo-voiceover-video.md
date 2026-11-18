@@ -1,7 +1,7 @@
 # Demo voiceover script + narrated MP4 plan
 
 Date: 2026-11-17 (final cut 2026-11-18)
-Status: **built** — `media/demo/ctbeam_demo_voiceover.mp4` (1:27.6, 5.07 MB,
+Status: **built** — `media/demo/ctbeam_demo_voiceover.mp4` (1:28.2, 5.1 MB,
 local only; build outputs are gitignored, see Git)
 Source visual: `ctbeam_demo.gif` (1280×720, 515 frames, 64.4 s, ~8 fps, the
 re-recorded high-quality GIF)
@@ -14,7 +14,7 @@ One narrated MP4 that explains the workflow the GIF shows. The GIF is **never
 sped up**; where the narration needs more time, the picture slows down (up to
 1.8×) or holds. Where the picture holds a static panel for longer than the
 narration needs, the panel is **cut**, not padded. 64 s of silent action became
-1:27.6 of explained action.
+1:28.2 of explained action.
 
 ## Voice
 
@@ -47,7 +47,7 @@ second, the sinogram tab opens at 13.3 s, the forward projection runs from
 
 | # | GIF range | On screen | Words | VO |
 |---|---|---|---|---|
-| S1 | 0.0–1.5 | Empty state, cursor → Load Demo Phantom | 9 | 5.1 s |
+| S1 | 0.0–1.5 | App already in Demo Mode, banner + phantom loaded | 12 | 5.7 s |
 | S2 | 1.5–7.0 | 2D axial/coronal + 3D gantry side by side | 24 | 9.4 s |
 | S3 | 7.0–13.3 | 3D full width, legend overlays, rotate tooltip | 23 | 11.0 s |
 | S4 | 13.3–16.0 | Sinogram Inspection tab, measured sinogram | 14 | 5.9 s |
@@ -56,16 +56,16 @@ second, the sinogram tab opens at 13.3 s, the forward projection runs from
 | S7 | 52.0–56.0 | Measured / simulated / difference, metrics table | 16 | 8.6 s |
 | S8 | 56.0–64.4 | Curves, distributions, projection index scrub | 34 | 14.8 s |
 
-177 words ⇒ 81.7 s of speech ⇒ **1:27.6** video (88.7 s timeline incl. padding).
-Measured rate is 2.17 words/s at `+0%`.
+180 words ⇒ 82.4 s of speech ⇒ **1:28.2** video (89.4 s timeline incl. padding).
+Measured rate is 2.18 words/s at `+0%`.
 
 ## Script
 
 Short clauses, present tense, no marketing adjectives. Arrows mark the UI
 element on screen at that moment. Commas sit where a speaker would breathe.
 
-**S1 — empty state (still, then the click)**
-> This is CT Beam Studio. Load the demo phantom. →
+**S1 — opening, already in Demo Mode**
+> This is CT Beam Studio. Here is the workflow for the demo phantom. →
 
 **S2 — viewer, 2D and 3D together**
 > No patient data needed, it runs a Shepp-Logan phantom. Axial and coronal
@@ -132,7 +132,7 @@ Built result:
 
 | Scene | VO | stretch | freeze |
 |---|---|---|---|
-| S1 | 5.1 | 1.80× | 3.16 s |
+| S1 | 5.7 | 1.80× | 3.81 s |
 | S2 | 9.4 | 1.80× | 0.31 s |
 | S3 | 11.0 | 1.80× | 0.36 s |
 | S4 | 5.9 | 1.80× | 1.99 s |

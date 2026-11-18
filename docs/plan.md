@@ -1,9 +1,8 @@
 
-
 # CTBeamStudio — Implementierungsplan
 
 **Projekt:** `Res_Indep_CTO` / `src/visualization/`
-**Stand:** 2026-10-14
+**Stand:** 2026-11-18
 **Start:** Mi, 2026-10-14
 
 ## Leitprinzipien
@@ -15,27 +14,33 @@
 | Viewer ohne Torch | separate Dependency-Gruppen |
 | Datenintern HU | Normalisierung nur in der Darstellung |
 
-## Tasks by functional area (index)
+## Phasen, Themen und Nummernkreise
 
-Chronological phases above stay the source of truth; this index groups the same tasks by area for navigation.
+Die Nummern vergibt das Projekt fortlaufend und **unveränderlich** — sie stehen in
+Code-Kommentaren, Tests, CI-Workflows, Specs und Commit-Messages (knapp 800
+Fundstellen), deshalb sagt eine Nummer nichts über ihr Thema. Das Thema liefert die
+**Phase**, und dorthin gehört der Eintrag.
 
-| Area | Tasks |
-|---|---|
-| License, hygiene, data guards | T-01, T-02, T-03, T-04 |
-| Core data model (`Volume`) | T-10 |
-| Loaders (DICOM, NPY, projection, sinogram) | T-11, T-12, T-54, T-64, T-65, T-66, T-90, T-92, T-98, T-102 |
-| Windowing & MPR | T-13, T-14 |
-| Projection geometry | T-50, T-51, T-52, T-53, T-55, T-56 |
-| Forward projection | T-61, T-62, T-63, T-79, T-104 |
-| Attenuation / display units (HU ↔ μ) | T-80 |
-| Backend restructure | T-78 |
-| Comparison (synthetic vs measured) | T-67, T-68, T-69 |
-| 3D visualization | T-23, T-55, T-82, T-84, T-86, T-87, T-94 |
-| App / UI (viewer, sidebar, panels) | T-20, T-21, T-22, T-56, T-70, T-81, T-83, T-85, T-88, T-89, T-93, T-96, T-97, T-99, T-100, T-101, T-103 |
-| Tests & fixtures | T-30, T-31, T-32, T-69, T-81 |
-| Deploy / Docker / CI | T-40, T-41, T-42, T-43, T-44, T-71, T-72, T-73, T-74 |
-| Environment / tooling | T-91 |
-| Future / research / shelved | T-56a, T-75, T-76, T-77, T-82, T-87 |
+| Phase | Thema | Nummern |
+|---|---|---|
+| 0 | Lizenz & Hygiene | T-01 – T-04 |
+| 1 | Kern & Backend (`Volume`, Loader, MPR, Restrukturierung) | T-10 – T-14, T-78 |
+| 2 | App (Viewer, Sidebar, Panels) | T-20 – T-23 |
+| 3 | Tests & Tooling | T-30 – T-33, T-81, T-91 |
+| 4 | Deploy (Dockerfile, CI) | T-40 – T-44 |
+| 5 | Projection Geometry | T-50 – T-53 |
+| 6 | Projection-Geometrie in 3D | T-54 – T-56a |
+| 7 | Docker Self-Deployment | T-71 – T-74 |
+| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80 |
+| 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
+| 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
+| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103 |
+| 12 | Release Readiness | T-104 – T-107 |
+| – | Research-Backlog | T-75 – T-77 |
+
+**Neue Aufgabe:** nächste freie Nummer (aktuell **T-108**), Eintrag unter der Phase
+ihres Themas — nicht ans Dateiende. Wird eine Aufgabe thematisch falsch einsortiert
+vorgefunden, wandert der Eintrag, nie die Nummer.
 
 ## Phase 0 — Lizenz & Hygiene (Tag 1–2)
 
@@ -63,7 +68,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Abhängig von:** –
 - **Akzeptanz:** `docs/data.md` beschreibt Registrierungsweg der AAPM-Challenge 2016, enthält die wörtlichen Pflichtzitate und den Satz, dass das Repo keine Daten verteilt.
 
-## Phase 1 — Kern (Tag 2–4)
+## Phase 1 — Kern & Backend (Tag 2–4)
 
 ### `[x]` T-10 — `Volume`-Dataclass
 - **Ziel:** Gemeinsames Austauschformat aller Loader.
@@ -112,6 +117,13 @@ Chronological phases above stay the source of truth; this index groups the same 
   - Isotropic resampling for correct aspect ratio
   - Hover coordinates via JavaScript
   - Click-to-focus + keyboard navigation (arrows, Home/End, Tab)
+
+### `[x]` T-78 — Backend-Restrukturierung (Refactor)
+- **Ziel:** Numerisches / Daten-Backend von der UI trennen (one-way dependency: `visualization` → `backend`).
+- **Dateien:** `src/backend/{volume,geometry,forward_project}.py`, `src/backend/loaders/`, Paketierung `pyproject.toml`
+- **Abhängig von:** T-63
+- **Akzeptanz:** `Volume`, `ProjectionGeometry`, `forward_project` und Loader (dicom, npy, projection) liegen unter `src/backend/`; `import backend` funktioniert ohne parallelproj (lazy); alle Imports (UI, Tests, Skripte) aktualisiert; Testsuite grün.
+- **Status:** ✅ Done (Nov 4, 2026) — siehe Spec `docs/superpowers/specs/2026-11-04-backend-restructure-design.md`.
 
 ## Phase 2 — App (Tag 4–5)
 
@@ -189,7 +201,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 | Detektor-Positionierung | Fixed SID, berechnet aus Gantry | Fixed SID (1000mm default) |
 | Volumen-Positionierung | Isocenter im Ursprung (0,0,0) | Volumen zentriert am Ursprung |
 
-## Phase 3 — Tests (Tag 5–6) — Teilweise erledigt
+## Phase 3 — Tests & Tooling (Tag 5–6)
 
 ### `[x]` T-30 — Synthetische Fixtures
 - **Dateien:** `tests/conftest.py`
@@ -217,6 +229,36 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Tabellarische Ausgabe der Serien; Exit 2 bei fehlendem Verzeichnis oder null Serien; Warnung, wenn alle Serien `unknown` sind.
 - **Status:** ✅ Done (Oct 23, 2026)
 - **Implementierung:** Scannt Verzeichnis, zeigt Tabelle mit Patient ID, Series Description, Slices, Dose Class
+
+### `[x]` T-81 — Schneller UI-Smoke-Test (ersetzt T-70d)
+- **Ziel:** Tab-/Sidebar-Layout wieder absichern, ohne die Testsuite zu verlangsamen.
+- **Hintergrund:** Die sechs `AppTest`-Tests aus T-70d dauerten **96,8 s** (~75 % der Suite), weil jeder Test einen kompletten Streamlit-Script-Run startet. Ein `AppTest.run()` kostet 10–30 s: ~8 s Import von `visualization.volume3d` (skimage/pyvista) und ~3,6 s in `load_last_loaded()` (87 KB Cache mit 560 toten Netzwerkpfaden). Entfernt in `8de260b`, Datei bleibt in der Historie (`6307a6a`).
+- **Dateien:** `tests/integration/test_ui_smoke.py` (neu)
+- **Abhängig von:** T-70
+- **Umsetzung:**
+  1. **Eine** `AppTest`-Instanz pro Modul (`scope="module"`), nicht pro Test.
+  2. Session-State vorab setzen (`demo_mode`, `volume`), damit `load_initial_volume()` und der Cache-Pfad übersprungen werden.
+  3. `auto_load_cache=False` erzwingen, um die 560 toten `O:`-Pfade nicht anzufassen.
+  4. `visualization.volume3d`-Import messen; ggf. 3D-Render lazily laden.
+  5. Optional `@pytest.mark.slow`, per Default ausgeschlossen (`-m "not slow"`).
+- **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
+- **Status:** ✅ Done (Nov 9, 2026) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis, Messdaten-Load und Empty-State-Start ab (14 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel erreicht:** Modul ~5 s, Suite ~16–20 s (vorher 22 s / 30 s). Der frühere Engpass `pyvista` (~5,6 s) ist durch den Lazy-Import (`test_volume3d_import.py`) und das Shelving des PyVista-Render-Modus (T-82/T-84) ganz aus dem Startpfad verschwunden.
+
+### `[x]` T-91 — Conda-Env `ct-viewer` verbindlich, keine übersprungenen Tests
+
+- **Ziel:** Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; die Suite meldet keine Skips mehr.
+- **Hintergrund:** `pytest` mit dem System-Python (3.13) übersprang die vier parallelproj-Tests, weil `parallelproj_c.dll` nur im aktivierten Env auf `PATH` liegt — die Tests *liefen* also nie, obwohl sie im Repo vorhanden sind. Zusätzlich behauptete `LINTING.md`, `flake8`/`black`/`isort` seien **nicht** im Env installiert und müssten vom System-Python laufen; tatsächlich sind sie über das `dev`-Extra im Env vorhanden.
+- **Umsetzung:**
+  1. Neu: `AGENTS.md` (auto-geladen) mit verbindlicher Env-Regel, exakten Aktivierungsbefehlen, Lint-Reihenfolge, Hard Rules und Test-Bar.
+  2. `LINTING.md`: falsche Tool-Verfügbarkeit korrigiert (alle drei im Env, ein Interpreter für Lint und Tests).
+  3. `pyproject.toml`: `nibabel` zusätzlich in `dev` — die Suite deckt NIfTI-Laden ab, ohne nibabel skippen diese vier Tests still. Damit genügt `.[dev]` für einen vollständigen Lauf; `nifti` bleibt das reine Laufzeit-Extra.
+  4. `environment.yml` und `.github/workflows/ci.yml`: bei `.[dev]` belassen (deckt nibabel jetzt ab).
+  5. `INSTALLATION.md`: die dokumentierten `.[cpu]`/`.[gpu]`-Befehle entfernt — diese Extras existieren in `pyproject.toml` **nie** (per `git log -S` geprüft) und `pip` akzeptiert `.[irgendwas]` ohne jede Warnung, installiert aber nichts; ersetzt durch die tatsächlichen conda-Befehle. Ebenso `parallelproj.__version__` (existiert nicht) und `parallelproj_core` (Modul existiert nicht) korrigiert zu `parallelproj.cuda_present`.
+  6. `docs/local-environment.md`, `docs/README.md`, `AGENTS.md`: Env als Pflicht dokumentiert, Test-/Lint-Befehle mit Aktivierung, Docs-Index ergänzt.
+- **Dateien:** `AGENTS.md` (neu), `LINTING.md`, `pyproject.toml`, `environment.yml`, `.github/workflows/ci.yml`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`
+- **Abhängig von:** T-69
+- **Akzeptanz:** `python -m pytest -q -rs` im Env `ct-viewer` endet mit „0 skipped"; `flake8` (Projekt-Ignore-Set), `black --check`, `isort --check-only` laufen im selben Env fehlerfrei.
+- **Status:** ✅ Done (Nov 12, 2026) — Env 3.11.18 mit parallelproj, torch, nibabel, flake8/black/isort. Suite: **301 passed, 0 skipped** (~25–40 s), vorher 293 passed / 2 skipped im System-Python bzw. 297/4 im Env ohne nibabel. `flake8 --count` = 0, `black --check` 60 Dateien unverändert, `isort --check-only` exit 0. Zusatzbefund: `.[cpu]`/`.[gpu]` waren nur in der Doku vorhanden, nie in `pyproject.toml`; `pip install -e ".[bogus]"` warnt nicht und installiert nichts — die Doku führt jetzt die conda-Befehle.
 
 ## Phase 4 — Deploy (Tag 6)
 
@@ -286,7 +328,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Alle Tests bestehen.
 - **Status:** ✅ Done (Oct 26, 2026)
 
-## Phase 6 — Projection Geometry 3D Visualization (Oct 26, 2026)
+## Phase 6 — Projection-Geometrie in 3D (Oct 26, 2026)
 
 ### `[x]` T-54 — Geometry Loader für User-Dateien
 - **Ziel:** Projektions-Geometrie aus User-Dateien laden.
@@ -329,20 +371,6 @@ Chronological phases above stay the source of truth; this index groups the same 
 
 - **Status:** ❌ Dropped (Nov 13, 2026) — `st.text_input` bleibt; Demo-/Restore-Flows verringern den Bedarf, keine neue Dependency (`streamlit-explorer`).
 
-### `[ ]` T-75 — Desktop App Wrapper (Future)
-- **Ziel:** Streamlit als Desktop-App ohne Browser starten.
-- **Dateien:** `src/visualization/desktop_launcher.py`
-- **Optionen:**
-  1. **streamlit-desktop-app** (PyPI) - PyInstaller support, stabil
-  2. **streamlitrunner** (PyPI) - Einfacher wrapper
-  3. **pywebview** manuell - Mehr Kontrolle
-- **Windows Requirements:** .NET Framework > 4.0, Edge WebView2
-- **Implementierung:**
-  ```python
-  # Start streamlit in background thread, wrap in pywebview window
-  ```
-- **Status:** ⚠️ Research
-
 ## Phase 7 — Docker Self-Deployment (Nov 13: CI-Route statt lokalem Docker)
 
 ### `[x]` T-71 — Review/Update Dockerfile
@@ -369,20 +397,6 @@ Chronological phases above stay the source of truth; this index groups the same 
   - `:full` (`--target full`, Kunden-Image mit parallelproj + torch CPU) startet, Port 8501 antwortet, und der Build bricht ab, wenn `PARALLELPROJ_AVAILABLE` nicht `True` ist (Smoke-Test im Dockerfile). Größe ~1,6 GB, also gilt die 400-MiB-Grenze nur für `:slim`.
   - Kein lokaler Build nötig.
 - **Status:** ⚠️ Open (Nov 17, 2026) — Dockerfile hat jetzt die Targets `slim`/`full` inkl. Build-Zeit-Smoke-Test, aber **unverifiziert**: auf diesem Rechner ist kein Docker installiert, und der CI-Job fehlt noch.
-
-### `[ ]` T-105 — Image veröffentlichen (GHCR + Tarball)
-- **Ziel:** Kunden kommen an das `:full`-Image, ohne das Repo zu klonen oder Docker zu bauen.
-- **Dateien:** `.github/workflows/ci.yml`, `scripts/export-image.sh`
-- **Abhängig von:** T-73
-- **Akzeptanz:** CI baut `:full` und `:slim` und pusht beide auf `main`/Tags nach GHCR; `docker save`-Tarball ist als Release-Asset verfügbar (Offline-Weg).
-- **Status:** ⚠️ Open (Nov 17, 2026) — es gibt aktuell **keinen** Push-Job; `ci.yml` enthält nur Daten-Guard, Lint und Tests.
-
-### `[ ]` T-106 — Image-Name `ctbeamstudio` und Release-Versionierung
-- **Ziel:** Ein Commit baut zwei Images; trotzdem muss „Release 1.0.0" genau ein Image bedeuten. Dazu kommen Name, Tag-Schema und ein automatisierter Release.
-- **Dateien:** `Dockerfile`, `README.md`, `INSTALLATION.md`, `docs/versioning.md`, `docs/customer-docker-guide.md`, `scripts/run-docker.sh`, `scripts/run-docker.ps1`, `.github/workflows/release.yml` (neu)
-- **Abhängig von:** T-73, T-105
-- **Akzeptanz:** Image heißt `ctbeamstudio` (Container `ctbeamstudio`, Volume `ctbeamstudio-cache`, Tarball `ctbeamstudio-1.0.0-full.tar`); Conda-Env und Python-Distribution bleiben `ct-viewer`; `1.0.0`/`1.0`/`latest` zeigen alle auf `full` und denselben Digest; `release.yml` bricht ab, wenn `pyproject.toml`-Version und `v*`-Tag auseinanderlaufen, und hängt Digest + Tarball an das GitHub-Release.
-- **Status:** ✅ Done (Nov 17, 2026) — Erster echter Release-Lauf am 17.11.2026 grün (Run #1, `v1.0.0` → `54ab0f4`): Lockstep-Check, Build ~2 min (CI-Cache), Tag+Push via `release_push.sh`, Digest `sha256:c62b760c…` in den Release-Notes, Asset `ctbeamstudio-1.0.0-full.tar.gz` 735 MB (gzip von 3,05 GiB, unter dem 2-GiB-Cap). `docker manifest inspect` ohne Login bestätigt: Pull ohne Auth. Verbleibend: manuell **immutable Tags** in den Package-Settings aktivieren; CI-Suite-Gate `362 passed, 0 skipped` vor Merge-Klassifizierung; T-105 (Push auf main/PR) offen.
 
 ### `[ ]` T-74 — Create Run Script
 - **Ziel:** Komfort-Script zum Starten des Containers.
@@ -414,14 +428,27 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Synthetische Projektionen aus Volumen generieren.
 - **Status:** ✅ Done (Nov 4, 2026) — Cone-Beam via `ListmodePETProjector` (joseph3d), geometrie/orientierung verifiziert (0°-Vier-Regionen-Test).
 
-### `[x]` T-78 — Backend-Restrukturierung (Refactor)
-- **Ziel:** Numerisches / Daten-Backend von der UI trennen (one-way dependency: `visualization` → `backend`).
-- **Dateien:** `src/backend/{volume,geometry,forward_project}.py`, `src/backend/loaders/`, Paketierung `pyproject.toml`
+### `[x]` T-79 — Non-contiguous Projection Selection Fix
+- **Ziel:** `forward_project` muss beliebige `proj_indices` (z. B. Downsample `[0, 10, 20]`) korrekt auf die passenden Gantry-Winkel abbilden.
+- **Dateien:** `src/backend/forward_project.py`, `src/backend/parallelproj/geometry.py`
 - **Abhängig von:** T-63
-- **Akzeptanz:** `Volume`, `ProjectionGeometry`, `forward_project` und Loader (dicom, npy, projection) liegen unter `src/backend/`; `import backend` funktioniert ohne parallelproj (lazy); alle Imports (UI, Tests, Skripte) aktualisiert; Testsuite grün.
-- **Status:** ✅ Done (Nov 4, 2026) — siehe Spec `docs/superpowers/specs/2026-11-04-backend-restructure-design.md`.
+- **Akzeptanz:** `calculate_xray_beam_list(projection_indices=...)` berechnet nur die gewählten Winkel; Ergebnis entspricht der entsprechenden Auswahl aus der vollen Projektion.
+- **Status:** ✅ Done (Nov 6, 2026) — Test `test_forward_project_selected_projection_indices_match_full`; Downsample/range-Auswahlen funktionieren jetzt ohne `IndexError`.
 
-## Phase 9 — Sinogram Loader with Lazy Loading
+### `[x]` T-80 — HU ↔ Attenuation mit Energieauswahl (FP-Grundlage)
+- **Ziel:** CT-Darstellung flexibel zwischen HU und linearer Schwächung umschaltbar machen, mit monoenergetischer Energieauswahl. Grundlage der Forward Projection ist die Schwächung, nicht HU.
+- **Dateien:** `src/backend/attenuation.py`, `src/visualization/display_units.py`, `src/visualization/app.py`, `src/visualization/projection_panel.py`
+- **Abhängig von:** T-63, T-70
+- **Modell:** wasseräquivalent, monoenergetisch — `μ(E) = μ_Wasser(E) · (1 + HU/1000)`. `μ_Wasser(E)` aus NIST-Tabellen (flüssiges Wasser, 30–150 keV, log-log interpoliert). Keine Beam-Hardening-Korrektur.
+- **Akzeptanz:**
+  - Umschalter **Display Unit: HU / Attenuation (1/cm)** in „Slice Options“, Energie-Slider 30–150 keV (Default 70)
+  - Fenster-Presets und Slider-Grenzen rechnen mit um
+  - `hu_to_mu` / `mu_to_hu` / `hu_window_to_mu` / `volume_to_mu` / `volume_for_projection`
+  - Forward Projection akzeptiert **nur** Attentuation (`1/mm`/`1/cm`) und lehnt HU mit `ValueError` ab
+  - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
+- **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
+
+## Phase 9 — Sinogram & Messdaten
 
 ### `[x]` T-64 — Sinogram Loader with Selection
 - **Ziel:** Sinogram-Daten laden mit Row/Col/Projection Selection.
@@ -444,7 +471,68 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** `from backend.loaders import load_sinogram` funktioniert.
 - **Status:** ✅ Done (Nov 4, 2026) — Exportiert `SelectionConfig`, `SinogramData`, `load_sinogram`, `resolve_indices`, `scan_dicom_sinogram`.
 
-## Phase 10 — Comparison
+### `[x]` T-90 — Sinogramm-Achsenreihenfolge wirkt auch für DICOM-Ordner und sofort
+
+- **Ziel:** Die Auswahl „File axis order" im Measurements-Panel muss das geladene Bild tatsächlich umorientieren — für jeden Formatpfad und ohne zweiten Klick auf „Load Measurements".
+- **Hintergrund (gemeldeter Fehler):** Bei einem DICOM-Projektionsordner änderte die Auswahl nichts. `_load_dicom` nahm `axis_order` entgegen, benutzte es aber nie und schrieb `source_axis_order=("proj","row","col")` fest; der Setter fiel danach in den Re-Read-Zweig, der wieder über `_load_dicom` lief — die Auswahl war an jeder Stelle wirkungslos. Bei `.npy`/NIfTI wurde die Reihenfolge korrekt angewandt, aber nur beim nächsten Klick auf „Load Measurements", weil der Selectbox-Wert ausschließlich im `if clicked:`-Zweig gelesen wurde.
+- **Umsetzung:**
+  1. `_load_dicom` reicht `axis_order` an `_finish_sinogram` weiter; der native DICOM-Stapel `(proj,row,col)` wird gemäß Deklaration transponiert (z. B. `proj → col → row` ⇒ Rahmen `(n_rows,n_cols)` → `(n_cols,n_rows)`). Die Zeilen-/Spaltenselektion bleibt kanonisch.
+  2. Lazy-Read bleibt erhalten, wenn `proj` auf der ersten Dateiachse liegt (dann wird die Projektionsauswahl weiterhin header-only aufgelöst); bei jeder anderen Reihenfolge liegen die „Projektionen" nicht mehr auf den Dateien, also werden alle Rahmen gelesen und die Auswahl kanonisch aufgelöst.
+  3. `apply_axis_order_change()` im UI wendet die Auswahl sofort über den vorhandenen `SinogramData.axis_order`-Setter an (In-Memory bei Volllast, sonst Re-Read) und ist bei unveränderter Reihenfolge ein No-op.
+  4. Setter um den Fall „kein Roharray, kein `path`" ergänzt (in-memory erzeugte Daten): reine Transposition zwischen alter und neuer Deklaration über `_reorder_canonical`.
+- **Dateien:** `src/backend/loaders/sinogram.py`, `src/visualization/projection_panel.py`, `tests/conftest.py` (Fixture-Variante `graded=True`), `tests/unit/test_sinogram_loader.py`, `tests/unit/test_projection_panel.py`, `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-64, T-65
+- **Akzeptanz:** Ein DICOM-Ordner mit deklarierter Reihenfolge `("proj","col","row")` liefert `data.shape == (n_proj, n_cols, n_rows)` und `source_axis_order` wie deklariert; ein Wechsel nach dem Laden orientiert um; die UI wendet die Auswahl ohne erneuten Lade-Klick an.
+- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Loader-Tests, 3 Helper-Tests, 1 UI-Test. Nachweis mit künstlichen DICOM-Serien (3 Rahmen, 4×6, je Rahmen ein eigener Gradient, damit eine Transposition sichtbar ist): `proj,row,col` → `(3,4,6)`, `proj,col,row` → `(3,6,4)`, Setter hin und zurück reversibel. `_reorder_canonical` zusätzlich gegen einen vollständigen Re-Derive über alle 36 Reihenfolge-Übergänge geprüft (0 Abweichungen). Volle Suite: 301 passed, 0 skipped.
+
+### `[x]` T-92 — Sinogram-Loader: Lazy Subset-Reads für große Dateien
+- **Ziel:** Subset-Auswahl (Zeilen/Spalten/Projektionen) aus großen `.npy`-/NIfTI-Dateien lesen, ohne die ganze Datei in den RAM zu laden — gemäß der in `docs/superpowers/plans/2026-11-04-sinogram-loader.md` vorgesehenen, aber nie umgesetzten mmap-/dataobj-Slices. DICOM bleibt unverändert (T-65 liest bereits nur die gewählten Projektionen, frame-weise).
+- **Dateien:** `src/backend/loaders/sinogram.py`, `tests/unit/test_sinogram_loader.py`, `docs/superpowers/specs/2026-11-12-sinogram-lazy-subset-reads-design.md` (neu)
+- **Abhängig von:** T-90
+- **Umsetzung:**
+  1. `.npy`: Subset → `np.load(path, mmap_mode="r")`; die bestehende `_apply_selection` (transpose + `np.ix_`) materialisiert nur die Auswahl, der Rest der Datei wird nie gelesen. Vollauswahl bleibt auf dem eager-Pfad (`_raw_file_order` hält das Roharray für die In-Memory-`axis_order`-Ableitung). `.npz` (Zip-Container) kann nicht gemappt werden — bleibt eager.
+  2. NIfTI: Jede Dateiachse, deren kanonischer Modus als Basic-Slice ausdrückbar ist (`central`/`range`/`downsample`), wird vor dem Materialisieren über `img.dataobj[slice_tuple]` auf der Platte vorgeschnitten (ein Read, nur der gewählte Bereich); vorgeschnittene Achsen werden in `applied_selection` auf `"all"` gesetzt — dasselbe Muster wie im DICOM-Loader. `custom`-Indexlisten brauchen Fancy-Indexing, das der Proxy nicht kann (verifiziert in nibabel 5.5.0: `ArrayProxy`/`slicer` werfen „Cannot handle fancy indexing") → voller Read-Pfad wie bisher.
+  3. Validierung bleibt erhalten: ungültige `range_` (leer/außerhalb) werden nicht vorgeschnitten, sodass `resolve_indices` weiterhin `IndexError`/`ValueError` wirft — ein `slice` würde Out-of-Bounds stillschweigend clampsen. Neue Helfer: `_is_full_selection` (nutzt auch `_finish_sinogram` statt der doppellten Bedingung), `_selection_axis`, `_mark_axis_all`, `_basic_slice_for_axis`.
+- **Akzeptanz:** Subset-Loads liefern exakt die Daten der eager-Variante; Tests belegen mmap (Spy auf `np.load`: `mmap_mode="r"` bei Subset, `None` bei Vollauswahl) bzw. Basic-Slice-Read (Spy auf `ArrayProxy.__getitem__`: ein Slice-Tuple, nie ein Voll-Read); Vollauswahl und Fehlerverträge unverändert; Suite grün ohne neue Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — 10 neue Tests (3 numpy/npz, 7 NIfTI inkl. downsample, Mehrachsen- und transponiertem Subset). `test_sinogram_loader.py`: 48 passed. `SinogramData.lazy` bleibt `False` (Auswahl ist nach dem Load materialisiert; Lazy ist Read-Zeit, nicht Zugriffszeit) — chunk-weises Streamen durch die Vorwärtsprojektion bleibt out of scope. `SinogramData`/UI/`forward_project` unverändert.
+
+### `[x]` T-93 — Dummy-Messung: 3D-Shepp-Logan-FP + Streuung + Rauschen
+- **Ziel:** Ein künstliches „gemessenes" Sinogramm für das Demo-Phantom — 3D-Shepp-Logan-Forward-Projektion + Streuung + Poisson-Rauschen — per Knopfdruck im Measurements-Panel, als kohärentes Demo-Trio (Volumen + Geometrie + Messung) für den Sinogram-Inspection-Vergleich ohne echte Messdaten.
+- **Hintergrund:**
+  - Das Demo-Phantom ist bereits in Standard-Kopfgröße (~138 × 184 × 180 mm im 192-mm-FOV, durch `test_head_dimensions_match_phantom_geometry` gepinnt); die Dummy-Messung nutzt genau diese Größe, kein geschrumpftes Spielzeug-Volumen.
+  - Die Default-Geometrie (64 Detektorzeilen × 1 mm) überstreicht nur ~32 mm in z auf der Isocenter-Ebene — ein kopfgroßes Phantom würde auf einen Slab zugeschnitten. Die Dummy-Geometrie (192 Zeilen × 2 mm, 512 Spalten × 1 mm, 60 Views/Rotation) überstreicht 192 mm in z und sieht den ganzen Kopf.
+  - Vorab gemessen (CPU-only, keine CUDA in `ct-viewer`): FP des Standard-Phantoms ≈ 10–20 s, Streuung+Rauschen ≈ 3 s. Ohne Puffer wäre jeder Klick eine Re-Projektion.
+- **Umsetzung:**
+  1. `create_dummy_geometry()` in `src/visualization/phantom.py`: Dummy-CBCT-Geometrie in Kopfgröße (s.o.).
+  2. `create_dummy_measured_sinogram()`: FP des HU→1/mm-konvertierten Phantoms → idealer Linienintegral-Stack; Streuung als Gauß-geglättete Kopie der Primär-Transmittanz (SPR-Verhältnis, Sigma in mm am Detektor, pro Achse konvertiert), in der Intensitätsdomäne addiert (Streuung zählt Photonen dazu, gemessenes Linienintegral also niedriger — Kontrastverlust/Cupping-Richtung); Poisson-Zählrauschen mit `i0` einfallenden Photonen pro Ray, Photonenmangel floort bei einem Zählwert. Ergebnis als `SinogramData` (format `"synthetic"`, kanonisch, ohne Datei — der T-90-Setter-Zweig transponiert in-memory).
+  3. **Ideal-FP auf Disk gepuffert** (`data/cache/dummy_fp_standard.npz`, gitignored; Fingerprint aus Geometrie + Energie + Cache-Version): erste Generierung ~13–23 s, jeder weitere Klick/App-Start ~3,5 s. Nur die Standard-Phantom-Strecke wird gepuffert; Streuung/Rauschen bleiben live, sodass `spr`/`i0`/`seed` nie re-projizieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule).
+  4. Phantom auf die Rotationsachse zentriert (Origin ≈ (−95.6, −95.6, −94.5) mm): der parallelproj-Kreis rotiert um den Weltsprungpunkt, der Demo-Default-Origin (0,0,0) parkt den Kopf im +x/+y/+z-Oktanten — außerhalb des FOV und halb außerhalb des Kegels (vorab so gemessen, siehe Preview). Der geteilte Demo-Default bleibt unverändert (separater Quirk, eigener Task-Kandidat).
+  5. UI: Button „🎲 Generate dummy measurement" im Measurements-Expander; setzt Volumen + Geometrie (`geometry_is_default=False`, `geometry_loaded_original`) + Messung in den Session-State und presetet die FP-Auswahl auf „all" — ein Klick auf „Run Forward Projection" reproduziert die Messform exakt, Difference und Metriken leben sofort. Empty-State-Hint im Inspection-Tab verweist auf den Button.
+- **Dateien:** `src/visualization/phantom.py`, `src/visualization/projection_panel.py`, `src/backend/loaders/sinogram.py` (Kommentar: `"synthetic"`-Format), `tests/test_dummy_measurement.py` (neu, 16 Tests), `tests/integration/test_ui_smoke.py` (3 Tests, Generator per Stub), `docs/superpowers/specs/2026-11-12-dummy-measured-sinogram-design.md` (neu)
+- **Abhängig von:** T-67, T-69, T-90
+- **Akzeptanz:** Der Generator liefert `(ppr, Zeilen, Spalten)` float32, endliche Werte, mit Seed reproduzierbar; `spr=0` ist reines Poisson-Rauschen um das ideale FP (Mittelwert ≈ 0), `spr>0` senkt die gemessenen Linienintegrale systematisch; Photonenmangel floort bei `ln(i0)`; Achsenwechsel transponiert in-memory reversibel; Cache-Roundtrip bit-identisch, invalidiert bei Geometrie-/Energie-Änderung, Custom-Volumes schreiben nie; UI-Button setzt das kohärente Trio und presetet die FP-Auswahl. Volle Suite grün, 0 Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — 19 neue Tests (16 Unit + 3 UI-Stub). Nachgemessen in `ct-viewer` (CPU-only): erste Generierung 12,6 s (unkorrekter Origin) bzw. 19,5 s (zentriert, ganzer Kopf im Kegel), Cache-Treffer 3,2 s, Cache 4,0 MB komprimiert; Preview bestätigt zentrierten, rotierenden Kopf mit Schädelrand, Streu-Belag und Rauschkorn. Lint: flake8 0, black/isort sauber.
+
+### `[x]` T-98 — Messungs-Laden lädt die ganze Datei („All" statt Downsample-Default)
+- **Ziel:** „Load Measurements" nutzte die geteilte Sample-Options-Auswahl mit FP-freundlichen Downsample-Defaults (proj 100, row 4, col 8) — eine Datei mit 2304 Projektionen wurde still auf (24, 16, 64) subsampelt (Nutzermeldung: „default measurement loading in sidebar: All statt 2304"). Jetzt lädt der Loader immer die ganze Datei; die Sample options im Tab steuern nur noch die Forward-Projektion.
+- **Dateien:** `src/visualization/projection_panel.py` (Loader-Selection = voll; `read_shared_selection`/`default_sample_selection` entfernt; Sample-Options-Caption und Shapes-differ-Hinweis angepasst), `tests/integration/test_ui_smoke.py` (redundante `_select_all_samples`/`_restore_sample_defaults`-Aufrufe entfernt; App-Fixture seedet jetzt auch die Dataclass-Default-Geometrie)
+- **Abhängig von:** T-93, T-96 (Sample-Options-Refactor)
+- **Umsetzung:**
+  1. Der Loader baut `build_selection_config()` (alle Achsen „all") statt `read_shared_selection()` — die Form-Readout zeigt die wahre Shape, und der T-90-Achsenwechsel kann in-memory ableiten. Zum Shape-Vergleich preset man die FP auf „all" (📐 Full projection geometry) — der Shapes-differ-Hinweis sagt es jetzt.
+  2. Die dadurch toten Helper `read_shared_selection`/`default_sample_selection` entfernt; die `_select_all_samples`/`_restore_sample_defaults`-Test-Helfer entfallen (der Loader lädt immer voll) — damit verschwindet auch der module-scoped „all"-Leak, der `fp_run`-Klicks auf die volle Default-Geometrie (2304 × 64 × 512 ≈ 75 M Rays) und einen 90-s-AppTest-Timeout auslöste.
+  3. Test-Determinismus: die App-Fixture seedet jetzt neben dem Volumen auch `projection_geometry` (Dataclass-Defaults) — ohne Seed stellte die App die machine-abhängige `data/.last_geometry.json` wieder her (zuletzt die Dummy-Geometrie mit 360 Views aus einer Form-Bearbeitung), und die erwartete FP-Shape war rechnerabhängig.
+- **Akzeptanz:** „Load Measurements" lädt die ganze Datei (Load-Tests ohne Sample-Vorwahl grün, exakte Daten); `fp_run` mit Downsample-Defaults liefert (24, 16, 64) unabhängig vom Maschinen-Cache; Sample-Options-Caption nennt nur noch die FP. Volle Suite grün, 0 Skips.
+- **Status:** ✅ Done (Nov 12, 2026) — `test_sinogram_inspection_run_button_produces_simulation` läuft jetzt deterministisch in ~3 s (vorher 90-s-Timeout bzw. maschinenabhängige Shape).
+
+### `[x]` T-102 — Geometry wird bei allen Messungsformaten mitgeführt; Default-Geometrie = Dummy-Phantom-Geometrie
+- **Ziel:** `load_sinogram` reichte `geometry` nur an den DICOM-Pfad durch — ein `.npy`/NIfTI-Messungs-Laden verlor die Geometrie still (`SinogramData.geometry = None`), obwohl die App die aktive Geometrie übergibt. Dadurch bekamen die Sinogram-Ansichten kein Detektor-Spacing und die Geometrie-Readouts waren inkohärent. Jetzt: alle drei Formate führen die Geometrie mit. Und: ohne Geometry-File ist die Default-Geometrie jetzt die **Dummy-Phantom-Geometrie** (`create_dummy_geometry()`, 60 Views, 512 × 1 mm Spalten, 192 × 2 mm Zeilen, SDD 1000 / SID 500, cone beam) statt der nackten Dataclass-Defaults — der Leerzustand und das Demo bleiben kohärent (gleicher Detektor, gleicher Scan).
+- **Dateien:** `src/backend/loaders/sinogram.py` (`_load_numpy`/`_load_nifti` mit `geometry`-Parameter, Forward an `_finish_sinogram`; `load_sinogram` reicht durch), `src/visualization/geometry_cache.py` (`default_geometry` → Cached oder `create_dummy_geometry()`), `tests/unit/test_sinogram_loader.py` (+1 Test: numpy-Laden mit Geometrie führt sie mit), `tests/unit/test_geometry_cache.py` (Fallback-Test auf die Dummy-Geometrie)
+- **Abhängig von:** T-98
+- **Umsetzung:** `_load_numpy`/`_load_nifti` nehmen `geometry` entgegen und geben es an `_finish_sinogram` weiter; `load_sinogram` reicht es an alle drei Pfade durch. `default_geometry()` fällt auf `create_dummy_geometry()` zurück (lazy Import, kein Zirkel). Eine Variante, `projections_per_rotation` aus der Projektionszahl der geladenen Datei abzuleiten, wurde verworfen: für Teil-Dateien (z. B. den 1-Projektions-Fall) wäre sie falsch, und sie leckte über die module-scoped UI-App-Fixture in Folgetests. Nachtrag: das Measurements-Expander bekommt die Sampling-Options als Opt-in zurück (T-98 lud immer die ganze Datei) — eine Checkbox „Sample instead of the whole file" (default aus) blendet die Per-Achsen-Auswahl ein (`render_selection_controls`, Prefix `load`, Proj-Default Downsample 10), ein gesampelter Load liest nur den gewählten Bereich (lazy für .npy/NIfTI), nie stillschweigend.
+- **Akzeptanz:** `.npy`-Laden mit `geometry=ProjectionGeometry()` → `sinogram.geometry is geometry` und `projections_per_rotation == 2304`; `default_geometry()` ohne Cache → `create_dummy_geometry()`; bestehende Loader-Tests (ohne Geometrie → `None`) unverändert grün; UI-Smoke-Suite grün (Checkbox aus per Default, Per-Achsen-Auswahl erscheint beim Anschalten); Lint sauber.
+- **Status:** ✅ Done (Nov 12, 2026) — Suite 341 passed, 0 skipped (die Korrelations-Metrik wurde separat entfernt).
+
+## Phase 10 — Vergleich simuliert vs. gemessen
 
 ### `[x]` T-67 — Comparison Module
 - **Vergleich:** Synthetic vs Measured Projektionen.
@@ -467,7 +555,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Volumen → Forward Project → Compare funktioniert.
 - **Status:** ✅ Done (Nov 6, 2026) — End-to-End mit echter parallelproj-Projektion, Sinogramm-Load und Metriken; läuft im `ct-viewer`-Env, wird sonst sauber geskippt.
 
-## Phase 11 — App Integration
+## Phase 11 — App & Viewer (Integration, Layout, 3D)
 
 ### `[x]` T-70 — Forward Projection UI
 - **Ziel:** UI für Forward Projection und Vergleich in Streamlit-App.
@@ -482,46 +570,16 @@ Chronological phases above stay the source of truth; this index groups the same 
 
 #### T-70 Detailplan (Nov 6, 2026)
 
-| Subtask | Beschreibung | Status |
-|---------|--------------|--------|
-| T-70a | Messdaten-Auswahl in der Sidebar (Pfad/Ordner, Achsen-Selektion, Axis-Order, Load-Button) | ✅ Done |
-| T-70b | Tab „Geometry“: Parameter aus Datei anzeigen + editieren (Apply/Reset) | ✅ Done |
-| T-70c | Tab „Real vs Simulated“: Forward-Projection-Controls, Run-Button, 3-Spalten-Vergleich + Metriken | ✅ Done |
-| T-70d | Headless-UI-Tests (Tabs, Sidebar-Controls, Messdaten-Load via `AppTest`) | ⚠️ entfernt (`8de260b`), neu geplant als T-81 |
-
-### `[x]` T-79 — Non-contiguous Projection Selection Fix
-- **Ziel:** `forward_project` muss beliebige `proj_indices` (z. B. Downsample `[0, 10, 20]`) korrekt auf die passenden Gantry-Winkel abbilden.
-- **Dateien:** `src/backend/forward_project.py`, `src/backend/parallelproj/geometry.py`
-- **Abhängig von:** T-63
-- **Akzeptanz:** `calculate_xray_beam_list(projection_indices=...)` berechnet nur die gewählten Winkel; Ergebnis entspricht der entsprechenden Auswahl aus der vollen Projektion.
-- **Status:** ✅ Done (Nov 6, 2026) — Test `test_forward_project_selected_projection_indices_match_full`; Downsample/range-Auswahlen funktionieren jetzt ohne `IndexError`.
-
-### `[x]` T-80 — HU ↔ Attenuation mit Energieauswahl (FP-Grundlage)
-- **Ziel:** CT-Darstellung flexibel zwischen HU und linearer Schwächung umschaltbar machen, mit monoenergetischer Energieauswahl. Grundlage der Forward Projection ist die Schwächung, nicht HU.
-- **Dateien:** `src/backend/attenuation.py`, `src/visualization/display_units.py`, `src/visualization/app.py`, `src/visualization/projection_panel.py`
-- **Abhängig von:** T-63, T-70
-- **Modell:** wasseräquivalent, monoenergetisch — `μ(E) = μ_Wasser(E) · (1 + HU/1000)`. `μ_Wasser(E)` aus NIST-Tabellen (flüssiges Wasser, 30–150 keV, log-log interpoliert). Keine Beam-Hardening-Korrektur.
-- **Akzeptanz:**
-  - Umschalter **Display Unit: HU / Attenuation (1/cm)** in „Slice Options“, Energie-Slider 30–150 keV (Default 70)
-  - Fenster-Presets und Slider-Grenzen rechnen mit um
-  - `hu_to_mu` / `mu_to_hu` / `hu_window_to_mu` / `volume_to_mu` / `volume_for_projection`
-  - Forward Projection akzeptiert **nur** Attentuation (`1/mm`/`1/cm`) und lehnt HU mit `ValueError` ab
-  - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
-- **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
-
-### `[x]` T-81 — Schneller UI-Smoke-Test (ersetzt T-70d)
-- **Ziel:** Tab-/Sidebar-Layout wieder absichern, ohne die Testsuite zu verlangsamen.
-- **Hintergrund:** Die sechs `AppTest`-Tests aus T-70d dauerten **96,8 s** (~75 % der Suite), weil jeder Test einen kompletten Streamlit-Script-Run startet. Ein `AppTest.run()` kostet 10–30 s: ~8 s Import von `visualization.volume3d` (skimage/pyvista) und ~3,6 s in `load_last_loaded()` (87 KB Cache mit 560 toten Netzwerkpfaden). Entfernt in `8de260b`, Datei bleibt in der Historie (`6307a6a`).
-- **Dateien:** `tests/integration/test_ui_smoke.py` (neu)
-- **Abhängig von:** T-70
-- **Umsetzung:**
-  1. **Eine** `AppTest`-Instanz pro Modul (`scope="module"`), nicht pro Test.
-  2. Session-State vorab setzen (`demo_mode`, `volume`), damit `load_initial_volume()` und der Cache-Pfad übersprungen werden.
-  3. `auto_load_cache=False` erzwingen, um die 560 toten `O:`-Pfade nicht anzufassen.
-  4. `visualization.volume3d`-Import messen; ggf. 3D-Render lazily laden.
-  5. Optional `@pytest.mark.slow`, per Default ausgeschlossen (`-m "not slow"`).
-- **Akzeptanz:** Tab-Reihenfolge, Sidebar-Controls, Geometry-Hinweis und Messdaten-Load abgedeckt; Laufzeit < 15 s; Suite bleibt unter 20 s.
-- **Status:** ✅ Done (Nov 9, 2026) — `tests/integration/test_ui_smoke.py` deckt Tab-Reihenfolge, Sidebar-Controls (Sektionsreihenfolge, Expanded-Defaults, kein „Data"-Header, Cache-Controls oben), Geometry-Hinweis, Missing-Inputs-Hinweis, Messdaten-Load und Empty-State-Start ab (14 Tests, eine modulweite `AppTest`-Instanz). **Laufzeit-Ziel erreicht:** Modul ~5 s, Suite ~16–20 s (vorher 22 s / 30 s). Der frühere Engpass `pyvista` (~5,6 s) ist durch den Lazy-Import (`test_volume3d_import.py`) und das Shelving des PyVista-Render-Modus (T-82/T-84) ganz aus dem Startpfad verschwunden.
+### `[ ]` T-82 — PyVista-Render-Modus reaktivieren (verschoben)
+- **Ziel:** Den off-screen PyVista-Render-Modus wieder in der UI anbieten — mit Geometrie-Overlay und On/Off-Schalter, nicht als statisches Bild.
+- **Status:** ⚠️ Shelved (Nov 9, 2026) — Der Modus wurde aus der UI entfernt (`render_mode` bietet nur noch Iso-Surface), weil `create_pyvista_volume()` serverseitig ein PNG rendert (`plotter.screenshot()` → `st.image`). Ein statisches Bild kann keinen interaktiven Schalter tragen, und der PyVista-Zweig zeichnete gar kein Geometrie-Overlay. Der Renderer bleibt unverändert in `src/visualization/volume3d.py` (inkl. Lazy-Import-Guard `PYVISTA_AVAILABLE`) — nichts gelöscht, nur nicht mehr verdrahtet. Aus dem Dockerfile wurde `pyvista` entfernt.
+- **Dateien (bei Reaktivierung):** `src/visualization/volume3d.py` (`create_pyvista_volume`), `src/visualization/app.py` (Render-Mode-Liste + Zweig), `Dockerfile`, `tests/unit/test_volume3d_import.py`
+- **Abhängig von:** –
+- **Umsetzung (Skizze):**
+  1. Geometrie-Overlay in den PyVista-Plot aufnehmen (Source/Detector/Trajektorie analog zu `add_trajectory_to_figure`).
+  2. Schalter bereitstellen: interaktiv geht nur ein Streamlit-`st.toggle` über dem Bild (rerun + Re-Render) — oder PyVista durch `panel`/`vtk.js`/`stpyvista` ersetzen, dann ist ein echter In-Canvas-Schalter möglich.
+  3. `pyvista` wieder in `Dockerfile` installieren.
+- **Akzeptanz:** Render-Mode-Auswahl bietet PyVista wieder an, das Overlay ist sichtbar und per Schalter abschaltbar, der Lazy-Import-Guard bleibt grün.
 
 ### `[x]` T-83 — Background-Startup-Load (nicht blockierender Start)
 - **Ziel:** Den Ladevorgang beim Start aus dem Streamlit-Script-Thread herausnehmen, damit Shell, Sidebar und alle drei Tabs schon bedienbar sind, während eine Serie gelesen wird.
@@ -555,17 +613,6 @@ Chronological phases above stay the source of truth; this index groups the same 
   3. Richtungspfeile: `sizemode="raw"` + `ARROW_LENGTH_MM = 25.0` statt `sizemode="absolute"` mit `sizeref=1` (das zeichnete Cones von einer Dateneinheit, also unsichtbar); eigener Legendeneintrag „Direction" mit Plotlys nativem Cone-Swatch.
   4. Sidebar: nur „Image" ist offen, „Projection Geometry" und „Measurements" sind zu; die abgeleiteten Geometriewerte (Fan/Cone angle, Collimation) sind eine kompakte Caption statt drei großer `st.metric`-Kacheln. Alle sichtbaren Strings wieder englisch.
 - **Status:** ✅ Done (Nov 9, 2026, `c4ad84e`) — Tests: Startup-Policy, `pitch=0.0` als gültiger Zirkulärscan, 2304-Default, Arrow-Sizing und „Direction"-Legendeneintrag, Empty-State-Start, zugeklappte Sektionen, entfallende Auto-load-Checkbox. Suite danach: **256 passed, 2 skipped** in ~16–23 s.
-
-### `[ ]` T-82 — PyVista-Render-Modus reaktivieren (verschoben)
-- **Ziel:** Den off-screen PyVista-Render-Modus wieder in der UI anbieten — mit Geometrie-Overlay und On/Off-Schalter, nicht als statisches Bild.
-- **Status:** ⚠️ Shelved (Nov 9, 2026) — Der Modus wurde aus der UI entfernt (`render_mode` bietet nur noch Iso-Surface), weil `create_pyvista_volume()` serverseitig ein PNG rendert (`plotter.screenshot()` → `st.image`). Ein statisches Bild kann keinen interaktiven Schalter tragen, und der PyVista-Zweig zeichnete gar kein Geometrie-Overlay. Der Renderer bleibt unverändert in `src/visualization/volume3d.py` (inkl. Lazy-Import-Guard `PYVISTA_AVAILABLE`) — nichts gelöscht, nur nicht mehr verdrahtet. Aus dem Dockerfile wurde `pyvista` entfernt.
-- **Dateien (bei Reaktivierung):** `src/visualization/volume3d.py` (`create_pyvista_volume`), `src/visualization/app.py` (Render-Mode-Liste + Zweig), `Dockerfile`, `tests/unit/test_volume3d_import.py`
-- **Abhängig von:** –
-- **Umsetzung (Skizze):**
-  1. Geometrie-Overlay in den PyVista-Plot aufnehmen (Source/Detector/Trajektorie analog zu `add_trajectory_to_figure`).
-  2. Schalter bereitstellen: interaktiv geht nur ein Streamlit-`st.toggle` über dem Bild (rerun + Re-Render) — oder PyVista durch `panel`/`vtk.js`/`stpyvista` ersetzen, dann ist ein echter In-Canvas-Schalter möglich.
-  3. `pyvista` wieder in `Dockerfile` installieren.
-- **Akzeptanz:** Render-Mode-Auswahl bietet PyVista wieder an, das Overlay ist sichtbar und per Schalter abschaltbar, der Lazy-Import-Guard bleibt grün.
 
 ### `[x]` T-86 — Viewer-Layout: All/2D/3D-Umschalter, gestapelte MPR, schwebende Options-Panels
 - **Ziel:** Der 3D-Ansicht die Mehrheit des Viewer-Tabs geben: drei kleine MPR-Ebenen links gestapelt, große 3D-Ansicht rechts, umschaltbar auf Vollbreite je Seite. Options-Panels sollen schweben, damit ihr Öffnen keine Ansicht verschiebt.
@@ -619,64 +666,6 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Kein Verweis mehr auf `plot_slot`, „Expander" oder „plot above options"; die Viewer-Notes beschreiben `All`/`2D`/`3D` und die Popovers.
 - **Status:** ✅ Done (Nov 10, 2026) — die drei Stellen korrigiert, zusätzlich zwei Risikozeilen (Stapel-Überlauf, 3D unter dem Fold) und ein „Erledigt (2026-11-10)"-Block ergänzt.
 
-### `[x]` T-90 — Sinogramm-Achsenreihenfolge wirkt auch für DICOM-Ordner und sofort
-
-- **Ziel:** Die Auswahl „File axis order" im Measurements-Panel muss das geladene Bild tatsächlich umorientieren — für jeden Formatpfad und ohne zweiten Klick auf „Load Measurements".
-- **Hintergrund (gemeldeter Fehler):** Bei einem DICOM-Projektionsordner änderte die Auswahl nichts. `_load_dicom` nahm `axis_order` entgegen, benutzte es aber nie und schrieb `source_axis_order=("proj","row","col")` fest; der Setter fiel danach in den Re-Read-Zweig, der wieder über `_load_dicom` lief — die Auswahl war an jeder Stelle wirkungslos. Bei `.npy`/NIfTI wurde die Reihenfolge korrekt angewandt, aber nur beim nächsten Klick auf „Load Measurements", weil der Selectbox-Wert ausschließlich im `if clicked:`-Zweig gelesen wurde.
-- **Umsetzung:**
-  1. `_load_dicom` reicht `axis_order` an `_finish_sinogram` weiter; der native DICOM-Stapel `(proj,row,col)` wird gemäß Deklaration transponiert (z. B. `proj → col → row` ⇒ Rahmen `(n_rows,n_cols)` → `(n_cols,n_rows)`). Die Zeilen-/Spaltenselektion bleibt kanonisch.
-  2. Lazy-Read bleibt erhalten, wenn `proj` auf der ersten Dateiachse liegt (dann wird die Projektionsauswahl weiterhin header-only aufgelöst); bei jeder anderen Reihenfolge liegen die „Projektionen" nicht mehr auf den Dateien, also werden alle Rahmen gelesen und die Auswahl kanonisch aufgelöst.
-  3. `apply_axis_order_change()` im UI wendet die Auswahl sofort über den vorhandenen `SinogramData.axis_order`-Setter an (In-Memory bei Volllast, sonst Re-Read) und ist bei unveränderter Reihenfolge ein No-op.
-  4. Setter um den Fall „kein Roharray, kein `path`" ergänzt (in-memory erzeugte Daten): reine Transposition zwischen alter und neuer Deklaration über `_reorder_canonical`.
-- **Dateien:** `src/backend/loaders/sinogram.py`, `src/visualization/projection_panel.py`, `tests/conftest.py` (Fixture-Variante `graded=True`), `tests/unit/test_sinogram_loader.py`, `tests/unit/test_projection_panel.py`, `tests/integration/test_ui_smoke.py`
-- **Abhängig von:** T-64, T-65
-- **Akzeptanz:** Ein DICOM-Ordner mit deklarierter Reihenfolge `("proj","col","row")` liefert `data.shape == (n_proj, n_cols, n_rows)` und `source_axis_order` wie deklariert; ein Wechsel nach dem Laden orientiert um; die UI wendet die Auswahl ohne erneuten Lade-Klick an.
-- **Status:** ✅ Done (Nov 12, 2026) — 5 neue Loader-Tests, 3 Helper-Tests, 1 UI-Test. Nachweis mit künstlichen DICOM-Serien (3 Rahmen, 4×6, je Rahmen ein eigener Gradient, damit eine Transposition sichtbar ist): `proj,row,col` → `(3,4,6)`, `proj,col,row` → `(3,6,4)`, Setter hin und zurück reversibel. `_reorder_canonical` zusätzlich gegen einen vollständigen Re-Derive über alle 36 Reihenfolge-Übergänge geprüft (0 Abweichungen). Volle Suite: 301 passed, 0 skipped.
-
-### `[x]` T-91 — Conda-Env `ct-viewer` verbindlich, keine übersprungenen Tests
-
-- **Ziel:** Projektbefehle laufen ausschließlich im Conda-Env `ct-viewer`; die Suite meldet keine Skips mehr.
-- **Hintergrund:** `pytest` mit dem System-Python (3.13) übersprang die vier parallelproj-Tests, weil `parallelproj_c.dll` nur im aktivierten Env auf `PATH` liegt — die Tests *liefen* also nie, obwohl sie im Repo vorhanden sind. Zusätzlich behauptete `LINTING.md`, `flake8`/`black`/`isort` seien **nicht** im Env installiert und müssten vom System-Python laufen; tatsächlich sind sie über das `dev`-Extra im Env vorhanden.
-- **Umsetzung:**
-  1. Neu: `AGENTS.md` (auto-geladen) mit verbindlicher Env-Regel, exakten Aktivierungsbefehlen, Lint-Reihenfolge, Hard Rules und Test-Bar.
-  2. `LINTING.md`: falsche Tool-Verfügbarkeit korrigiert (alle drei im Env, ein Interpreter für Lint und Tests).
-  3. `pyproject.toml`: `nibabel` zusätzlich in `dev` — die Suite deckt NIfTI-Laden ab, ohne nibabel skippen diese vier Tests still. Damit genügt `.[dev]` für einen vollständigen Lauf; `nifti` bleibt das reine Laufzeit-Extra.
-  4. `environment.yml` und `.github/workflows/ci.yml`: bei `.[dev]` belassen (deckt nibabel jetzt ab).
-  5. `INSTALLATION.md`: die dokumentierten `.[cpu]`/`.[gpu]`-Befehle entfernt — diese Extras existieren in `pyproject.toml` **nie** (per `git log -S` geprüft) und `pip` akzeptiert `.[irgendwas]` ohne jede Warnung, installiert aber nichts; ersetzt durch die tatsächlichen conda-Befehle. Ebenso `parallelproj.__version__` (existiert nicht) und `parallelproj_core` (Modul existiert nicht) korrigiert zu `parallelproj.cuda_present`.
-  6. `docs/local-environment.md`, `docs/README.md`, `AGENTS.md`: Env als Pflicht dokumentiert, Test-/Lint-Befehle mit Aktivierung, Docs-Index ergänzt.
-- **Dateien:** `AGENTS.md` (neu), `LINTING.md`, `pyproject.toml`, `environment.yml`, `.github/workflows/ci.yml`, `INSTALLATION.md`, `docs/local-environment.md`, `docs/README.md`
-- **Abhängig von:** T-69
-- **Akzeptanz:** `python -m pytest -q -rs` im Env `ct-viewer` endet mit „0 skipped"; `flake8` (Projekt-Ignore-Set), `black --check`, `isort --check-only` laufen im selben Env fehlerfrei.
-- **Status:** ✅ Done (Nov 12, 2026) — Env 3.11.18 mit parallelproj, torch, nibabel, flake8/black/isort. Suite: **301 passed, 0 skipped** (~25–40 s), vorher 293 passed / 2 skipped im System-Python bzw. 297/4 im Env ohne nibabel. `flake8 --count` = 0, `black --check` 60 Dateien unverändert, `isort --check-only` exit 0. Zusatzbefund: `.[cpu]`/`.[gpu]` waren nur in der Doku vorhanden, nie in `pyproject.toml`; `pip install -e ".[bogus]"` warnt nicht und installiert nichts — die Doku führt jetzt die conda-Befehle.
-
-### `[x]` T-92 — Sinogram-Loader: Lazy Subset-Reads für große Dateien
-- **Ziel:** Subset-Auswahl (Zeilen/Spalten/Projektionen) aus großen `.npy`-/NIfTI-Dateien lesen, ohne die ganze Datei in den RAM zu laden — gemäß der in `docs/superpowers/plans/2026-11-04-sinogram-loader.md` vorgesehenen, aber nie umgesetzten mmap-/dataobj-Slices. DICOM bleibt unverändert (T-65 liest bereits nur die gewählten Projektionen, frame-weise).
-- **Dateien:** `src/backend/loaders/sinogram.py`, `tests/unit/test_sinogram_loader.py`, `docs/superpowers/specs/2026-11-12-sinogram-lazy-subset-reads-design.md` (neu)
-- **Abhängig von:** T-90
-- **Umsetzung:**
-  1. `.npy`: Subset → `np.load(path, mmap_mode="r")`; die bestehende `_apply_selection` (transpose + `np.ix_`) materialisiert nur die Auswahl, der Rest der Datei wird nie gelesen. Vollauswahl bleibt auf dem eager-Pfad (`_raw_file_order` hält das Roharray für die In-Memory-`axis_order`-Ableitung). `.npz` (Zip-Container) kann nicht gemappt werden — bleibt eager.
-  2. NIfTI: Jede Dateiachse, deren kanonischer Modus als Basic-Slice ausdrückbar ist (`central`/`range`/`downsample`), wird vor dem Materialisieren über `img.dataobj[slice_tuple]` auf der Platte vorgeschnitten (ein Read, nur der gewählte Bereich); vorgeschnittene Achsen werden in `applied_selection` auf `"all"` gesetzt — dasselbe Muster wie im DICOM-Loader. `custom`-Indexlisten brauchen Fancy-Indexing, das der Proxy nicht kann (verifiziert in nibabel 5.5.0: `ArrayProxy`/`slicer` werfen „Cannot handle fancy indexing") → voller Read-Pfad wie bisher.
-  3. Validierung bleibt erhalten: ungültige `range_` (leer/außerhalb) werden nicht vorgeschnitten, sodass `resolve_indices` weiterhin `IndexError`/`ValueError` wirft — ein `slice` würde Out-of-Bounds stillschweigend clampsen. Neue Helfer: `_is_full_selection` (nutzt auch `_finish_sinogram` statt der doppellten Bedingung), `_selection_axis`, `_mark_axis_all`, `_basic_slice_for_axis`.
-- **Akzeptanz:** Subset-Loads liefern exakt die Daten der eager-Variante; Tests belegen mmap (Spy auf `np.load`: `mmap_mode="r"` bei Subset, `None` bei Vollauswahl) bzw. Basic-Slice-Read (Spy auf `ArrayProxy.__getitem__`: ein Slice-Tuple, nie ein Voll-Read); Vollauswahl und Fehlerverträge unverändert; Suite grün ohne neue Skips.
-- **Status:** ✅ Done (Nov 12, 2026) — 10 neue Tests (3 numpy/npz, 7 NIfTI inkl. downsample, Mehrachsen- und transponiertem Subset). `test_sinogram_loader.py`: 48 passed. `SinogramData.lazy` bleibt `False` (Auswahl ist nach dem Load materialisiert; Lazy ist Read-Zeit, nicht Zugriffszeit) — chunk-weises Streamen durch die Vorwärtsprojektion bleibt out of scope. `SinogramData`/UI/`forward_project` unverändert.
-
-### `[x]` T-93 — Dummy-Messung: 3D-Shepp-Logan-FP + Streuung + Rauschen
-- **Ziel:** Ein künstliches „gemessenes" Sinogramm für das Demo-Phantom — 3D-Shepp-Logan-Forward-Projektion + Streuung + Poisson-Rauschen — per Knopfdruck im Measurements-Panel, als kohärentes Demo-Trio (Volumen + Geometrie + Messung) für den Sinogram-Inspection-Vergleich ohne echte Messdaten.
-- **Hintergrund:**
-  - Das Demo-Phantom ist bereits in Standard-Kopfgröße (~138 × 184 × 180 mm im 192-mm-FOV, durch `test_head_dimensions_match_phantom_geometry` gepinnt); die Dummy-Messung nutzt genau diese Größe, kein geschrumpftes Spielzeug-Volumen.
-  - Die Default-Geometrie (64 Detektorzeilen × 1 mm) überstreicht nur ~32 mm in z auf der Isocenter-Ebene — ein kopfgroßes Phantom würde auf einen Slab zugeschnitten. Die Dummy-Geometrie (192 Zeilen × 2 mm, 512 Spalten × 1 mm, 60 Views/Rotation) überstreicht 192 mm in z und sieht den ganzen Kopf.
-  - Vorab gemessen (CPU-only, keine CUDA in `ct-viewer`): FP des Standard-Phantoms ≈ 10–20 s, Streuung+Rauschen ≈ 3 s. Ohne Puffer wäre jeder Klick eine Re-Projektion.
-- **Umsetzung:**
-  1. `create_dummy_geometry()` in `src/visualization/phantom.py`: Dummy-CBCT-Geometrie in Kopfgröße (s.o.).
-  2. `create_dummy_measured_sinogram()`: FP des HU→1/mm-konvertierten Phantoms → idealer Linienintegral-Stack; Streuung als Gauß-geglättete Kopie der Primär-Transmittanz (SPR-Verhältnis, Sigma in mm am Detektor, pro Achse konvertiert), in der Intensitätsdomäne addiert (Streuung zählt Photonen dazu, gemessenes Linienintegral also niedriger — Kontrastverlust/Cupping-Richtung); Poisson-Zählrauschen mit `i0` einfallenden Photonen pro Ray, Photonenmangel floort bei einem Zählwert. Ergebnis als `SinogramData` (format `"synthetic"`, kanonisch, ohne Datei — der T-90-Setter-Zweig transponiert in-memory).
-  3. **Ideal-FP auf Disk gepuffert** (`data/cache/dummy_fp_standard.npz`, gitignored; Fingerprint aus Geometrie + Energie + Cache-Version): erste Generierung ~13–23 s, jeder weitere Klick/App-Start ~3,5 s. Nur die Standard-Phantom-Strecke wird gepuffert; Streuung/Rauschen bleiben live, sodass `spr`/`i0`/`seed` nie re-projizieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule).
-  4. Phantom auf die Rotationsachse zentriert (Origin ≈ (−95.6, −95.6, −94.5) mm): der parallelproj-Kreis rotiert um den Weltsprungpunkt, der Demo-Default-Origin (0,0,0) parkt den Kopf im +x/+y/+z-Oktanten — außerhalb des FOV und halb außerhalb des Kegels (vorab so gemessen, siehe Preview). Der geteilte Demo-Default bleibt unverändert (separater Quirk, eigener Task-Kandidat).
-  5. UI: Button „🎲 Generate dummy measurement" im Measurements-Expander; setzt Volumen + Geometrie (`geometry_is_default=False`, `geometry_loaded_original`) + Messung in den Session-State und presetet die FP-Auswahl auf „all" — ein Klick auf „Run Forward Projection" reproduziert die Messform exakt, Difference und Metriken leben sofort. Empty-State-Hint im Inspection-Tab verweist auf den Button.
-- **Dateien:** `src/visualization/phantom.py`, `src/visualization/projection_panel.py`, `src/backend/loaders/sinogram.py` (Kommentar: `"synthetic"`-Format), `tests/test_dummy_measurement.py` (neu, 16 Tests), `tests/integration/test_ui_smoke.py` (3 Tests, Generator per Stub), `docs/superpowers/specs/2026-11-12-dummy-measured-sinogram-design.md` (neu)
-- **Abhängig von:** T-67, T-69, T-90
-- **Akzeptanz:** Der Generator liefert `(ppr, Zeilen, Spalten)` float32, endliche Werte, mit Seed reproduzierbar; `spr=0` ist reines Poisson-Rauschen um das ideale FP (Mittelwert ≈ 0), `spr>0` senkt die gemessenen Linienintegrale systematisch; Photonenmangel floort bei `ln(i0)`; Achsenwechsel transponiert in-memory reversibel; Cache-Roundtrip bit-identisch, invalidiert bei Geometrie-/Energie-Änderung, Custom-Volumes schreiben nie; UI-Button setzt das kohärente Trio und presetet die FP-Auswahl. Volle Suite grün, 0 Skips.
-- **Status:** ✅ Done (Nov 12, 2026) — 19 neue Tests (16 Unit + 3 UI-Stub). Nachgemessen in `ct-viewer` (CPU-only): erste Generierung 12,6 s (unkorrekter Origin) bzw. 19,5 s (zentriert, ganzer Kopf im Kegel), Cache-Treffer 3,2 s, Cache 4,0 MB komprimiert; Preview bestätigt zentrierten, rotierenden Kopf mit Schädelrand, Streu-Belag und Rauschkorn. Lint: flake8 0, black/isort sauber.
-
 ### `[x]` T-94 — 3D-Ansicht: echtes Weltkoordinatensystem (Origin + Spacing der FP)
 - **Ziel:** Der 3D-Plot muss das Volumen im selben Weltkoordinatensystem zeichnen, in dem die Forward-Projektion rechnet — echter DICOM-Origin, echtes Spacing — sodass Geometrie-Overlay (Source-Pfad, Detektor-Ebene, Zentralstrahlen) und gerendertes Phantom mit den simulierten Projektionen übereinstimmen. Gemeldeter Fehler: der 3D-Plot zeigte den Zentralstrahl durch die Phantommitte, während die simulierte FP das Phantom oben am Detektor zeigte.
 - **Hintergrund:**
@@ -718,17 +707,6 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Helper-Tests pinnen `(2.0, 1.0)` für die Dummy-Geometrie bzw. `None`; die Ansichten zeigen quadratische mm-Pixel; bestehende Inspection-Tests unverändert grün.
 - **Status:** ✅ Done (Nov 12, 2026) — 2 neue Helper-Tests, `test_sinogram_inspection_*`-Suite grün.
 
-### `[x]` T-98 — Messungs-Laden lädt die ganze Datei („All" statt Downsample-Default)
-- **Ziel:** „Load Measurements" nutzte die geteilte Sample-Options-Auswahl mit FP-freundlichen Downsample-Defaults (proj 100, row 4, col 8) — eine Datei mit 2304 Projektionen wurde still auf (24, 16, 64) subsampelt (Nutzermeldung: „default measurement loading in sidebar: All statt 2304"). Jetzt lädt der Loader immer die ganze Datei; die Sample options im Tab steuern nur noch die Forward-Projektion.
-- **Dateien:** `src/visualization/projection_panel.py` (Loader-Selection = voll; `read_shared_selection`/`default_sample_selection` entfernt; Sample-Options-Caption und Shapes-differ-Hinweis angepasst), `tests/integration/test_ui_smoke.py` (redundante `_select_all_samples`/`_restore_sample_defaults`-Aufrufe entfernt; App-Fixture seedet jetzt auch die Dataclass-Default-Geometrie)
-- **Abhängig von:** T-93, T-96 (Sample-Options-Refactor)
-- **Umsetzung:**
-  1. Der Loader baut `build_selection_config()` (alle Achsen „all") statt `read_shared_selection()` — die Form-Readout zeigt die wahre Shape, und der T-90-Achsenwechsel kann in-memory ableiten. Zum Shape-Vergleich preset man die FP auf „all" (📐 Full projection geometry) — der Shapes-differ-Hinweis sagt es jetzt.
-  2. Die dadurch toten Helper `read_shared_selection`/`default_sample_selection` entfernt; die `_select_all_samples`/`_restore_sample_defaults`-Test-Helfer entfallen (der Loader lädt immer voll) — damit verschwindet auch der module-scoped „all"-Leak, der `fp_run`-Klicks auf die volle Default-Geometrie (2304 × 64 × 512 ≈ 75 M Rays) und einen 90-s-AppTest-Timeout auslöste.
-  3. Test-Determinismus: die App-Fixture seedet jetzt neben dem Volumen auch `projection_geometry` (Dataclass-Defaults) — ohne Seed stellte die App die machine-abhängige `data/.last_geometry.json` wieder her (zuletzt die Dummy-Geometrie mit 360 Views aus einer Form-Bearbeitung), und die erwartete FP-Shape war rechnerabhängig.
-- **Akzeptanz:** „Load Measurements" lädt die ganze Datei (Load-Tests ohne Sample-Vorwahl grün, exakte Daten); `fp_run` mit Downsample-Defaults liefert (24, 16, 64) unabhängig vom Maschinen-Cache; Sample-Options-Caption nennt nur noch die FP. Volle Suite grün, 0 Skips.
-- **Status:** ✅ Done (Nov 12, 2026) — `test_sinogram_inspection_run_button_produces_simulation` läuft jetzt deterministisch in ~3 s (vorher 90-s-Timeout bzw. maschinenabhängige Shape).
-
 ### `[x]` T-99 — Geometrie-Laden im Geometry-Tab statt der Sidebar; Trajectory-Settings nur Visualisierung
 - **Ziel:** Der Geometry-File-Upload (inkl. der Notes „Geometry loaded!"/„No geometry file loaded") lebte im Sidebar-Expander — die Notiz über die geladene Geometrie gehört neben die Readouts und das Editier-Formular im Geometry-Tab. Die Sidebar hält nur noch die Trajectory-Overlay-Settings („Projections", „Trajectory Downsample") — Visualisierung only, ohne Einfluss auf die Forward-Projektion (die die Sample options im Sinogram-Inspection-Tab nutzt).
 - **Dateien:** `src/visualization/projection_panel.py` (`render_geometry_tab`: Uploader + Load-Logik + Notes), `src/visualization/sidebar.py` (`_render_geometry_section` ohne Upload; Caption „3D geometry overlay only"; tote Imports entfernt)
@@ -757,16 +735,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 - **Akzeptanz:** Erste (anterior-)Projektion zeigt das aufrechte Oval (vorher: nahezu runder Blob mit seitlichen Tumoren — vorher/nachher als PNG verifiziert); Head-Dimensionen x≈180/y≈138/z≈184 mm; volle Suite 340 passed, 0 skipped; flake8/black/isort sauber.
 - **Status:** ✅ Done (Nov 12, 2026) — `DUMMY_FP_CACHE` wird durch den Versions-Bump automatisch invalidiert; erster Demo-Lauf rechnet die FP neu.
 
-### `[x]` T-102 — Geometry wird bei allen Messungsformaten mitgeführt; Default-Geometrie = Dummy-Phantom-Geometrie
-- **Ziel:** `load_sinogram` reichte `geometry` nur an den DICOM-Pfad durch — ein `.npy`/NIfTI-Messungs-Laden verlor die Geometrie still (`SinogramData.geometry = None`), obwohl die App die aktive Geometrie übergibt. Dadurch bekamen die Sinogram-Ansichten kein Detektor-Spacing und die Geometrie-Readouts waren inkohärent. Jetzt: alle drei Formate führen die Geometrie mit. Und: ohne Geometry-File ist die Default-Geometrie jetzt die **Dummy-Phantom-Geometrie** (`create_dummy_geometry()`, 60 Views, 512 × 1 mm Spalten, 192 × 2 mm Zeilen, SDD 1000 / SID 500, cone beam) statt der nackten Dataclass-Defaults — der Leerzustand und das Demo bleiben kohärent (gleicher Detektor, gleicher Scan).
-- **Dateien:** `src/backend/loaders/sinogram.py` (`_load_numpy`/`_load_nifti` mit `geometry`-Parameter, Forward an `_finish_sinogram`; `load_sinogram` reicht durch), `src/visualization/geometry_cache.py` (`default_geometry` → Cached oder `create_dummy_geometry()`), `tests/unit/test_sinogram_loader.py` (+1 Test: numpy-Laden mit Geometrie führt sie mit), `tests/unit/test_geometry_cache.py` (Fallback-Test auf die Dummy-Geometrie)
-- **Abhängig von:** T-98
-- **Umsetzung:** `_load_numpy`/`_load_nifti` nehmen `geometry` entgegen und geben es an `_finish_sinogram` weiter; `load_sinogram` reicht es an alle drei Pfade durch. `default_geometry()` fällt auf `create_dummy_geometry()` zurück (lazy Import, kein Zirkel). Eine Variante, `projections_per_rotation` aus der Projektionszahl der geladenen Datei abzuleiten, wurde verworfen: für Teil-Dateien (z. B. den 1-Projektions-Fall) wäre sie falsch, und sie leckte über die module-scoped UI-App-Fixture in Folgetests. Nachtrag: das Measurements-Expander bekommt die Sampling-Options als Opt-in zurück (T-98 lud immer die ganze Datei) — eine Checkbox „Sample instead of the whole file" (default aus) blendet die Per-Achsen-Auswahl ein (`render_selection_controls`, Prefix `load`, Proj-Default Downsample 10), ein gesampelter Load liest nur den gewählten Bereich (lazy für .npy/NIfTI), nie stillschweigend.
-- **Akzeptanz:** `.npy`-Laden mit `geometry=ProjectionGeometry()` → `sinogram.geometry is geometry` und `projections_per_rotation == 2304`; `default_geometry()` ohne Cache → `create_dummy_geometry()`; bestehende Loader-Tests (ohne Geometrie → `None`) unverändert grün; UI-Smoke-Suite grün (Checkbox aus per Default, Per-Achsen-Auswahl erscheint beim Anschalten); Lint sauber.
-- **Status:** ✅ Done (Nov 12, 2026) — Suite 341 passed, 0 skipped (die Korrelations-Metrik wurde separat entfernt).
-
-### `[ ]` T-103 — Restore last session button in empty state (Reload überleben)
-
+### `[x]` T-103 — Restore last session button in empty state (Reload überleben)
 - **Ziel:** Nach einem Browser-Reload (neue Streamlit-Session) sind Volume, Geometrie und Demo-State aus der `session_state` weg, obwohl die Caches (`data/.last_loaded.json`, In-Memory `_volume_cache`, disk-cached Ideal-FP) überleben. Die Empty State bekommt jetzt einen „↺ Restore last session"-Button, der den letzten Stand wiederherstellt: DICOM-Volumen aus dem In-Memory-Cache (Reload = gleicher Server-Prozess → Cache-Hit), Demo-Trio neu aus dem disk-cached Forward-Projection.
 - **Dateien:** `src/visualization/volume_cache.py` (Record `{kind, files}`; `save_last_demo`, `load_last_session`; `load_last_loaded`-Kompatibilität), `src/visualization/sidebar.py` (`load_demo_volume` persistiert die Demo, `restore_last_session`), `src/visualization/app.py` (Restore-Button in `render_empty_state`)
 - **Abhängig von:** T-85, T-96
@@ -776,7 +745,7 @@ Chronological phases above stay the source of truth; this index groups the same 
 
 Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden schließen (T-73 CI-Route), Plan-Hygiene und Helix-FP-Verifikation. Nutzerentscheidung: Helix-FP gehört **in** den Meilenstein, nicht danach.
 
-### `[ ]` T-104 — Helix-FP-Verifikation und Doku-Sync
+### `[x]` T-104 — Helix-FP-Verifikation und Doku-Sync
 - **Ziel:** Die Helix-Vorschub-Implementierung (z-feed pro Projektion, `b7b7279`) durch Tests absichern und die veraltete Doku korrigieren.
 - **Hintergrund:** `src/backend/forward_project.py` rechnet seit `b7b7279` einen Helix-Vorschub (`z_step = pitch * n_rows * row_spacing / ppr`); `src/backend/parallelproj/geometry.py` wendet per-Projektion-z an. Die frühere T-94-Notiz („Projektor ignoriert pitch/Tabellenvorschub") ist damit veraltet.
 - **Dateien:** `tests/unit/test_forward_project.py` (Helix-Tests), `src/backend/forward_project.py` (nur falls die Tests eine Lücke zeigen), `docs/geometry.md`, `docs/plan.md` (T-94-Notiz), Spec in `docs/superpowers/specs/` (vor Umsetzung)
@@ -787,6 +756,33 @@ Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden sch
   3. Doku-Sync: `docs/geometry.md` Helix-Abschnitt ergänzen/angleichen.
 - **Akzeptanz:** Helix-Tests grün; `pitch = 0` verhält sich bit-identisch zum bisherigen Verhalten; `docs/geometry.md` und die T-94-Notiz beschreiben den Ist-Zustand; Suite grün, 0 Skips.
 - **Status:** ✅ Done (Nov 17, 2026) — 5 neue Tests in `test_forward_project.py` (Slab-Shift: nur die z=0-Projektion trifft die attenuierende Ebene, reproduzierbar; `pitch = 0` zirkulär und gleich; exakte z-Formel inkl. `n_projections_total` und Original-Index-Selektion, Detektor reitet auf z; `z_step = 0` = Pre-Helix-Pfad; FP ↔ `get_trajectory_positions`, Quellen und zentrale Detektor-Pixel, atol 1e-2 mm). Helix-Sektion in `docs/geometry.md`; Test-Bar 351 → 356. Keine Produktionsänderung nötig — die Tests bestätigen den Ist-Zustand. Spec: `docs/superpowers/specs/2026-11-17-helix-fp-verification-design.md`, Plan: `docs/superpowers/plans/2026-11-17-helix-fp-verification.md`.
+
+### `[ ]` T-105 — Image veröffentlichen (GHCR + Tarball)
+- **Ziel:** Kunden kommen an das `:full`-Image, ohne das Repo zu klonen oder Docker zu bauen.
+- **Dateien:** `.github/workflows/ci.yml`, `scripts/export-image.sh`
+- **Abhängig von:** T-73
+- **Akzeptanz:** CI baut `:full` und `:slim` und pusht beide auf `main`/Tags nach GHCR; `docker save`-Tarball ist als Release-Asset verfügbar (Offline-Weg).
+- **Status:** ⚠️ Open (Nov 17, 2026) — es gibt aktuell **keinen** Push-Job; `ci.yml` enthält nur Daten-Guard, Lint und Tests.
+
+### `[x]` T-106 — Image-Name `ctbeamstudio` und Release-Versionierung
+- **Ziel:** Ein Commit baut zwei Images; trotzdem muss „Release 1.0.0" genau ein Image bedeuten. Dazu kommen Name, Tag-Schema und ein automatisierter Release.
+- **Dateien:** `Dockerfile`, `README.md`, `INSTALLATION.md`, `docs/versioning.md`, `docs/customer-docker-guide.md`, `scripts/run-docker.sh`, `scripts/run-docker.ps1`, `.github/workflows/release.yml` (neu)
+- **Abhängig von:** T-73, T-105
+- **Akzeptanz:** Image heißt `ctbeamstudio` (Container `ctbeamstudio`, Volume `ctbeamstudio-cache`, Tarball `ctbeamstudio-1.0.0-full.tar`); Conda-Env und Python-Distribution bleiben `ct-viewer`; `1.0.0`/`1.0`/`latest` zeigen alle auf `full` und denselben Digest; `release.yml` bricht ab, wenn `pyproject.toml`-Version und `v*`-Tag auseinanderlaufen, und hängt Digest + Tarball an das GitHub-Release.
+- **Status:** ✅ Done (Nov 17, 2026) — Erster echter Release-Lauf am 17.11.2026 grün (Run #1, `v1.0.0` → `54ab0f4`): Lockstep-Check, Build ~2 min (CI-Cache), Tag+Push via `release_push.sh`, Digest `sha256:c62b760c…` in den Release-Notes, Asset `ctbeamstudio-1.0.0-full.tar.gz` 735 MB (gzip von 3,05 GiB, unter dem 2-GiB-Cap). `docker manifest inspect` ohne Login bestätigt: Pull ohne Auth. Verbleibend: manuell **immutable Tags** in den Package-Settings aktivieren; CI-Suite-Gate `362 passed, 0 skipped` vor Merge-Klassifizierung; T-105 (Push auf main/PR) offen.
+
+### `[x]` T-107 — README und Doku auf den Code-Stand bringen
+- **Ziel:** Wer über das Repo einsteigt (Recruiter, Contributors, Kunden), darf keinen Widerspruch zwischen Text und laufender Demo sehen. Die README ist die öffentliche Einstiegsseite.
+- **Dateien:** `README.md`, `AGENTS.md`
+- **Abhängig von:** T-67, T-68, T-69, T-104
+- **Akzeptanz:**
+  - Weg mit der Roadmap-Aussage, FP und Vergleich seien „planned" — der Vergleich steht als Kernfunktion vorn.
+  - Usage beschreibt den echten Ablauf (drei Tabs, Text-Input statt „folder picker", `src/visualization/app.py`).
+  - Keine Zusage, die die UI nicht einlöst (NumPy-Volumes), keine Links auf nicht getrackte Dateien.
+  - Test-Bar in `AGENTS.md` stimmt mit dem Lauf überein.
+- **Status:** ✅ Done (Nov 18, 2026) — README neu geordnet: Kernfunktion (simuliert vs. gemessen) zuerst, Features nach Workflow (Vergleich / Forward Projection / Geometrie / Viewer / Engineering), Roadmap → knapper Status-Abschnitt, Usage auf die drei Tabs umgestellt, Development-Abschnitt ergänzt, NumPy-Volume-Versprechen entfernt (kein UI-Pfad). `AGENTS.md`: erfundener `slow`-Marker und „7 slow Tests deselected" entfernt, `bash`-Voraussetzung von `test_release_push.py` dokumentiert. Lauf: `362 passed`; die 4 Fehler in `test_release_push.py` sind lokal (kein `bash` auf `PATH`), nicht durch diese Änderung verursacht.
+
+## Zeitplan (Tag 1–16)
 
 | Tag | Datum | Tasks |
 |---|---|---|
@@ -809,7 +805,24 @@ Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden sch
 
 ## Research-Backlog (Nov 13, 2026 — nicht eingeplant)
 
-T-76 und T-77 sind aus dem aktuellen Projektumfang genommen (Grilling-Round vom 13.11.2026); die T-Nummern bleiben referenzierbar. Reaktivierung über einen eigenen Spec (Workflow: brainstorm → spec → plan).
+T-75 bis T-77 sind aus dem aktuellen Projektumfang genommen (T-75 kam aus dem
+Umfeld der 3D-Phase hierher, T-76/T-77 aus der Grilling-Round vom 13.11.2026); die
+T-Nummern bleiben referenzierbar. Reaktivierung über einen eigenen Spec (Workflow:
+brainstorm → spec → plan).
+
+### `[ ]` T-75 — Desktop App Wrapper (Future)
+- **Ziel:** Streamlit als Desktop-App ohne Browser starten.
+- **Dateien:** `src/visualization/desktop_launcher.py`
+- **Optionen:**
+  1. **streamlit-desktop-app** (PyPI) - PyInstaller support, stabil
+  2. **streamlitrunner** (PyPI) - Einfacher wrapper
+  3. **pywebview** manuell - Mehr Kontrolle
+- **Windows Requirements:** .NET Framework > 4.0, Edge WebView2
+- **Implementierung:**
+  ```python
+  # Start streamlit in background thread, wrap in pywebview window
+  ```
+- **Status:** ⚠️ Research
 
 ### `[ ]` T-76 — FDK / Analytische Rekonstruktion
 - **Ziel:** FDK-Algorithmus für CBCT-Rekonstruktion implementieren.
@@ -864,6 +877,7 @@ T-76 und T-77 sind aus dem aktuellen Projektumfang genommen (Grilling-Round vom 
 | D-23 | 2026-11-12 | Dummy-Messung puffert nur das **ideale** FP auf Disk (`data/cache/`, gitignored); Streuung/Rauschen bleiben live; Phantom zentriert auf der Rotationsachse; FP-Auswahl wird auf „all" presetet | Der FP ist der einzige teure Schritt (~10–20 s CPU) — Puffer macht jeden weiteren Klick ~3,5 s; live-Streuung hält `spr`/`i0`/`seed` ohne Re-Projektion veränderbar; ohne Zentrierung parkt der Demo-Origin (0,0,0) den Kopf außerhalb von FOV und Kegel (gemessen); „all" lässt einen Klick auf „Run Forward Projection" die Messform exakt reproduzieren. Keine committeden Binärdateien (CI-Data-Guard, Hard Rule) |
 | D-24 | 2026-11-12 | 3D-Ansicht positioniert das Volumen am **echten DICOM-Origin** im Weltkoordinatensystem der FP statt schematisch zentriert; Detektor-Ebene bei `sdd - sid` statt `-sdd` | Die Ansicht soll zeigen, was die FP tatsächlich rechnet (gemeldeter Fehler: 3D-Plot Zentralstrahl durch die Phantommitte, FP Phantom oben am Detektor). Mit Origin (0,0,0) parkt der Demo-Kopf im `+`-Oktanten — die Diskrepanz wird sichtbar statt versteckt; SDD ist ab Source gemessen, die Ebene lag `sid` mm zu weit außen |
 | D-25 | 2026-11-12 | Demo-Phantom-Origin zentriert auf die Rotationsachse (T-95); die Dummy-Messung wird automatisch beim Laden des Demo-Bildes erzeugt statt nur per Button (T-96) | Bei Origin (0,0,0) parkte der Demo-Kopf im `+`-Oktanten — seit T-94 zeigten FP und 3D-Ansicht ihn gewollt off-center; zentriert stimmen FP, 3D-Ansicht und MPR-Readout überein. Die Messung gehört zum Demo-Erlebnis: wer das Demo-Bild lädt, will den kompletten Vergleich ohne extra Klick (FP-Puffer macht den Auto-Pfad ~3,5 s) |
+| D-26 | 2026-11-18 | Der Plan sortiert Aufgaben nach **Thema**; T-Nummern werden nie neu vergeben und nie umsortiert | Die Nummern stehen in Code, Tests, CI, Specs und Commit-Messages (knapp 800 Fundstellen); ein thematisches Renumbering würde Historie und Referenzen brechen, ohne dem Leser zu helfen. Die Phase trägt das Thema, die Nummer bleibt stabil — Aufgaben wandern beim Umsortieren, Nummern nicht |
 
 ## Offene Fragen
 
@@ -952,5 +966,4 @@ python -m pytest tests/ -v
 | MPR-Stapel läuft in schmaler Spalte über | T-86: `use_column_width=True` statt Pixel-Cap; 1:2-Verhältnis hält den Stapel bei 700 px |
 | `VIEWER_HEIGHT_PX` zu hoch → 3D unter dem Fold | T-86: 700 px + `SCENE_DOMAIN_Y = [0.2, 1]` |
 | Zeitplan reißt | T-23 ist explizit optional |
-
 

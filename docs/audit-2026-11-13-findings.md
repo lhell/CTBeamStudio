@@ -188,7 +188,7 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   pytest run.
 - **Fix:** Delete.
 
-### 14. Docs out of date with the code — `open`
+### 14. Docs out of date with the code - `fixed`
 
 - **Where:** `README.md`, `AGENTS.md`
 - **Problem:**
@@ -202,6 +202,10 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
     `@pytest.mark.slow` marker exists anywhere, and collection is 351 tests,
     not the documented 345+7=352.
 - **Fix:** One README and one AGENTS.md edit.
+- **Status:** fixed (Nov 18, 2026, T-107) — README rebuilt around the implemented
+  comparison workflow (no "planned" claims, no NumPy volume promise, Usage matches
+  the three tabs and the real entry point); AGENTS.md test bar corrected (no `slow`
+  marker exists, no default deselection).
 
 ## Summary
 

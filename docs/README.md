@@ -50,8 +50,9 @@ docs/
 
 ### 1. Master Plan (`plan.md`)
 - **Purpose:** Overall project implementation plan
-- **Tasks:** T-01 to T-75 (Phases 0-8)
-- **Status:** ~27 tasks done, 15 open
+- **Tasks:** T-01 to T-107, phases 0-12 plus timeline and decision log
+- **Structure:** tasks are filed by theme (phase), numbers stay stable — see
+  `plan.md#phasen-themen-und-nummernkreise`
 
 ---
 
@@ -107,29 +108,20 @@ docs/
 
 ## ✅ Project Status
 
-### Completed Phases
-- **Phase 0:** License & Hygiene (T-01 to T-04) ✅
-- **Phase 1:** Core - Volume, Loaders, Windowing (T-10 to T-14) ✅
-- **Phase 2:** App - Streamlit, Series Selection, Phantom (T-20 to T-23) ✅
-- **Phase 3:** Tests - Fixtures, Loader tests, Windowing tests (T-30 to T-33) ✅
-- **Phase 5:** Projection Geometry (T-50 to T-56) ✅
+Short version; the authoritative overview is
+[`plan.md`](plan.md#phasen-themen-und-nummernkreise).
 
-### Completed Phases
-- **Phase 0:** License & Hygiene (T-01 to T-04) ✅
-- **Phase 1:** Core - Volume, Loaders, Windowing (T-10 to T-14) ✅
-- **Phase 2:** App - Streamlit, Series Selection, Phantom (T-20 to T-23) ✅
-- **Phase 3:** Tests - Fixtures, Loader tests, Windowing tests (T-30 to T-33) ✅
-- **Phase 4:** Deployment (T-40 to T-44) ✅ (local), Docker deferred
-- **Phase 5:** Projection Geometry (T-50 to T-56) ✅
+### Open
+- **T-73** — verify the Docker targets in CI (no Docker on this machine)
+- **T-74** — run the run-scripts against a real Docker daemon
+- **T-105** — push job for `main`/PRs (releases already publish)
 
-### In Progress
-- **Phase 6:** Forward Projection (T-61 to T-70) 🔄
+### Shelved / dropped
+- **T-82** (PyVista render mode), **T-87** (fullscreen per view), **T-56a** (dropped)
 
-### Deferred (Future)
-- **Phase 7:** Docker Self-Deployment (T-71 to T-74) - no Docker available
-- **Phase 8:** Forward Projection (T-61 to T-70) 🔄
-- **T-76:** FDK / Analytische Rekonstruktion
-- **T-77:** Phantomlose Geometrie-Kalibrierung (Research)
+### Research backlog
+- **T-75** (desktop wrapper), **T-76** (FDK reconstruction),
+  **T-77** (phantomless geometry calibration)
 
 ---
 

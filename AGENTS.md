@@ -88,17 +88,24 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
   cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, T-101 + T-102
   added 2, over the 301 baseline; 1 removed by dropping the correlation
   metric; 2 added for the scan z-offset; T-104 added 5; T-106 added 6
-  (release-tag lockstep); 7 `slow` tests are
-  deselected by default).
+  (release-tag lockstep)).
   When your task changes
   the suite profile, update the numbers here as part of done.
-- `@pytest.mark.slow` tests exist; default runs exclude them.
+- No `slow` marker and no default deselection exist: a plain `pytest` run is the
+  whole suite.
+- `tests/unit/test_release_push.py` shells out to `bash` (Git Bash on Windows). When
+  that `bash` is not on `PATH`, those four tests fail with `FileNotFoundError`
+  instead of running.
 - `AppTest` cannot fire `run_every` fragments or interactive modebar toggles —
   verify those in the browser and say so in the ledger status (precedent: T-83).
 
 ## Conventions
 - `docs/plan.md` is German and stays German; new ledger tasks use its format
   (Ziel / Dateien / Abhängig von / Akzeptanz / Status).
+- Task numbers are permanent: never renumber or reorder them, because they appear
+  in code, tests, CI and specs. File each new task under the phase of its theme
+  (not at the end of the file) and take the next free number — currently `T-108`.
+  See `plan.md` § "Phasen, Themen und Nummernkreise".
 - New documentation is English.
 - Specs: `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`.
   Plans: `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.

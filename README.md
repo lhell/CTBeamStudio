@@ -1,43 +1,85 @@
 # CTBeamStudio
 
-A web-based tool for exploring CT scanner geometry and generating **simulated projections** from 3D volume data — for the purpose of comparing them against **measured** projections.
+An open-source, browser-based tool for exploring CT scanner geometry and comparing
+**simulated** projections against **measured** ones.
 
-**Core utility:** load a CT volume together with a cone-beam projection geometry, forward-project the volume to produce *simulated* projections, and compare them directly against *measured* projection data. This simulated-vs-measured comparison (quantitative metrics plus side-by-side / difference visualization) is the central workflow of the tool — e.g. to validate scanner geometry parameters against real acquisitions.
+**Core utility:** load a CT volume together with a cone-beam projection geometry,
+forward-project the volume to produce *simulated* projections, and compare them
+directly against *measured* projection data. That comparison — side by side, as a
+difference image, and scored per projection — is the point of the tool: it is how
+you check whether a geometry table (SID, SDD, detector offsets, pitch) actually
+describes a real acquisition.
 
-<img width="1347" height="797" alt="image" src="https://github.com/user-attachments/assets/09dd9bb6-3514-47c9-bf6a-b8fe68dada42" />
+<img width="1347" height="797" alt="CTBeamStudio" src="https://github.com/user-attachments/assets/09dd9bb6-3514-47c9-bf6a-b8fe68dada42" />
 
-**Demo (synthetic phantom):** loading the demo data, toggling 2D/3D views, inspecting the projection geometry, running the forward projection, and comparing simulated vs. measured sinograms with MAE/RMSE/SSIM:
+**Demo (synthetic phantom):** loading the demo data, toggling 2D/3D views, inspecting
+the projection geometry, running the forward projection, and comparing simulated vs.
+measured sinograms with MAE/RMSE/SSIM:
 
 <img src="ctbeam_demo.gif" width="960" alt="CTBeamStudio demo — demo phantom, 2D/3D views, geometry, forward projection, sinogram comparison" />
 
 ## Features
 
-### Core Workflow
+### Simulated vs. measured comparison
 
-- **DICOM Loading** — Read CT volumes from DICOM series (`.dcm`, `.ima`), plus NumPy volumes; the input to the forward-projection pipeline
-- **Projection Geometry** — Define, load, and visualize cone-beam CT geometry (source/detector positions, distances `SDD`/`SID`, fan & cone angle, detector size/shape, offsets, and helical parameters). Geometry can be loaded from YAML or Mayo Clinic–style text files.
-- **3D Geometry Visualization** — Interactive 3D view of the volume with the source path, detector, and full gantry trajectory overlaid, plus manual control of SID, gantry angle, and isocenter.
+- **Three-column view** — measured | simulated | difference, driven by a shared
+  projection-index slider
+- **Quantitative metrics** — MAE, RMSE and SSIM per projection, metric curves over the
+  projection index, and distributions across all projections, so you can see *where*
+  the two disagree
+- **Beam energy** — sets the Hounsfield-unit → attenuation conversion used for the
+  simulation
 
-### Visualization & Data Handling
+### Forward projection
 
-- **3D Volume Visualization** — Interactive iso-surface rendering with source and detector positioning; the projection-geometry overlay toggles on/off with an On/Off control inside the 3D view
-- **Multi-Planar Reconstruction (MPR)** — Axial, coronal, and sagittal slices with isotropic resampling
-- **Windowing** — Presets for lung, abdomen, bone, and brain imaging plus manual center/width control
-- **HU Values** — Native Hounsfield Unit handling
-- **Demo Phantom** — Built-in synthetic phantom for testing without real patient data
+- **parallelproj** (Joseph 3D) cone-beam ray tracing, using CUDA when available and the
+  CPU otherwise
+- **Subset runs** — restrict a run to selected projections, detector rows/columns, or a
+  downsample factor
+- **Circular and helical** trajectories
 
-## Roadmap
+### Projection geometry
 
-Forward projection and simulated-vs-measured comparison are the long-term core utility of the tool. Parts are implemented in the backend; surfacing them in the app UI and the comparison workflow are planned next.
+- **Define, load and edit** — source/detector distances (`SDD`/`SID`), fan and cone
+  angle, detector size and shape, offsets, pitch. Geometry is read from YAML or
+  Mayo Clinic–style text files; see [docs/geometry.md](docs/geometry.md) for the
+  definition.
+- **3D visualization** — the volume iso-surface sits inside the gantry, with source,
+  detector, isocenter and central beam overlaid, plus the full gantry trajectory.
+  Legend entries toggle each layer.
 
-- **Forward Projection Engine** *(backend done, UI planned)* — Generate simulated projections from a 3D volume for a given geometry, using [parallelproj](https://github.com/gschramm/parallelproj)'s cone-beam ray tracing (Joseph 3D). Supports CUDA when available, and partial detector row/column/projection selection.
-- **Simulated vs. Measured Comparison** *(planned)* — Compare forward-projected (simulated) projections against measured projection data with quantitative metrics (MAE, RMSE, SSIM) and side-by-side / difference visualization — the central utility of the tool for validating scanner geometry against real acquisitions.
+### Volume viewing
+
+- **DICOM Loading** — CT volumes from DICOM series (`.dcm`, `.ima`)
+- **Multi-Planar Reconstruction (MPR)** — axial, coronal and sagittal slices with
+  isotropic resampling
+- **Windowing** — lung, abdomen, bone and brain presets plus manual center/width
+- **HU Values** — native Hounsfield Unit handling; windowing only changes the display
+- **Demo Phantom** — built-in Shepp-Logan phantom, so the whole workflow runs without
+  any patient data
+
+### Engineering
+
+- **362 tests, zero skipped** — no silent gaps in the suite
+- **CI** — lint, full test run, and a data guard that fails the build if a DICOM/NPY
+  file is ever tracked
+- **Docker** — `slim` (viewer only, ~1.43 GiB) and `full` (viewer + parallelproj +
+  torch) targets, and a published image
+
+## Status
+
+The full path works end to end: load a volume and a geometry, forward-project it, and
+score the result against measured projections. Open work sits on the delivery side
+rather than the imaging side — the Docker image is built and published on release, but
+not yet on every push, and `main` has no CI gate for the Docker targets yet.
 
 ## Supported Data
 
-- **AAPM Low-Dose CT Challenge 2016** — [Download data here](https://aapm.app.box.com/s/eaw4jddb53keg1bptavvvd1sf4x3pe9h/folder/144226105715) 
+- **AAPM Low-Dose CT Challenge 2016** — [Download data here](https://aapm.app.box.com/s/eaw4jddb53keg1bptavvvd1sf4x3pe9h/folder/144226105715)
 - **Generic DICOM** — Any CT dataset with valid HU values
-- **NumPy** — `.npy` files with shape `(z, y, x)` and `int16` dtype
+- **Measured projections / sinograms** — NumPy (`.npy`, `.npz`), NIfTI (`.nii`,
+  `.nii.gz`) and DICOM, with lazy subset reads so only the selected projections are
+  loaded; the demo also provides a synthetic sinogram
 
 > **Note:** This project does NOT distribute patient data. Users must register separately for the AAPM challenge and use their own licensed data.
 
@@ -49,13 +91,15 @@ For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 ### Quick Start
 
-**Docker (Recommended):**
+**Docker (Recommended):** pull the published image, or build it yourself.
 ```bash
-docker build -t ctbeamstudio:full --target full .
-docker run -p 8501:8501 -v /path/to/dicom:/data:ro ctbeamstudio:full
+docker pull ghcr.io/lhell/ctbeamstudio:1.0.0
+docker run -p 8501:8501 -v /path/to/dicom:/data:ro ghcr.io/lhell/ctbeamstudio:1.0.0
 ```
-The `full` target includes parallelproj and torch, so the forward projection
-works. `docker build -t ctbeamstudio:slim --target slim .` builds `slim`
+The image includes parallelproj and torch, so the forward projection works
+(point the app at `/data` inside the container). Building locally:
+`docker build -t ctbeamstudio:full --target full .` — and
+`docker build -t ctbeamstudio:slim --target slim .` builds `slim`
 (viewer only, no projection; ~1.43 GiB — see the Dockerfile header for the
 size breakdown). To hand the image to a customer:
 [docs/customer-docker-guide.md](docs/customer-docker-guide.md).
@@ -79,15 +123,31 @@ if parallelproj is missing). Using pip alone is fine for the viewer, but
 
 ## Usage
 
-1. **Start the app:** `streamlit run app.py`
-2. **Load data:**
-   - Use the folder picker to select a DICOM series
-   - Or start without data to use the demo phantom
-3. **Navigate:** Use the slider to scroll through slices
-4. **Adjust window:** Select presets (lung, abdomen, bone) or set custom center/width
-5. **3D View:** Switch to 3D mode for volume visualization with source/detector
+1. **Start the app:** `streamlit run src/visualization/app.py`
+2. **Load data:** enter a DICOM folder path in the sidebar, or start without data to
+   get the built-in demo phantom
+3. **Viewer tab:** scroll through slices, set a window preset, and switch to 3D to see
+   the volume inside the gantry with the geometry overlay
+4. **Geometry tab:** inspect and edit the projection geometry
+5. **Sinogram Inspection tab:** load measured projections (or use the synthetic ones),
+   set the beam energy, and optionally restrict the run to a subset of projections,
+   rows or columns
+6. **Run Forward Projection:** compare measured vs. simulated side by side, read the
+   per-projection MAE/RMSE/SSIM, and scrub through the projection index to find where
+   the two disagree
 
-> Forward projection and simulated-vs-measured comparison (the core utility) are on the roadmap — see [Roadmap](#roadmap) above.
+## Development
+
+Project code runs in the conda environment `ct-viewer` (parallelproj is conda-forge
+only — see [docs/local-environment.md](docs/local-environment.md)):
+
+```bash
+python -m pytest -q -rs          # full suite, no skips expected
+python -m flake8 . --ignore=F841,E501,E402,F541,F401,W503,E203
+python -m black . && python -m isort .
+```
+
+`AGENTS.md` documents the conventions, and `docs/plan.md` is the task ledger.
 
 ## License
 

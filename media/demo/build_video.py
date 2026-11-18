@@ -460,6 +460,51 @@ def mux(silent: Path, wav: Path, srt: Path, out: Path) -> None:
     _mux_copy(silent, norm, srt, out)
 
 
+BURN_STYLE = (
+    "FontName=Arial,Fontsize=11,PrimaryColour=&H00FFFFFF,"
+    "OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,"
+    "Alignment=2,MarginV=12"
+)
+
+
+def burn(src: Path, srt: Path, out: Path) -> None:
+    """Hard-subtitle a muxed MP4, so the cue text is in the picture.
+
+    A mov_text track is off by default in most players and invisible in
+    browsers; burned-in text always shows. libass cannot parse a Windows drive
+    path inside the filter string, hence the copy into WORK and a relative ref.
+    """
+    WORK.mkdir(parents=True, exist_ok=True)
+    (WORK / "burn.srt").write_text(srt.read_text(encoding="utf-8"), encoding="utf-8")
+    subprocess.run(
+        [
+            FFMPEG,
+            "-y",
+            "-v",
+            "error",
+            "-i",
+            str(src),
+            "-vf",
+            f"subtitles=burn.srt:force_style='{BURN_STYLE}'",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(out),
+        ],
+        check=True,
+        cwd=WORK,
+    )
+
+
 # ---------------------------------------------------------------------- entry
 
 
@@ -471,7 +516,7 @@ def _need(p: Path | None) -> Path:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["sheet", "render", "preview", "subs"])
+    ap.add_argument("cmd", choices=["sheet", "render", "preview", "subs", "burn"])
     ap.add_argument("--source", type=Path, help="frames dir or .gif (sheet/render)")
     ap.add_argument(
         "--every",
@@ -486,6 +531,16 @@ def main() -> int:
 
     if a.cmd == "sheet":
         contact_sheet(_need(a.source), a.every, a.t0, a.t1)
+        return 0
+
+    if a.cmd == "burn":
+        # no source frames needed: burn the existing SRT into the existing MP4
+        srt = a.out.with_suffix(".srt")
+        if not (a.out.exists() and srt.exists()):
+            raise SystemExit(f"nothing to burn: need {a.out.name} and {srt.name}")
+        out = a.out.with_name(f"{a.out.stem}_burned.mp4")
+        burn(a.out, srt, out)
+        print(f"{out}  ({out.stat().st_size / 1e6:.1f} MB)")
         return 0
 
     WORK.mkdir(parents=True, exist_ok=True)

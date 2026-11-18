@@ -149,7 +149,7 @@ Inputs live in `media/demo/`:
 |---|---|
 | `scenes.json` | **the script** — id, title, `gif_t0/t1`, optional `trim`, `text` (subtitles) and optional `spoken` (TTS only) |
 | `record_voice.py` | scenes.json → `work/voice/S*.mp3` + `.words.json` (`--only` for a subset) |
-| `build_video.py` | `sheet` / `preview` / `render` / `subs` |
+| `build_video.py` | `sheet` / `preview` / `render` / `subs` / `burn` |
 | `audition.py` | five-voice comparison MP4 |
 
 ```powershell
@@ -159,6 +159,7 @@ python media\demo\build_video.py sheet --source ctbeam_demo.gif --every 2
 python media\demo\build_video.py preview                # animatic, no screencast
 python media\demo\build_video.py render --source ctbeam_demo.gif
 python media\demo\build_video.py subs --source ctbeam_demo.gif   # retitle, no re-encode
+python media\demo\build_video.py burn                   # hardsub copy of the mp4
 ```
 
 Pipeline: PIL upscales/unsharpens each source frame to 1280×688 and pipes raw
@@ -178,6 +179,14 @@ file that plays as silence.
 
 Output: `media/demo/ctbeam_demo_voiceover.mp4` (1280×688, 30 fps, H.264 High,
 AAC 48 kHz mono, soft Eng subtitles) + `.srt`.
+
+`burn` writes `ctbeam_demo_voiceover_burned.mp4`: the same cut with the cues
+rendered into the picture by libass (Arial 11 against libass's 288 px reference,
+white with a dark outline and shadow, bottom-centred). Needed because a
+`mov_text` track is off by default in most desktop players and invisible in
+browsers, so the soft version looks unsubtitled to a viewer; the burned one
+always shows. It costs one extra encode, so it is a little smaller and softer
+than the source — invisible on flat UI.
 
 Renders are not atomic at the file level: two concurrent `render` runs race and
 the older one can finish last and win. Run one at a time.

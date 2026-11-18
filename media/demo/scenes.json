@@ -20,7 +20,7 @@
       "gif_t0": 1.5,
       "gif_t1": 7.0,
       "extra_hold": 0.0,
-      "text": "No patient data needed, it runs a Shepp-Logan phantom. Axial and coronal slices on the left, and the gantry in 3D on the right."
+      "text": "No patient data needed, it runs a Shepp-Logan phantom. Axial, coronal, and sagittal slices on the left, and the gantry in 3D on the right."
     },
     {
       "id": "S3",
@@ -53,7 +53,7 @@
       "gif_t1": 52.0,
       "trim": [[24.5, 31.5], [48.5, 51.5]],
       "extra_hold": 0.0,
-      "spoken": "Run Forward Projection traces rays through the volume with parallel proj. With a GPU when CUDA is available, otherwise on the CPU. One simulated projection per gantry angle, sixty in this case.",
+      "spoken": "Run Forward Projection traces rays through the volume with parallel projj. With a GPU when CUDA is available, otherwise on the CPU. One simulated projection per gantry angle, sixty in this case.",
       "text": "Run Forward Projection traces rays through the volume with parallelproj. With a GPU when CUDA is available, otherwise on the CPU. One simulated projection per gantry angle, sixty in this case."
     },
     {

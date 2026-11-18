@@ -1,7 +1,7 @@
 # Demo voiceover script + narrated MP4 plan
 
 Date: 2026-11-17 (final cut 2026-11-18)
-Status: **built** — `media/demo/ctbeam_demo_voiceover.mp4` (1:28.2, 5.1 MB,
+Status: **built** — `media/demo/ctbeam_demo_voiceover.mp4` (1:29.3, 5.4 MB,
 local only; build outputs are gitignored, see Git)
 Source visual: `ctbeam_demo.gif` (1280×720, 515 frames, 64.4 s, ~8 fps, the
 re-recorded high-quality GIF)
@@ -14,7 +14,7 @@ One narrated MP4 that explains the workflow the GIF shows. The GIF is **never
 sped up**; where the narration needs more time, the picture slows down (up to
 1.8×) or holds. Where the picture holds a static panel for longer than the
 narration needs, the panel is **cut**, not padded. 64 s of silent action became
-1:28.2 of explained action.
+1:29.3 of explained action.
 
 ## Voice
 
@@ -47,8 +47,8 @@ second, the sinogram tab opens at 13.3 s, the forward projection runs from
 
 | # | GIF range | On screen | Words | VO |
 |---|---|---|---|---|
-| S1 | 0.0–1.5 | App already in Demo Mode, banner + phantom loaded | 12 | 5.7 s |
-| S2 | 1.5–7.0 | 2D axial/coronal + 3D gantry side by side | 24 | 9.4 s |
+| S1 | 0.0–1.5 | App already in Demo Mode, banner + phantom loaded | 13 | 5.7 s |
+| S2 | 1.5–7.0 | 2D axial/coronal/sagittal + 3D gantry side by side | 25 | 10.5 s |
 | S3 | 7.0–13.3 | 3D full width, legend overlays, rotate tooltip | 23 | 11.0 s |
 | S4 | 13.3–16.0 | Sinogram Inspection tab, measured sinogram | 14 | 5.9 s |
 | S5 | 16.0–24.5 | Sample options, beam energy 70 keV | 25 | 12.5 s |
@@ -56,7 +56,7 @@ second, the sinogram tab opens at 13.3 s, the forward projection runs from
 | S7 | 52.0–56.0 | Measured / simulated / difference, metrics table | 16 | 8.6 s |
 | S8 | 56.0–64.4 | Curves, distributions, projection index scrub | 34 | 14.8 s |
 
-180 words ⇒ 82.4 s of speech ⇒ **1:28.2** video (89.4 s timeline incl. padding).
+182 words ⇒ 83.5 s of speech ⇒ **1:29.3** video (90.5 s timeline incl. padding).
 Measured rate is 2.18 words/s at `+0%`.
 
 ## Script
@@ -68,8 +68,8 @@ element on screen at that moment. Commas sit where a speaker would breathe.
 > This is CT Beam Studio. Here is the workflow for the demo phantom. →
 
 **S2 — viewer, 2D and 3D together**
-> No patient data needed, it runs a Shepp-Logan phantom. Axial and coronal
-> slices on the left, → and the gantry in 3D on the right. →
+> No patient data needed, it runs a Shepp-Logan phantom. Axial, coronal, and
+> sagittal slices on the left, → and the gantry in 3D on the right. →
 
 **S3 — 3D geometry and overlays**
 > The 3D view draws the projection geometry: source trajectory, detector,
@@ -99,9 +99,12 @@ element on screen at that moment. Commas sit where a speaker would breathe.
 > inspect a single view, then read its scores. That comparison, checking scanner
 > geometry against real acquisitions, is the point of the tool.
 
-`parallelproj` is spoken as "parallel proj": `scenes.json` carries a `spoken`
-field for exactly this, so the TTS gets two words while the subtitle keeps the
-real name.
+`parallelproj` is spoken as "parallel projj": `scenes.json` carries a `spoken`
+field for exactly this, so the TTS gets a spelling it pronounces /prɒdʒ/ while
+the subtitle keeps the real name. Plain "proj" was read as "project" (the word
+token measured 0.625 s, longer than "parallel"), and "parallelproj" as one
+token came out as "parallelo-proj". Six spellings were auditioned in
+`work/proj/` (throwaway, gitignored) and "projj" was picked by ear.
 
 ## Timing engine
 
@@ -133,7 +136,7 @@ Built result:
 | Scene | VO | stretch | freeze |
 |---|---|---|---|
 | S1 | 5.7 | 1.80× | 3.81 s |
-| S2 | 9.4 | 1.80× | 0.31 s |
+| S2 | 10.5 | 1.80× | 1.41 s |
 | S3 | 11.0 | 1.80× | 0.36 s |
 | S4 | 5.9 | 1.80× | 1.99 s |
 | S5 | 12.5 | 1.56× | – |
@@ -171,7 +174,7 @@ Subtitles take their **text from `scenes.json`** (punctuation intact) and only
 the **timing from the TTS word boundaries**, aligned sentence by sentence — the
 raw word tokens have no commas, which produced "This is CT Beam Studio Load the
 demo phantom" on the first attempt. Cue word counts come from `spoken`, not
-`text`, or the "parallel proj" split would shift every boundary after it.
+`text`, or the "parallel projj" split would shift every boundary after it.
 
 Voice writes are atomic (`.part` then replace): a player holding a clip makes
 the run stop with "locked by another program" instead of leaving a truncated

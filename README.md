@@ -167,4 +167,13 @@ If you use this software in your research, please cite:
 
 > CTBeamStudio: A visualization tool for CT orientation. 2026.
 
+The forward projection is computed with [parallelproj](https://github.com/KUL-recon-lab/parallelproj).
+If you use simulated projections from this tool in your research, please cite the
+parallelproj publication as well — the upstream project recommends it:
+
+> Schramm, G. & Thielemans, K. *PARALLELPROJ — an open-source framework for fast
+> calculation of projections in tomography.* Front. Nucl. Med. **3**, 1324562 (2024).
+> doi:[10.3389/fnume.2023.1324562](https://doi.org/10.3389/fnume.2023.1324562)
+> (preprint: [arXiv:2212.12519](https://arxiv.org/abs/2212.12519))
+
 If you use AAPM Challenge data, please also cite the original challenge.

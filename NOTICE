@@ -15,8 +15,22 @@ This project includes the following third-party components:
 - pylibjpeg: https://github.com/pydicom/pylibjpeg
   License: BSD 3-Clause "New" or "Revised" License
 
+- parallelproj: https://github.com/KUL-recon-lab/parallelproj
+  License: Apache License 2.0
+
 The CTBeamStudio project itself is licensed under the MIT License.
 See the LICENSE file for details.
+
+parallelproj
+============
+
+CTBeamStudio computes forward projections with parallelproj. The upstream project
+recommends citing its publication; if you publish results that use simulated
+projections from this tool, please cite:
+
+- G. Schramm, K. Thielemans: "PARALLELPROJ - An open-source framework for fast
+  calculation of projections in tomography". Front. Nucl. Med. 3, 1324562 (2024).
+  doi:10.3389/fnume.2023.1324562 (preprint: arXiv:2212.12519)
 
 AAPM LDCT Challenge 2016 Data
 =============================

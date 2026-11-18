@@ -3,6 +3,11 @@
 This module provides forward projection functionality to generate synthetic
 projections from 3D volumes. It uses parallelproj when available, with a
 fallback to a placeholder implementation for testing/development.
+
+If you publish results that use these projections, cite the projector's
+publication: G. Schramm, K. Thielemans, "PARALLELPROJ - An open-source framework
+for fast calculation of projections in tomography", Front. Nucl. Med. 3, 1324562
+(2024), doi:10.3389/fnume.2023.1324562.
 """
 
 import warnings

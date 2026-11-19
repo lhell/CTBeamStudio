@@ -25,6 +25,10 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   in `ConeBeamProjector.__init__`. Nothing else changes.
 - **If skipped:** Forward projection is broken on GPU, right after
   environment.yml and README promise "CUDA when available".
+- **Reproduced 2026-11-19** on a real GPU machine (8× RTX A6000, fresh conda
+  env): 340 passed / 19 failed, all with exactly this TypeError. Unticking
+  "Use CUDA if available" avoids it because the CPU path never creates CUDA
+  tensors. The install handoff (`ctbeam_handoff.json`) records the run.
 - **Verify:** Cannot be tested on this machine (no CUDA); check in a GPU
   environment or via a mocked-device unit test.
 

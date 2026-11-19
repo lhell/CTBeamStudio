@@ -160,17 +160,39 @@ def resolve_selection(
     return proj_idx, row_idx, col_idx
 
 
-def normalize_projection(array: np.ndarray) -> np.ndarray:
-    """Normalize an arbitrary projection image to float32 in ``[0, 1]``.
+def stack_window(*arrays) -> tuple[float, float]:
+    """Return the one ``(lo, hi)`` display window for whole projection stacks.
 
-    A constant image maps to all zeros (nothing to show).
+    Every view and every slice of the comparison tab shares this window, so a
+    given detector value gets the same gray level everywhere. With a per-frame
+    normalize, a dim projection and a bright one looked identical and
+    measured/simulated could not be compared at all. Empty or constant input
+    has no range to map, so ``(0, 1)`` is returned.
     """
-    array = np.asarray(array, dtype=np.float32)
-    lo = float(array.min()) if array.size else 0.0
-    hi = float(array.max()) if array.size else 0.0
-    if hi <= lo:
-        return np.zeros_like(array, dtype=np.float32)
-    return ((array - lo) / (hi - lo)).astype(np.float32)
+    lo, hi = np.inf, -np.inf
+    for array in arrays:
+        if array is None or not np.size(array):
+            continue
+        lo = min(lo, float(np.min(array)))
+        hi = max(hi, float(np.max(array)))
+    if not (np.isfinite(lo) and np.isfinite(hi)) or hi <= lo:
+        return (0.0, 1.0)
+    return (float(lo), float(hi))
+
+
+def window_image(array: np.ndarray, window: tuple[float, float]) -> np.ndarray:
+    """Map raw values to ``[0, 1]`` through a shared ``(lo, hi)`` window.
+
+    Values outside the window clip, which is the point of a common window: a
+    frame brighter than the rest saturates instead of silently rescaling
+    itself and looking like every other frame.
+    """
+    lo, hi = window
+    span = hi - lo
+    if span <= 0:
+        return np.zeros(np.shape(array), dtype=np.float32)
+    image = (np.asarray(array, dtype=np.float32) - lo) / span
+    return np.clip(image, 0.0, 1.0).astype(np.float32)
 
 
 def apply_geometry_updates(
@@ -184,13 +206,83 @@ def apply_geometry_updates(
     return replace(geometry, **updates)
 
 
-def normalize_difference(diff: np.ndarray) -> np.ndarray:
-    """Map a signed difference to grayscale ``[0, 1]`` with zero at mid-gray."""
-    diff = np.asarray(diff, dtype=np.float32)
-    scale = float(np.max(np.abs(diff))) if diff.size else 0.0
-    if scale == 0:
-        return np.full_like(diff, 0.5, dtype=np.float32)
-    return (diff / (2.0 * scale) + 0.5).astype(np.float32)
+def difference_scale(measured, simulated) -> float:
+    """Largest ``|measured - simulated|`` over both whole stacks.
+
+    The difference views need one symmetric scale for the same reason the
+    projections need one window: otherwise every slice brightens to its own
+    maximum and a tiny error looks as loud as a large one. The difference
+    stack is never materialized — the pass runs in projection chunks.
+    """
+    if (
+        measured is None
+        or simulated is None
+        or np.shape(measured) != np.shape(simulated)
+    ):
+        return 0.0
+    scale = 0.0
+    for start in range(0, len(measured), 8):
+        delta = np.abs(measured[start : start + 8] - simulated[start : start + 8])
+        if delta.size:
+            scale = max(scale, float(np.max(delta)))
+    return scale
+
+
+def difference_image(delta: np.ndarray, scale: float) -> np.ndarray:
+    """Map a signed difference to gray with zero at mid-gray.
+
+    ``scale`` comes from :func:`difference_scale`, so all difference views and
+    slices share one brightness mapping; ``scale <= 0`` means no difference at
+    all and gives an even mid-gray.
+    """
+    delta = np.asarray(delta, dtype=np.float32)
+    if scale <= 0:
+        return np.full(delta.shape, 0.5, dtype=np.float32)
+    image = delta / (2.0 * scale) + 0.5
+    return np.clip(image, 0.0, 1.0).astype(np.float32)
+
+
+def comparison_scales(measured, simulated):
+    """Return ``(window, difference_scale)`` shared by every comparison view.
+
+    Both rows and both sources draw through ``window``: one detector value,
+    one gray level, whatever slider position or view it appears in. The
+    difference views get one symmetric ``difference_scale`` with zero pinned
+    to mid-gray, so slice-to-slice brightness does not jump either.
+    """
+    shapes_match = (
+        measured is not None
+        and simulated is not None
+        and np.shape(measured) == np.shape(simulated)
+    )
+    return (
+        stack_window(measured, simulated),
+        difference_scale(measured, simulated) if shapes_match else 0.0,
+    )
+
+
+def cached_comparison_scales(measured, simulated):
+    """Memoize :func:`comparison_scales` until one of the stacks changes.
+
+    The window is a min/max over both full stacks and the difference scale is
+    another full pass; at full projection geometry that is a second of reading
+    per call, and every slider tick reruns the script. The stacks themselves
+    live in session state, so the shapes plus the sums of two edge projections
+    are a cheap, stable identity stamp — a new stack recomputes.
+    """
+    import streamlit as st
+
+    stamp = tuple(
+        (array.shape, float(np.sum(array[0])), float(np.sum(array[-1])))
+        for array in (measured, simulated)
+        if array is not None and np.size(array)
+    )
+    cached = st.session_state.get("_sino_display_scales")
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    scales = comparison_scales(measured, simulated)
+    st.session_state["_sino_display_scales"] = (stamp, scales)
+    return scales
 
 
 def row_sinogram(array: np.ndarray, row_index: int) -> np.ndarray:
@@ -234,11 +326,22 @@ def index_slider(container, label: str, key: str, n_items: int) -> int:
     Streamlit rejects sliders with ``min_value == max_value``, so a
     0..0 slider (a single frame) must never be rendered. Returns the
     selected index: 0 for empty/single-frame cases.
+
+    The label is kept only for screen readers: each slider sits directly
+    under the row it indexes, so a visible name would be redundant.
     """
     if n_items <= 1:
         return 0
-    index = resolve_view_index(key, n_items)
-    return int(container.slider(label, 0, n_items - 1, key=key))
+    resolve_view_index(key, n_items)
+    return int(
+        container.slider(
+            label,
+            0,
+            n_items - 1,
+            key=key,
+            label_visibility="collapsed",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -411,9 +514,9 @@ def render_measurement_sidebar() -> None:
         # re-derive in memory. The sampling options below bring the per-axis
         # selection back as an opt-in for big files — a sampled load reads
         # only the selected subset (lazily for .npy/NIfTI), never silently.
-        # The Sample options in the tab govern the forward projection; to
-        # compare shapes against the full load, preset the FP to "all"
-        # (📐 Full projection geometry).
+        # The Sample options in the Forward Projection tab govern the forward
+        # projection; to compare shapes against the full load, preset the FP
+        # to "all" (📐 Full projection geometry).
         sample_on_load = st.checkbox(
             "Sample instead of the whole file",
             key="load_sample_on",
@@ -592,7 +695,7 @@ def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
     )
     st.caption(
         "Number of projections in the scan — used by the 3D trajectory and by "
-        "the forward projection. The Sample options in the Sinogram Inspection "
+        "the forward projection. The Sample options in the Forward Projection "
         "tab can select a subset."
     )
 
@@ -677,27 +780,22 @@ def projection_display_spacing(geometry):
     return (float(geometry.det_row_spacing_mm), float(geometry.det_col_spacing_mm))
 
 
-def _render_projection_image(array: np.ndarray, caption: str, spacing=None) -> None:
-    """Render one projection image with square mm pixels.
+def projection_display_image(array: np.ndarray, window, spacing=None) -> np.ndarray:
+    """Return a projection frame as image, through the shared level/window.
 
-    ``spacing`` is ``(row_spacing_mm, col_spacing_mm)`` from
+    ``window`` is the ``(lo, hi)`` from :func:`stack_window`; it is explicit so
+    no view can fall back to normalizing a single frame. ``spacing`` is
+    ``(row_spacing_mm, col_spacing_mm)`` from
     :func:`projection_display_spacing`; an anisotropic detector would
     otherwise show a distorted phantom (a 2 mm x 1 mm detector shows the
     head half as tall as it really is).
     """
-    import streamlit as st
-
-    from visualization.app import to_isotropic
-
-    image = normalize_projection(array)
+    image = window_image(array, window)
     if spacing is not None:
+        from visualization.app import to_isotropic
+
         image = to_isotropic(image, spacing)
-    st.image(
-        image,
-        caption=caption,
-        clamp=True,
-        use_column_width=True,
-    )
+    return image
 
 
 # Height (px) of an empty slot in the Sinogram Inspection tab. The three
@@ -707,8 +805,121 @@ def _render_projection_image(array: np.ndarray, caption: str, spacing=None) -> N
 # below it -- from jumping when the first projection arrives.
 PLACEHOLDER_HEIGHT_PX = 360
 
+# Upper bound (px) for a comparison view. The cap itself comes from the
+# projection images (see comparison_view_height); this only stops a very
+# large detector from turning one row into a page of its own.
+COMPARISON_VIEW_MAX_HEIGHT_PX = 720
 
-def _render_placeholder(message: str) -> None:
+# Zoom range of the comparison viewer, relative to "fit the column width".
+VIEW_ZOOM_MAX = 8
+
+
+def comparison_view_height(*frames) -> int:
+    """Return the height (px) of the comparison view boxes.
+
+    The two rows show the same detector in different directions. A row
+    sinogram is one detector row as ``(col, projection)``, so it is far
+    taller than wide and used to stretch the page by a few thousand pixels at
+    column width. Both rows are therefore capped at the largest side of a
+    first-row projection frame, so the sinogram row never grows past the
+    projection images above it and the boxes line up. Without data the
+    placeholder height applies; the result is clamped to
+    ``[PLACEHOLDER_HEIGHT_PX, COMPARISON_VIEW_MAX_HEIGHT_PX]``.
+    """
+    sides = [
+        max(np.shape(frame)) for frame in frames if frame is not None and np.size(frame)
+    ]
+    cap = max(sides) if sides else 0
+    return int(min(COMPARISON_VIEW_MAX_HEIGHT_PX, max(PLACEHOLDER_HEIGHT_PX, cap)))
+
+
+def png_data_uri(image: np.ndarray, max_side: int = 2048) -> str:
+    """Encode a ``[0, 1]`` image as an inline PNG data URI.
+
+    The long side is downscaled to ``max_side`` first: the comparison views
+    are a few hundred pixels on screen and the URI travels with every rerun,
+    so shipping the full detector raster as base64 would be waste.
+    """
+    import base64
+    import io
+
+    from PIL import Image
+
+    array = np.clip(np.asarray(image, dtype=np.float32), 0.0, 1.0)
+    pixels = (array * 255.0 + 0.5).astype(np.uint8)
+    png = Image.fromarray(pixels, mode="L")
+    png.thumbnail((max_side, max_side), Image.BILINEAR)
+    buffer = io.BytesIO()
+    png.save(buffer, format="PNG", optimize=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def build_zoomable_image_html(data_uri: str) -> str:
+    """Self-contained viewer: scrolls, and zooms with Ctrl + mouse wheel.
+
+    ``st.image`` fills the column width and offers no zoom, so a tall
+    sinogram ("fit width") cannot be inspected without the page growing and
+    shrinking. The viewer keeps the full width, scrolls the overflow inside a
+    fixed box, and scales the image under the cursor on Ctrl + wheel (a plain
+    wheel scrolls, as expected in a scroll box). Double-click resets it. The
+    image is centred while it fits and aligns to the start once it overflows,
+    so nothing is clipped un-scrollably.
+    """
+    return f"""
+<style>
+  html, body {{ margin: 0; padding: 0; height: 100%; background: transparent; overflow: hidden; }}
+  html {{ color-scheme: dark; }}
+  #box {{ height: 100%; overflow: auto; overscroll-behavior: contain;
+         display: flex; flex-direction: column; justify-content: safe center;
+         scrollbar-width: thin; scrollbar-color: #4a4a4a transparent; }}
+  #box::-webkit-scrollbar {{ width: 10px; height: 10px; }}
+  #box::-webkit-scrollbar-track {{ background: rgba(0, 0, 0, 0.35); }}
+  #box::-webkit-scrollbar-thumb {{ background: #4a4a4a; border-radius: 5px; }}
+  #box::-webkit-scrollbar-thumb:hover {{ background: #666666; }}
+  #img {{ display: block; width: 100%; align-self: safe center; }}
+</style>
+<div id="box"><img id="img" src="{data_uri}" alt=""></div>
+<script>
+(function () {{
+  const box = document.getElementById("box");
+  const img = document.getElementById("img");
+  const step = 1.15, min = 0.1, max = {VIEW_ZOOM_MAX};
+  let zoom = 1.0;
+  box.addEventListener("wheel", function (ev) {{
+    if (!ev.ctrlKey) return;
+    ev.preventDefault();
+    const next = Math.min(max, Math.max(min, zoom * (ev.deltaY < 0 ? step : 1 / step)));
+    if (next === zoom) return;
+    const rect = box.getBoundingClientRect();
+    const fx = (ev.clientX - rect.left + box.scrollLeft) / img.offsetWidth;
+    const fy = (ev.clientY - rect.top + box.scrollTop) / img.offsetHeight;
+    zoom = next;
+    img.style.width = zoom * 100 + "%";
+    box.scrollLeft = fx * img.offsetWidth - (ev.clientX - rect.left);
+    box.scrollTop = fy * img.offsetHeight - (ev.clientY - rect.top);
+  }}, {{ passive: false }});
+  box.addEventListener("dblclick", function () {{
+    zoom = 1.0;
+    img.style.width = "100%";
+  }});
+}})();
+</script>
+"""
+
+
+def _render_comparison_view(image: np.ndarray, height: int) -> None:
+    """Render one already-normalized image as a capped, zoomable view."""
+    from streamlit.components.v1 import html as component_html
+
+    component_html(
+        build_zoomable_image_html(png_data_uri(image)),
+        height=height,
+        scrolling=False,
+    )
+
+
+def _render_placeholder(message: str, height: int = PLACEHOLDER_HEIGHT_PX) -> None:
     """Render an empty slot at the size a projection image will occupy.
 
     A bare ``st.info`` is a one-line strip, which left the three columns
@@ -717,21 +928,21 @@ def _render_placeholder(message: str) -> None:
     """
     import streamlit as st
 
-    with st.container(height=PLACEHOLDER_HEIGHT_PX, border=False):
+    with st.container(height=height, border=False):
         st.info(message)
 
 
-def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> None:
+def render_comparison_tab() -> None:
     """Sinogram Inspection: measured vs simulated projections side by side.
 
     The full frame (three columns + shared index slider) always renders;
     each slot fills in as its data arrives. Measured data is shown as soon
     as it is loaded; simulated data appears after a forward projection.
+    The controls that produce the simulated data live in the Forward
+    Projection tab.
     """
     import streamlit as st
 
-    from backend.forward_project import PARALLELPROJ_AVAILABLE
-    from visualization.actions import enqueue_forward_projection, session_token
     from visualization.comparison import (
         build_distribution_figure,
         build_metric_figure,
@@ -764,6 +975,20 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
         and measured.shape == simulated.shape
     )
 
+    # One level/window for every view and every slice: a detector value maps to
+    # the same gray in both rows and in both sources, so the brightness no
+    # longer follows the slider and measured vs simulated stays comparable.
+    # Same for the difference: one symmetric scale, zero pinned to mid-gray.
+    window, diff_scale = cached_comparison_scales(measured, simulated)
+
+    # Both rows are capped at the largest side of a projection frame, so the
+    # sinogram row below never grows past the images here and the two rows
+    # line up. The views scroll internally; Ctrl + wheel zooms them.
+    view_height = comparison_view_height(
+        measured[meas_index] if measured is not None else None,
+        simulated[sim_index] if simulated is not None else None,
+    )
+
     col_meas, col_sim, col_diff = st.columns(3)
     # Detector (row, col) spacing in mm for the display resampling: the raw
     # projection pixels are anisotropic in mm, so the views resample the row
@@ -779,29 +1004,33 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
     with col_meas:
         if n_meas:
             st.caption(f"Measured projection {meas_index + 1}/{n_meas}")
-            _render_projection_image(
-                measured[meas_index],
-                f"Measured projection {meas_index + 1}/{n_meas}",
-                spacing=meas_spacing,
+            _render_comparison_view(
+                projection_display_image(measured[meas_index], window, meas_spacing),
+                height=view_height,
             )
         else:
             _render_placeholder(
                 "No measured data — load measurements in the sidebar or "
-                "generate a dummy measurement."
+                "generate a dummy measurement.",
+                height=view_height,
             )
     with col_sim:
         if n_sim:
             st.caption(f"Simulated projection {sim_index + 1}/{n_sim}")
-            _render_projection_image(
-                simulated[sim_index],
-                f"Simulated projection {sim_index + 1}/{n_sim}",
-                spacing=sim_spacing,
+            _render_comparison_view(
+                projection_display_image(simulated[sim_index], window, sim_spacing),
+                height=view_height,
             )
         else:
-            _render_placeholder("Run the forward projection to fill this column.")
+            _render_placeholder(
+                "Run the forward projection to fill this column.",
+                height=view_height,
+            )
     with col_diff:
         if shapes_match:
-            diff = normalize_difference(measured[meas_index] - simulated[sim_index])
+            diff = difference_image(
+                measured[meas_index] - simulated[sim_index], diff_scale
+            )
             if meas_spacing is not None:
                 from visualization.app import to_isotropic
 
@@ -810,20 +1039,18 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             # above, then the image — otherwise the difference image starts
             # one caption-line higher than its neighbours.
             st.caption("Difference (measured − simulated)")
-            st.image(
-                diff,
-                clamp=True,
-                use_column_width=True,
-            )
+            _render_comparison_view(diff, height=view_height)
         elif n_meas and n_sim:
             _render_placeholder(
                 f"Shapes differ ({measured.shape} vs {simulated.shape}) — preset "
                 'the projection to "all" (📐 Full projection geometry) to '
-                "compare."
+                "compare.",
+                height=view_height,
             )
         else:
             _render_placeholder(
-                "Difference appears once measured and simulated shapes match."
+                "Difference appears once measured and simulated shapes match.",
+                height=view_height,
             )
 
     # Shared slider below the views. Renders nothing when there are fewer
@@ -843,35 +1070,57 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
     meas_row = min(row, n_rows_meas - 1) if n_rows_meas else 0
     sim_row = min(row, n_rows_sim - 1) if n_rows_sim else 0
 
+    # The sinogram row uses the same box height as the projection row above
+    # (view_height): the sinogram is far taller than wide at column width,
+    # so it scrolls inside that box instead of stretching the page.
     row_sino_meas, row_sino_sim, row_sino_diff = st.columns(3)
     with row_sino_meas:
         if n_rows_meas:
             label = f"Measured sinogram, row {meas_row + 1}/{n_rows_meas}"
             st.caption(label)
-            _render_projection_image(row_sinogram(measured, meas_row), label)
+            _render_comparison_view(
+                window_image(row_sinogram(measured, meas_row), window),
+                height=view_height,
+            )
         else:
-            _render_placeholder("No measured data for a row sinogram.")
+            _render_placeholder(
+                "No measured data for a row sinogram.", height=view_height
+            )
     with row_sino_sim:
         if n_rows_sim:
             label = f"Simulated sinogram, row {sim_row + 1}/{n_rows_sim}"
             st.caption(label)
-            _render_projection_image(row_sinogram(simulated, sim_row), label)
+            _render_comparison_view(
+                window_image(row_sinogram(simulated, sim_row), window),
+                height=view_height,
+            )
         else:
-            _render_placeholder("Run the forward projection to fill this row.")
+            _render_placeholder(
+                "Run the forward projection to fill this row.", height=view_height
+            )
     with row_sino_diff:
         if shapes_match:
-            diff = normalize_difference(
-                row_sinogram(measured, meas_row) - row_sinogram(simulated, sim_row)
+            diff = difference_image(
+                row_sinogram(measured, meas_row) - row_sinogram(simulated, sim_row),
+                diff_scale,
             )
             st.caption("Difference sinogram (measured − simulated)")
-            st.image(diff, clamp=True, use_column_width=True)
+            _render_comparison_view(diff, height=view_height)
         elif n_rows_meas and n_rows_sim:
-            _render_placeholder("Shapes differ — see the projection row above.")
+            _render_placeholder(
+                "Shapes differ — see the projection row above.", height=view_height
+            )
         else:
             _render_placeholder(
                 "Difference sinogram appears once measured and simulated "
-                "shapes match."
+                "shapes match.",
+                height=view_height,
             )
+
+    st.caption(
+        "Ctrl + mouse wheel zooms a view, double-click resets it. "
+        "A view scrolls when it is larger than its box."
+    )
 
     # Own slider for the row, below the second row.
     index_slider(st, "Row index", "sino_row_index", n_rows_total)
@@ -921,6 +1170,24 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             f"SSIM {per_slice['ssim'][shared]:.4f}"
         )
 
+
+def render_forward_projection_tab(
+    volume, geometry: Optional[ProjectionGeometry]
+) -> None:
+    """Forward Projection: sampling, beam energy and the run button.
+
+    Kept separate from Sinogram Inspection so that tab stays a pure image
+    grid. The widgets still render on every rerun — Streamlit builds all
+    tabs — so the measurement loader in the sidebar can keep reading the
+    shared ``sample_selection`` stash right after a widget change.
+    """
+    import streamlit as st
+
+    from backend.forward_project import PARALLELPROJ_AVAILABLE
+    from visualization.actions import enqueue_forward_projection, session_token
+
+    st.subheader("Forward Projection")
+
     # --- Sample options (forward projection) --------------------------------
     with st.expander("Sample options", expanded=True):
         st.caption(
@@ -939,16 +1206,16 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             default_col_mode="downsample",
             default_col_step=8,
         )
-        # The sidebar loads measurements before this tab renders, so the
-        # loader cannot instantiate the shared widgets itself — it reads
-        # this stash instead. A widget change reruns before any click can
-        # happen, so the stash is never stale at click time.
+        # The sidebar loads measurements before the tabs render, so the loader
+        # cannot instantiate the shared widgets itself — it reads this stash
+        # instead. A widget change reruns before any click can happen, so the
+        # stash is never stale at click time.
         st.session_state["sample_selection"] = selection
         # One click back to the full detector and every projection of the
         # geometry: the same preset the dummy measurement applies, without
-        # having to touch the three dropdowns by hand. The preset runs as
-        # an on_click callback because callbacks execute before the script
-        # (and thus before these widgets are instantiated) — assigning the
+        # having to touch the three dropdowns by hand. The preset runs as an
+        # on_click callback because callbacks execute before the script (and
+        # thus before these widgets are instantiated) — assigning the
         # widget-backed keys after them would raise.
 
         def _preset_full_geometry():

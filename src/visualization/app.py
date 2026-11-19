@@ -54,6 +54,7 @@ from visualization.display_units import (
 from visualization.mpr import extract_slice
 from visualization.projection_panel import (
     render_comparison_tab,
+    render_forward_projection_tab,
     render_geometry_tab,
     scan_n_projections,
 )
@@ -768,8 +769,13 @@ def main():
 
     shell.empty()
 
-    tab_view, tab_geometry, tab_compare = st.tabs(
-        ["🩻 Viewer", "📐 Geometry", "🔍 Sinogram Inspection"]
+    tab_view, tab_geometry, tab_forward, tab_compare = st.tabs(
+        [
+            "🩻 Viewer",
+            "📐 Geometry",
+            "🚀 Forward Projection",
+            "🔍 Sinogram Inspection",
+        ]
     )
 
     with tab_view:
@@ -778,8 +784,11 @@ def main():
     with tab_geometry:
         render_geometry_tab(projection_geometry)
 
+    with tab_forward:
+        render_forward_projection_tab(volume, projection_geometry)
+
     with tab_compare:
-        render_comparison_tab(volume, projection_geometry)
+        render_comparison_tab()
 
     # Mount last: every action button has been evaluated by now, including the
     # FP button in the tab above. The poller renders nothing; it only forces an

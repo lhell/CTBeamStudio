@@ -6,19 +6,28 @@ import pytest
 from backend.geometry import ProjectionGeometry
 from backend.loaders.sinogram import SelectionConfig
 from visualization.projection_panel import (
+    COMPARISON_VIEW_MAX_HEIGHT_PX,
     EDITABLE_GEOMETRY_FIELDS,
+    PLACEHOLDER_HEIGHT_PX,
     apply_axis_order_change,
     apply_geometry_updates,
     build_selection_config,
+    build_zoomable_image_html,
+    cached_comparison_scales,
     clamp_index_state,
+    comparison_view_height,
+    difference_image,
+    difference_scale,
     index_slider,
-    normalize_difference,
-    normalize_projection,
+    png_data_uri,
     prepare_projection_volume,
+    projection_display_image,
     projection_display_spacing,
     resolve_selection,
     resolve_view_index,
     row_sinogram,
+    stack_window,
+    window_image,
 )
 
 
@@ -39,31 +48,72 @@ def test_projection_display_spacing_without_geometry_is_none():
     assert projection_display_spacing(None) is None
 
 
-def test_normalize_projection_scales_to_unit_range():
-    arr = np.array([[0.0, 5.0], [10.0, 2.5]], dtype=np.float32)
+def test_stack_window_spans_every_stack():
+    """One window for measured and simulated together: the measured stack
+    alone would never reach the simulated values, and a per-frame normalize
+    is exactly what this replaces."""
+    measured = np.full((2, 3, 4), 10.0, dtype=np.float32)
+    measured[1, 2, 3] = 20.0
+    simulated = np.zeros((2, 3, 4), dtype=np.float32)
 
-    out = normalize_projection(arr)
+    assert stack_window(measured, simulated) == (0.0, 20.0)
+
+
+def test_stack_window_without_data_falls_back_to_unit_range():
+    assert stack_window(None, np.empty((0, 0))) == (0.0, 1.0)
+    assert stack_window(np.full((2, 2), 5.0)) == (0.0, 1.0)
+
+
+def test_window_image_maps_and_clips_through_the_shared_window():
+    """A frame is mapped with the common window, not rescaled to itself: its
+    own max (15) is mid-gray and anything past the window clips."""
+    frame = np.array([[10.0, 15.0], [20.0, 25.0]], dtype=np.float32)
+
+    out = window_image(frame, (10.0, 20.0))
 
     assert out.dtype == np.float32
-    assert out.min() == pytest.approx(0.0)
-    assert out.max() == pytest.approx(1.0)
-    np.testing.assert_allclose(out, [[0.0, 0.5], [1.0, 0.25]])
+    np.testing.assert_allclose(out, [[0.0, 0.5], [1.0, 1.0]])
 
 
-def test_normalize_projection_constant_returns_zeros():
-    arr = np.full((3, 3), 42.0, dtype=np.float32)
+def test_window_image_with_zero_span_is_black():
+    out = window_image(np.full((3, 3), 42.0, dtype=np.float32), (5.0, 5.0))
 
-    out = normalize_projection(arr)
-
-    assert out.shape == arr.shape
-    assert out.dtype == np.float32
-    np.testing.assert_allclose(out, np.zeros_like(arr))
+    np.testing.assert_allclose(out, np.zeros((3, 3), dtype=np.float32))
 
 
-def test_normalize_difference_maps_zero_to_mid_gray():
+def test_projection_display_image_keeps_a_value_at_one_gray_level():
+    """The same detector value gets the same gray in every slice — that is
+    what "common level/window" means for the two rows."""
+    window = (0.0, 10.0)
+    first = projection_display_image(np.full((2, 2), 2.5), window)
+    second = projection_display_image(np.full((2, 2), 2.5), window)
+
+    np.testing.assert_allclose(first, second)
+    np.testing.assert_allclose(first, np.full((2, 2), 0.25, dtype=np.float32))
+
+
+def test_difference_scale_takes_the_largest_error_of_all_slices():
+    """A small error in one slice must stay dim: the scale comes from the
+    whole stack, not from the slice currently on screen."""
+    measured = np.array([[[1.0]], [[4.0]]], dtype=np.float32)
+    simulated = np.zeros((2, 1, 1), dtype=np.float32)
+
+    assert difference_scale(measured, simulated) == 4.0
+
+    small = difference_image(measured[0] - simulated[0], 4.0)
+    large = difference_image(measured[1] - simulated[1], 4.0)
+    assert small[0, 0] < large[0, 0]
+
+
+def test_difference_scale_needs_matching_shapes():
+    assert difference_scale(np.zeros((2, 1, 1)), np.zeros((3, 1, 1))) == 0.0
+    assert difference_scale(None, np.zeros((2, 1, 1))) == 0.0
+
+
+def test_difference_image_maps_zero_to_mid_gray():
     diff = np.array([[-2.0, 0.0], [2.0, 1.0]], dtype=np.float32)
 
-    out = normalize_difference(diff)
+    out = difference_image(diff, 2.0)
 
     assert out.dtype == np.float32
     assert out.min() == pytest.approx(0.0)
@@ -71,12 +121,25 @@ def test_normalize_difference_maps_zero_to_mid_gray():
     assert out[0, 1] == pytest.approx(0.5)
 
 
-def test_normalize_difference_constant_returns_mid_gray():
-    diff = np.zeros((3, 3), dtype=np.float32)
-
-    out = normalize_difference(diff)
+def test_difference_image_without_error_is_even_mid_gray():
+    out = difference_image(np.zeros((3, 3), dtype=np.float32), 0.0)
 
     np.testing.assert_allclose(out, np.full((3, 3), 0.5, dtype=np.float32))
+
+
+def test_cached_comparison_scales_recomputes_only_for_a_new_stack():
+    import streamlit as st
+
+    st.session_state.pop("_sino_display_scales", None)
+    first = np.full((2, 3, 4), 10.0, dtype=np.float32)
+    assert cached_comparison_scales(first, None) == ((0.0, 1.0), 0.0)
+    assert cached_comparison_scales(first, None) == ((0.0, 1.0), 0.0)
+
+    # Same shape, different content: the stamp changes and the window follows.
+    second = np.full((2, 3, 4), 25.0, dtype=np.float32)
+    assert cached_comparison_scales(second, None)[0] == (0.0, 1.0)
+    second[0, 0, 0] = 5.0
+    assert cached_comparison_scales(second, None)[0] == (5.0, 25.0)
 
 
 def test_row_sinogram_fixes_row_and_swaps_axes():
@@ -98,6 +161,77 @@ def test_row_sinogram_keeps_first_and_last_row():
 
     np.testing.assert_array_equal(row_sinogram(data, 0), data[:, 0, :].T)
     np.testing.assert_array_equal(row_sinogram(data, 2), data[:, 2, :].T)
+
+
+def test_comparison_view_height_caps_at_the_largest_projection_side():
+    """Both rows use one box height, taken from the largest side of a
+    projection frame: a 192 x 512 frame caps the boxes at 512 px."""
+    assert comparison_view_height(np.zeros((192, 512), dtype=np.float32)) == 512
+
+
+def test_comparison_view_height_takes_the_tallest_available_frame():
+    assert (
+        comparison_view_height(
+            np.zeros((64, 256), dtype=np.float32),
+            np.zeros((192, 512), dtype=np.float32),
+        )
+        == 512
+    )
+
+
+def test_comparison_view_height_without_data_uses_the_placeholder():
+    assert comparison_view_height(None, np.empty((0, 0))) == PLACEHOLDER_HEIGHT_PX
+
+
+def test_comparison_view_height_is_clamped_to_the_view_maximum():
+    """A wide detector (or a small test frame) must not turn one row into a
+    page of its own, and must still reserve a visible box."""
+    assert comparison_view_height(np.zeros((64, 4000))) == COMPARISON_VIEW_MAX_HEIGHT_PX
+    assert comparison_view_height(np.zeros((4, 5))) == PLACEHOLDER_HEIGHT_PX
+
+
+def test_png_data_uri_encodes_a_grayscale_png():
+    import base64
+    from io import BytesIO
+
+    from PIL import Image
+
+    uri = png_data_uri(np.array([[0.0, 0.5], [1.0, 0.25]], dtype=np.float32))
+
+    assert uri.startswith("data:image/png;base64,")
+    png = Image.open(BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+    assert png.mode == "L"
+    assert png.size == (2, 2)
+    assert png.getpixel((0, 0)) == 0
+    assert png.getpixel((0, 1)) == 255
+
+
+def test_png_data_uri_downscales_the_long_side():
+    import base64
+    from io import BytesIO
+
+    from PIL import Image
+
+    uri = png_data_uri(np.zeros((10, 100), dtype=np.float32), max_side=20)
+
+    png = Image.open(BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+    assert png.size == (20, 2)
+
+
+def test_zoomable_html_embeds_the_image_and_the_wheel_zoom():
+    uri = "data:image/png;base64,AAAA"
+
+    html = build_zoomable_image_html(uri)
+
+    assert f'src="{uri}"' in html
+    assert '"wheel"' in html
+    assert "ctrlKey" in html
+    assert "dblclick" in html
+    assert "<script>" in html
+    # The box gets its own dark scrollbar: the iframe does not inherit the
+    # app's dark theme, so the default light track stood out.
+    assert "::-webkit-scrollbar" in html
+    assert "scrollbar-color" in html
 
 
 def test_build_selection_config_maps_all_axes():

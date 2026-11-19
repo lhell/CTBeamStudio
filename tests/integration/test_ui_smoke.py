@@ -29,7 +29,12 @@ from visualization.phantom import DummyMeasurement, create_demo_volume
 APP_PATH = Path(__file__).resolve().parents[2] / "src" / "visualization" / "app.py"
 
 SIDEBAR_SECTIONS = ["Image", "Measurements"]
-TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "🔍 Sinogram Inspection"]
+TAB_LABELS = [
+    "🩻 Viewer",
+    "📐 Geometry",
+    "🚀 Forward Projection",
+    "🔍 Sinogram Inspection",
+]
 
 
 @pytest.fixture(scope="module")
@@ -70,7 +75,7 @@ def test_no_completed_load_status_is_shown(app):
     assert "Daten geladen" not in status_labels
 
 
-def test_three_tabs_are_rendered_in_order(app):
+def test_tabs_are_rendered_in_order(app):
     assert [tab.label for tab in app.tabs] == TAB_LABELS
 
 
@@ -392,8 +397,8 @@ def test_sidebar_lists_every_file_read_for_a_folder_load(app, create_projection_
 # ---------------------------------------------------------------------------
 
 # Calculated from the default geometry (2304 projections, 64 rows, 512
-# columns) with the tab's fp defaults (proj step 100, row step 4, col step
-# 8): ceil-ish index counts 2304/100=24, 64/4=16, 512/8=64.
+# columns) with the Forward Projection tab's defaults (proj step 100, row
+# step 4, col step 8): ceil-ish counts 2304/100=24, 64/4=16, 512/8=64.
 FP_DEFAULT_SIM_SHAPE = (24, 16, 64)
 
 

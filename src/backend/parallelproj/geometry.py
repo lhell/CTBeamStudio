@@ -86,6 +86,7 @@ class ConeBeamGeometry:
         z_offset_mm: float = 0.0,
         z_step_mm: float = 0.0,
         n_projections_total: int = 0,
+        source_offset_z_mm: float = 0.0,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Calculate LOR start/end points for all projections.
 
@@ -99,13 +100,15 @@ class ConeBeamGeometry:
         have shape ``(n_projections * n_det_rows * n_det_cols, 3)``, where the
         last axis is ``(x, y, z)`` world coordinates (parallelproj convention).
 
-        The source starts at ``(sid, 0, z_offset_mm)`` (anterior, ``+x``) and
-        circles the isocenter around the ``z`` axis (CCW seen from ``+z``).
-        The detector is placed opposite the source at a distance ``sdd - sid``
-        from isocenter and rotates together with it. The whole trajectory sits
-        in the plane ``z = z_offset_mm`` — pass the volume's z centre so the
-        scan intersects the volume even when its DICOM z origin is far from 0.
-        The angle of projection ``i`` is ``first_angle + i * angular_inc_degree``.
+        The source starts at ``(sid, 0, z_offset_mm + source_offset_z_mm)``
+        (anterior, ``+x``) and circles the isocenter around the ``z`` axis
+        (CCW seen from ``+z``). The detector is placed opposite the source at a
+        distance ``sdd - sid`` from isocenter and rotates together with it;
+        it follows the source's z offset as well. The whole trajectory sits in
+        the plane ``z = z_offset_mm + source_offset_z_mm`` — pass the volume's
+        z centre as ``z_offset_mm`` so the scan intersects the volume even when
+        its DICOM z origin is far from 0. The angle of projection ``i`` is
+        ``first_angle + i * angular_inc_degree``.
 
         Args:
             detector_offset_rows_mm: Detector row offset (mm).
@@ -120,6 +123,10 @@ class ConeBeamGeometry:
             z_offset_mm: World z position of the scan plane (mm). ``0.0``
                 places the trajectory in the ``z = 0`` plane; pass the
                 volume's z centre to centre the scan on the volume.
+            source_offset_z_mm: Additional manual z shift of the whole
+                trajectory (source and detector), e.g. from
+                ``ProjectionGeometry.source_offset_z``. ``0.0`` keeps the
+                automatic placement.
 
         Returns:
             Tuple ``(pos_beam_start, pos_beam_end)``, each a float32 tensor of
@@ -179,6 +186,8 @@ class ConeBeamGeometry:
             # (the volume's z centre) over n projections, so the first
             # projection sits at the bottom of the volume and the last at the
             # top. z_step_mm == 0.0 gives a circular scan (constant z).
+            # source_offset_z_mm is a manual shift of the whole trajectory;
+            # the detector rides on it just like on the table feed.
             n_for_centering = (
                 n_projections_total if n_projections_total > 0 else n_projs
             )
@@ -186,6 +195,7 @@ class ConeBeamGeometry:
                 z_offset_mm
                 - (n_for_centering / 2.0) * z_step_mm
                 + idx_angle * z_step_mm
+                + source_offset_z_mm
             )
 
             # Initial source position: (sid, 0, z) -> circles in a plane

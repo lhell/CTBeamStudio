@@ -229,7 +229,7 @@ Three install traps seen in a real GPU setup:
 > `RuntimeError: cudaSetDevice failed: no CUDA-capable device is detected`.
 > Unticking **Use CUDA if available** is therefore **not** a reliable fallback
 > in a GPU-built env. Only the CPU env from `environment.yml` is validated
-> (388 passed, 0 skipped). Planned fix: **T-08-01**,
+> (390 passed, 0 skipped). Planned fix: **T-08-01**,
 > `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`; the reproduced
 > errors are recorded in
 > `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
@@ -244,7 +244,7 @@ CUDA is **not** enabled or validated by the tests:
   `forward_project(...)` with its default `use_cuda=True`. On a GPU machine
   those take the CUDA path and hit the bug above — that is the source of the
   19 failures. There is no `conftest.py` fixture or environment variable that
-  forces CPU, so the green 388/0 result only applies to the CPU env.
+  forces CPU, so the green 390/0 result only applies to the CPU env.
 - `scripts/verify_forward_projection.py` and `scripts/forward_projection_plot.py`
   both hard-code `use_cuda=False`, so they check the CPU path. In a GPU-built
   parallelproj env that path can still fail with `cudaSetDevice`; use them in

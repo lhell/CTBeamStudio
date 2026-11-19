@@ -86,6 +86,10 @@ the 3D plot draws a helix for non-zero pitch. Making the forward
 projection helical is its own task; the plot is ahead of the projector
 there, not behind.
 
+> Update (T-08-02): `source_offset_z` is now honoured by the projector and
+> shifts source and detector in both the forward projection and the 3D plot.
+> The x/y source offsets remain 3D-only.
+
 ## Tests
 
 `tests/unit/test_volume3d.py` (5 tests): exact mesh placement at

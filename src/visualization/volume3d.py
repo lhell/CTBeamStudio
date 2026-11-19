@@ -80,9 +80,11 @@ def get_detector_position(geometry, source_angle: float = 0.0, z_offset: float =
     # Apply detector offsets (independent of source)
     x = base_x + geometry.detector_offset_x
     y = base_y + geometry.detector_offset_y
-    # Detector Z follows source Z offset
+    # The detector follows the source's z offset (see ProjectionGeometry):
+    # the forward projector shifts both by source_offset_z as well.
+    z = base_z + geometry.source_offset_z
 
-    return (x, y, base_z)
+    return (x, y, z)
 
 
 def get_trajectory_positions(geometry, n_projections: int, z_offset: float = 0.0):

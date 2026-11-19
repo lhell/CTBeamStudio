@@ -38,7 +38,7 @@ Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 | 5 | Projection Geometry | T-50 – T-53 |
 | 6 | Projection-Geometrie in 3D | T-54 – T-56a |
 | 7 | Docker Self-Deployment | T-71 – T-74 |
-| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108, T-08-01 |
+| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108, T-08-01, T-08-02 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
 | 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110 |
@@ -489,6 +489,18 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Akzeptanz:** Suite in CPU- und GPU-Env je 0 Skips; CPU-Ergebnisse bitgleich wie vorher; GPU-Ergebnisse innerhalb der gemessenen Toleranz identisch; Browser-Verifikation auf GPU-Maschine dokumentiert. Kein Eingriff in Docker-Image oder CI (beide bleiben CPU).
 - **Status:** ⚠️ Open (Nov 19, 2026) — nicht implementiert; ohne GPU in der Testbasis nur geplant. Spec `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`, Plan `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`.
 - **Siehe auch:** Audit-Finding #1 (`docs/audit-2026-11-13-findings.md`), INSTALLATION.md „GPU setup".
+
+### `[x]` T-08-02 — Source-Z-Offset in der Forward Projection
+- **Ziel:** `ProjectionGeometry.source_offset_z` verschiebt nicht nur die 3D-Trajektorie, sondern auch die simulierten Strahlen.
+- **Hintergrund:** Das UI kennt `Source Offset Z (mm)` und `volume3d` zieht die Quelle mit, der Projektor ignorierte den Wert aber: `calculate_xray_beam_list` nutzte nur `z_offset_mm` (Volume-Zentrum) und den Helix-Vorschub. Simulierte und gemessene Projektion konnten dadurch in z versetzt liegen.
+- **Dateien:** `src/backend/parallelproj/geometry.py`, `src/backend/forward_project.py`, `src/visualization/volume3d.py`, `tests/unit/test_parallelproj.py`, `tests/unit/test_forward_project.py`, `docs/geometry.md`, `docs/superpowers/specs/2026-11-12-3d-view-real-world-origin-design.md`, `AGENTS.md`
+- **Abhängig von:** T-63, T-104
+- **Umsetzung:**
+  1. `calculate_xray_beam_list(..., source_offset_z_mm=0.0)` addiert den Offset auf die per-Projektion-z; Quelle und Detektor teilen ihn, die Rotation bleibt unverändert.
+  2. `forward_project` reicht `geometry.source_offset_z` durch; `get_detector_position` in `volume3d` zieht ebenfalls nach (vorher nur die Quelle).
+  3. Tests: LOR-Start/End verschieben sich in z ohne x/y-Änderung; `source_offset_z` ändert das FP-Ergebnis; FP ↔ 3D-Trajektorie stimmen auch bei Offset überein.
+- **Akzeptanz:** Offset 0 bleibt unverändert; Suite grün, 0 Skips; Test-Bar angepasst.
+- **Status:** ✅ Done (Nov 19, 2026) — `source_offset_z_mm` in `calculate_xray_beam_list` verschiebt Quelle und Detektor; `forward_project` reicht den Feldwert durch, `get_detector_position` zieht in der 3D-Ansicht nach. Neue Tests: LOR-Offset ohne x/y-Änderung, FP-Ergebnis ändert sich mit dem Offset, FP ↔ 3D-Trajektorie auch bei Offset (bestehender Test erweitert). Offset 0 bleibt unverändert. Suite 390 passed, 0 skipped.
 
 ## Phase 9 — Sinogram & Messdaten
 

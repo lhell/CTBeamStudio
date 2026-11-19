@@ -319,6 +319,32 @@ def test_forward_project_pitch_zero_is_exactly_circular():
 
 
 @requires_projection_backend
+def test_forward_project_applies_source_offset_z():
+    """ProjectionGeometry.source_offset_z moves the simulated ray plane."""
+    from backend.forward_project import forward_project
+
+    def project(offset_z: float):
+        return forward_project(
+            _slab_volume(),
+            ProjectionGeometry(
+                n_det_cols=1,
+                n_det_rows=1,
+                projections_per_rotation=4,
+                source_offset_z=offset_z,
+            ),
+            row_indices=[0],
+            col_indices=[0],
+            proj_indices=[0, 1, 2, 3],
+        )
+
+    # The slab sits at z = 0; an offset of 4 mm puts every ray above it.
+    centred = project(0.0).projections[:, 0, 0]
+    shifted = project(4.0).projections[:, 0, 0]
+    assert np.all(centred > 0)
+    assert np.all(shifted < 0.01 * centred)
+
+
+@requires_projection_backend
 def test_calculate_xray_beam_list_helix_z_positions_pinned():
     """The helix z feed follows the documented formula, exactly.
 
@@ -407,7 +433,8 @@ def test_forward_project_helix_matches_3d_trajectory():
     planes; the projector computes rays at the same z(i) and angles. The
     source position is the first LOR start of each projection (identical
     for every detector element); the central-pixel detector position has no
-    pixel offset and equals the drawn detector centre.
+    pixel offset and equals the drawn detector centre. A non-zero
+    source_offset_z shifts both paths together.
     """
     from backend.parallelproj import geometry_from_projection_geometry
     from visualization.volume3d import get_trajectory_positions
@@ -420,6 +447,7 @@ def test_forward_project_helix_matches_3d_trajectory():
         det_row_spacing_mm=2.0,
         projections_per_rotation=8,
         pitch=0.5,
+        source_offset_z=7.0,
     )
     n = 8
     z_offset = 25.0
@@ -438,6 +466,7 @@ def test_forward_project_helix_matches_3d_trajectory():
         z_offset_mm=z_offset,
         z_step_mm=z_step,
         n_projections_total=n,
+        source_offset_z_mm=geometry.source_offset_z,
     )
     per_proj = geometry.n_det_rows * geometry.n_det_cols
     src_fp = pos_start.view(n, per_proj, 3)[:, 0, :].numpy()

@@ -127,6 +127,32 @@ def test_geometry_z_offset_shifts_scan_plane():
     )
 
 
+def test_geometry_source_offset_z_shifts_source_and_detector():
+    """source_offset_z_mm shifts the whole LOR pair along z, not in x/y."""
+    g = ConeBeamGeometry(
+        sid=500.0,
+        sdd=1000.0,
+        n_projections=1,
+        angular_inc_degree=90.0,
+        n_det_rows=3,
+        n_det_cols=3,
+        det_row_spacing_mm=1.0,
+        det_col_spacing_mm=1.0,
+        first_angle=0.0,
+    )
+    start, end = g.calculate_xray_beam_list(dev="cpu")
+    shifted_start, shifted_end = g.calculate_xray_beam_list(
+        dev="cpu", source_offset_z_mm=17.0
+    )
+
+    assert shifted_start[0].numpy()[2] == pytest.approx(17.0, abs=1e-4)
+    assert shifted_end[1].numpy()[2] == pytest.approx(17.0, abs=1e-4)
+    assert start[0].numpy()[2] == pytest.approx(0.0, abs=1e-4)
+    np.testing.assert_allclose(
+        shifted_start[0].numpy()[:2], start[0].numpy()[:2], atol=1e-5
+    )
+
+
 def test_four_region_projection_order():
     """0° projection shows the four quadrants in order 1(top-left)..4(bottom-right)."""
     vol_zyx = _four_region_volume()

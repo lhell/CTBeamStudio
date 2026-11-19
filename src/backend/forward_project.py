@@ -285,6 +285,7 @@ def _forward_project_parallelproj(
             # Centre the helix over the whole selection, not over this
             # chunk: the beam list would otherwise re-centre per chunk.
             n_projections_total=n_projections_total or n_projs,
+            source_offset_z_mm=float(geometry.source_offset_z),
         )
 
         projector = ConeBeamProjector(

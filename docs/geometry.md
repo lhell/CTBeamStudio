@@ -75,7 +75,9 @@ placement:
 ```
 collimation_width = n_det_rows × det_row_spacing_mm
 z_step            = pitch × collimation_width / projections_per_rotation   [mm/projection]
-z(i)              = z_center − (N / 2) × z_step + i × z_step               [mm]
+z(i)              = z_center + source_offset_z + (i − N / 2) × z_step      [mm]
+z_detector(i, r)  = z(i) + (−n_det_rows / 2 + 0.5 + r) × det_row_spacing_mm
+                    + detector_offset_rows_mm                              [mm]
 ```
 
 - `z_center` = the volume's z centre
@@ -85,8 +87,12 @@ z(i)              = z_center − (N / 2) × z_step + i × z_step               [
   range selection keeps the z position of its *original* angle index.
 - `i` = original projection (angle) index, not the position inside the
   selection.
-- The detector rides on the table feed: its rows are offset by `z(i)`, so
-  the whole detector plane translates with the helix.
+- `source_offset_z` = manual `ProjectionGeometry.source_offset_z` (mm). It is
+  added directly to the whole trajectory, so it shifts source and detector
+  together and leaves x/y untouched. Default `0`.
+- `r` = detector row index (`0 … n_det_rows − 1`). The detector rides on the
+  same `z(i)` as the source, plus its row offset in the detector plane;
+  `detector_offset_rows_mm` defaults to `0` in the forward projection.
 - `pitch = 0` → `z_step = 0` → circular scan at constant `z_center` (the
   default, decision D-12).
 
@@ -106,11 +112,14 @@ When the source moves with an offset, the detector **follows** (stays connected 
 |-----------|-------------|
 | `sourceOffsetX` | Source lateral offset (mm) |
 | `sourceOffsetY` | Source longitudinal offset, perpendicular to table (mm) |
-| `sourceOffsetZ` | Source Z offset (table feed direction) — for helical scanning |
+| `source_offset_z` | Source Z offset (mm), table feed direction — added to the whole trajectory |
 
-The relationship for helical scanning:
+`source_offset_z` is a constant manual shift; it is **not** the helical table
+feed. The table feed is the separate `pitch` term, and the combined z position
+of projection `i` is given by the formula in *Helix Implementation* above:
+
 ```
-sourceOffsetZ = (sourceAngle / 360°) × pitch × collimation_width
+z(i) = z_center + source_offset_z + (i − N / 2) × z_step
 ```
 
 ### Detector Offsets (Independent Movement)
@@ -142,7 +151,10 @@ The forward projection and the 3D volume view share one world frame:
   z origin is far from the world origin. For a helical scan (`pitch > 0`) the
   trajectory is a helix instead of a plane: the source and detector advance
   by `z_step` per projection, centred on `z_center` over the full scan (see
-  *Helix Implementation* above).
+  *Helix Implementation* above). A non-zero
+  `ProjectionGeometry.source_offset_z` shifts source **and** detector along
+  z by that amount; the forward projection and the 3D view apply the same
+  shift.
 - **Source at 0°**: `(sid, 0, z_center)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
 - **Detector**: opposite the source at `sdd - sid` from the isocenter (SDD is measured from the source, not from the rotation axis).
 - **Volume**: voxel `[0, 0, 0]` of the `(x, y, z)`-reordered grid sits at

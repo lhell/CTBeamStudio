@@ -16,10 +16,17 @@
 
 ## Phasen, Themen und Nummernkreise
 
-Die Nummern vergibt das Projekt fortlaufend und **unveränderlich** — sie stehen in
+Die Nummern vergibt das Projekt **unveränderlich** — sie stehen in
 Code-Kommentaren, Tests, CI-Workflows, Specs und Commit-Messages (knapp 800
-Fundstellen), deshalb sagt eine Nummer nichts über ihr Thema. Das Thema liefert die
+Fundstellen). Alte Nummern sagen deshalb nichts über ihr Thema; das Thema liefert die
 **Phase**, und dorthin gehört der Eintrag.
+
+**Neue Nummerierung ab dem nächsten Eintrag:** `T-<Phase>-<NN>`, wobei `<Phase>` die
+Nummer aus der Tabelle unten ist und `<NN>` eine zweistellige Fortlaufnummer **pro
+Phase**, beginnend bei `01`. Die nächste neue Aufgabe in Phase 11 heißt damit
+`T-11-01`, die nächste in Phase 12 `T-12-01`. Alle bestehenden Nummern `T-01` bis
+`T-110` bleiben unverändert — die gemischte Schreibweise in der Tabelle ist gewollt.
+Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 
 | Phase | Thema | Nummern |
 |---|---|---|
@@ -38,7 +45,7 @@ Fundstellen), deshalb sagt eine Nummer nichts über ihr Thema. Das Thema liefert
 | 12 | Release Readiness | T-104 – T-107 |
 | – | Research-Backlog | T-75 – T-77 |
 
-**Neue Aufgabe:** nächste freie Nummer (aktuell **T-111**), Eintrag unter der Phase
+**Neue Aufgabe:** `T-<Phase>-<NN>` nach der Regel oben, Eintrag unter der Phase
 ihres Themas — nicht ans Dateiende. Wird eine Aufgabe thematisch falsch einsortiert
 vorgefunden, wandert der Eintrag, nie die Nummer.
 
@@ -751,6 +758,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Dateien:** `src/visualization/volume_cache.py` (Record `{kind, files}`; `save_last_demo`, `load_last_session`; `load_last_loaded`-Kompatibilität), `src/visualization/sidebar.py` (`load_demo_volume` persistiert die Demo, `restore_last_session`), `src/visualization/app.py` (Restore-Button in `render_empty_state`)
 - **Abhängig von:** T-85, T-96
 - **Status:** ✅ Done (Nov 12, 2026) — Restore-Button erscheint nur, wenn ein gültiger Session-Record existiert; Clear Cache entfernt ihn (Cache-Datei gelöscht).
+
+### `[x]` T-109 — Aktions-Queue: neue Klicks stoppen keine laufenden Aktionen
+- **Ziel:** Die vier langlaufenden UI-Aktionen (Load Series, Load Measurements, Dummy measurement, Run Forward Projection) werden pro Session in einer FIFO-Queue ausgeführt. Ein weiterer Klick stellt keine laufende Aktion ein und verwirft kein fertiges Ergebnis. Die Queue ist über das Sidebar-Kontrollkästchen „Show queue" erreichbar (standardmäßig aus, ohne zusätzlichen Expander), zeigt wartende Einträge und erlaubt das Abbrechen einzelner wartender Einträge.
+- **Dateien:** `src/visualization/action_queue.py` (Streamlit-freier Registry mit einem Daemon-Worker pro Session), `src/visualization/actions.py` (Eingaben einfrieren, Ergebnis auf dem Hauptthread anwenden, Queue-Panel und Poller), `src/visualization/sidebar.py`, `src/visualization/projection_panel.py`, `src/visualization/app.py`, `tests/unit/test_action_queue.py`, `tests/unit/test_actions.py`, `tests/integration/test_ui_smoke.py`, `docs/actions.md`
+- **Abhängig von:** T-85, T-108
+- **Umsetzung:** Jeder Button-Klick friert seine Eingaben in einem `run()`-Closure ein und hängt den Eintrag an die Session-Queue. Ein Worker pro Session arbeitet strikt FIFO, ein Eintrag nach dem anderen; `drain_action_results` wendet fertige Einträge am Anfang von `main()` an, bevor Widgets erzeugt werden. Ein unsichtbarer 1-s-Poller erzwingt bei Statuswechsel einen App-Rerun — auch wenn „Show queue" aus ist. Abbrechen ist nur für wartende Einträge möglich (ein laufender C-Aufruf kann nicht gestoppt werden). Ein 10-min-Timeout markiert hängende Einträge als fehlgeschlagen. `actions_inline` ist ein reiner Test-Seam für AppTest.
+- **Akzeptanz:** Keine Aktion blockiert den Script-Thread; Einträge laufen in Klickreihenfolge; fertige Ergebnisse gehen nicht durch einen Rerun verloren; das Panel listet Status, Laufzeit, Fortschritt und Fehler und bietet „✕ Cancel" nur für wartende Einträge; Suite grün ohne Skips, Lint sauber.
+- **Status:** ✅ Done (Nov 19, 2026) — 14 Queue-, 12 Action-Unit-Tests; Queue-Panel, `Show queue` und Cancel eines wartenden Eintrags im UI-Smoke abgedeckt. Test-Bar 359 → 387 passed, 0 skipped; flake8/black/isort sauber. Im Browser (Port 8502) verifiziert: Panel in der Sidebar, Live-Fortschritt (`60/60`), Ergebnis auch bei ausgeblendetem Panel, Klick-Reaktivität während des Laufs, Cancel eines wartenden Eintrags, Tab-Wechsel ohne Fehler, neuer Tab ohne Queue. `AppTest` feuert `run_every` nicht. Offen durch die Umgebung: echte DICOM-/Projektionsdateien und ein CUDA-Gerät (hier `CUDA present: False`; `use_cuda=True/False` liefern identische Summen, der Worker-Lauf mit CUDA-Option endet normal). Details in `docs/actions.md` und im Plan.
 
 ### `[x]` T-110 — Scan-Projektionszahl in den Geometry-Tab, Overlay-Anzeige in die 3D Options
 - **Ziel:** Die beiden Trajectory-Overlay-Widgets aus dem Sidebar-Expander „Projection Geometry" stehen an ihrem thematischen Ort: die Projektionszahl des Scans im Geometry-Tab bei den Readouts, die Sichtbarkeit („Show projections") und „Trajectory Downsample" (reine 3D-Darstellung) im 3D-Options-Popover des Viewer-Tabs. Die In-Canvas-„Projection Geometry"-On/Off-Buttons entfallen: ein einziger Schalter statt zweier Bedienorte. Die Zahl ist die **Scan-Länge** (nicht eine Umdrehung): sie steuert sowohl die 3D-Trajektorie als auch die Projektionsachse der Forward Projection; `projections_per_rotation` sagt nur, wie viele Views eine Umdrehung hat.

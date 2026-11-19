@@ -1,12 +1,17 @@
 """Sidebar controls for CTBeamStudio."""
 
-import logging
 import uuid
 from pathlib import Path
 
 import streamlit as st
 
 from backend.loaders.dicom import scan_series
+from visualization import action_queue
+from visualization.actions import (
+    enqueue_series,
+    render_developer_options,
+    session_token,
+)
 from visualization.background_load import reset_job
 from visualization.geometry_cache import (
     clear_cached_geometry,
@@ -22,8 +27,6 @@ from visualization.volume_cache import (
     load_volume_cached,
     save_last_demo,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _series_stub(description: str, patient_id: str, n_slices: int):
@@ -56,6 +59,11 @@ def render_sidebar():
         # silently no-op and the viewer would stay empty. Read the name before
         # the session-state wipe below removes its token.
         reset_job(startup_job_name())
+        # The action registry also lives outside session state and must be
+        # dropped with the same click, before the token below is wiped.
+        queue_session = session_token()
+        st.session_state.pop("_action_queue_signature", None)
+        action_queue.reset_queue(queue_session)
         # Clear session state. The app then renders its empty state, exactly as
         # on a fresh start: nothing is auto-loaded.
         for k in list(st.session_state.keys()):
@@ -75,6 +83,8 @@ def render_sidebar():
 
     # Measurements loader (sinogram / projection data)
     render_measurement_sidebar()
+
+    render_developer_options(session_token())
 
     return volume, projection_geometry
 
@@ -157,55 +167,16 @@ def _render_image_section():
                     )
 
                 if st.button("Load Series"):
-                    # Use files from selected_series if available, otherwise scan folder
-                    if selected_series.files:
-                        files = (
-                            selected_series.files[:n_slices]
-                            if n_slices
-                            else selected_series.files
-                        )
-                    else:
-                        files = (
-                            list(Path(data_path).iterdir())[:n_slices]
-                            if n_slices
-                            else list(Path(data_path).iterdir())
-                        )
+                    # Snapshot the clicked values. The read and its progress live
+                    # on a worker; only the finished volume is applied to state
+                    # by the main script (see visualization.actions).
+                    from visualization.actions import series_file_list
 
-                    from visualization.volume_cache import save_last_loaded
-
-                    with st.spinner("Loading DICOM series..."):
-                        # Convert Path objects to strings for cache key
-                        file_paths_str = [str(f) for f in files]
-
-                        # Create progress bar
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-
-                        def update_progress(current: int, total: int):
-                            progress_bar.progress(current / total)
-                            status_text.text(f"Loading {current}/{total} slices...")
-
-                        # Load with progress callback
-                        volume = load_volume_cached(
-                            file_paths_str, _progress_callback=update_progress
-                        )
-
-                        # Clear progress UI
-                        progress_bar.empty()
-                        status_text.empty()
-
-                    st.session_state["volume"] = volume
-                    st.session_state["series"] = selected_series
-                    st.session_state["loaded_files"] = files
-                    # Clear old slice indices so clamp_slice_state will center them
-                    for k in ("axial_slice", "coronal_slice", "sagittal_slice"):
-                        st.session_state.pop(k, None)
-
-                    logger.info(
-                        "Loaded %d slices, shape=%s", len(files), volume.array.shape
+                    enqueue_series(
+                        session_token(),
+                        series_file_list(selected_series, n_slices, data_path),
+                        selected_series,
                     )
-                    st.toast(f"Loaded {len(files)} slices!")
-                    save_last_loaded(files)
 
     return volume, projection_geometry
 

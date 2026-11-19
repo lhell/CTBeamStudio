@@ -380,7 +380,7 @@ def render_measurement_sidebar() -> None:
     """Sidebar section for loading measured projection / sinogram data."""
     import streamlit as st
 
-    from backend.loaders.sinogram import load_sinogram
+    from visualization.actions import enqueue_measurements, session_token
 
     # Collapsed on startup: measured data is an optional second input, and an
     # open section pushed the actual load controls far down the sidebar.
@@ -431,40 +431,16 @@ def render_measurement_sidebar() -> None:
                 if not path.exists():
                     st.error(f"Path not found: {path}")
                 else:
-                    try:
-                        with st.spinner("Loading projections..."):
-                            # Loading bar with current/total projections, like
-                            # the DICOM image section: a spinner alone gives
-                            # no feedback on how far a big folder has come.
-                            progress_bar = st.progress(0)
-                            status_text = st.empty()
-
-                            def update_progress(current: int, total: int):
-                                progress_bar.progress(current / total)
-                                status_text.text(
-                                    f"Loading {current}/{total} projections..."
-                                )
-
-                            sinogram = load_sinogram(
-                                path,
-                                selection=selection,
-                                geometry=st.session_state.get("projection_geometry"),
-                                axis_order=axis_order,
-                                progress=update_progress,
-                            )
-                            progress_bar.empty()
-                            status_text.empty()
-                    except Exception as exc:  # noqa: BLE001 - surface loader errors
-                        st.error(f"Failed to load measurements: {exc}")
-                    else:
-                        st.session_state["sinogram"] = sinogram
-                        shape = (
-                            sinogram.data.shape
-                            if sinogram.data is not None
-                            else sinogram.original_shape
-                        )
-                        st.success(f"Loaded measurements {shape}.")
-                        st.toast("Measurements loaded!", icon="✅")
+                    # The geometry and selection are frozen at click time; the
+                    # read and its progress run on a worker. Validation above
+                    # stays synchronous — it is cheap and belongs to the click.
+                    enqueue_measurements(
+                        session_token(),
+                        path,
+                        selection,
+                        axis_order,
+                        st.session_state.get("projection_geometry"),
+                    )
         else:
             # The axis-order dropdown is how the user says "the file is stored
             # the other way round", and they judge it by looking at the image.
@@ -508,39 +484,9 @@ def render_measurement_sidebar() -> None:
             "scatter and Poisson noise."
         )
         if st.button("🎲 Generate dummy measurement", key="dummy_measurement"):
-            from visualization.phantom import create_dummy_measured_sinogram
+            from visualization.actions import enqueue_dummy_measurement
 
-            try:
-                with st.spinner(
-                    "Synthesizing dummy measurement (forward projection + "
-                    "scatter + noise)..."
-                ):
-                    dummy = create_dummy_measured_sinogram()
-            except Exception as exc:  # noqa: BLE001 - surface generator errors
-                st.error(f"Dummy measurement failed: {exc}")
-            else:
-                st.session_state["volume"] = dummy.volume
-                st.session_state["projection_geometry"] = dummy.geometry
-                st.session_state["geometry_is_default"] = False
-                st.session_state["geometry_loaded_original"] = dummy.geometry
-                st.session_state["sinogram"] = dummy.sinogram
-                # The dummy contains the full detector and every projection
-                # of its geometry, so "all" reproduces it exactly: one click
-                # on "Run Forward Projection" then yields matching shapes and
-                # a live comparison with difference and metrics.
-                st.session_state["sample_proj_mode"] = "all"
-                st.session_state["sample_row_mode"] = "all"
-                st.session_state["sample_col_mode"] = "all"
-                # New geometry: drop cached widget values so the geometry
-                # form prefills the dummy values instead of stale ones.
-                clear_geometry_edit_state()
-                fp_note = (
-                    "cached projection reused"
-                    if dummy.params["fp_from_cache"]
-                    else "projection computed"
-                )
-                st.toast(f"Dummy measurement ready ({fp_note}).", icon="🎲")
-                st.rerun()
+            enqueue_dummy_measurement(session_token())
 
 
 def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
@@ -774,7 +720,8 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
     """
     import streamlit as st
 
-    from backend.forward_project import PARALLELPROJ_AVAILABLE, forward_project
+    from backend.forward_project import PARALLELPROJ_AVAILABLE
+    from visualization.actions import enqueue_forward_projection, session_token
     from visualization.comparison import (
         build_distribution_figure,
         build_metric_figure,
@@ -1007,41 +954,22 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 proj_idx, row_idx, col_idx = resolve_selection(
                     selection, detector_shape
                 )
-                projection_volume = prepare_projection_volume(volume, energy_kev)
-                with st.spinner("Running forward projection..."):
-                    # x/y feedback: a full-geometry run takes minutes, and a
-                    # bare spinner does not show how far it has come.
-                    progress_bar = st.progress(
-                        0.0, text=f"Forward projecting 0/{len(proj_idx)} projections"
-                    )
-
-                    def update_progress(current: int, total: int):
-                        progress_bar.progress(
-                            current / total,
-                            text=f"Forward projecting {current}/{total} projections",
-                        )
-
-                    result = forward_project(
-                        projection_volume,
-                        geometry,
-                        row_indices=row_idx,
-                        col_indices=col_idx,
-                        proj_indices=proj_idx,
-                        # Centre a helix over the whole scan, even when only a
-                        # subset of projections is computed.
-                        n_projections_total=n_scan,
-                        use_cuda=use_cuda,
-                        progress=update_progress,
-                    )
-                    progress_bar.empty()
-            except Exception as exc:  # noqa: BLE001 - backend errors in the UI
-                st.error(f"Forward projection failed: {exc}")
+            except (
+                Exception
+            ) as exc:  # noqa: BLE001 - invalid selection is a click error
+                st.error(f"Invalid projection selection: {exc}")
             else:
-                st.session_state["forward_projection"] = result
-                # The views and captions above already rendered with the old
-                # state this run, so rerun to fill the simulated column and
-                # the metric plots immediately.
-                st.toast(
-                    f"Computed {result.projections.shape[0]} projections.", icon="✅"
+                # Volume, geometry, selection and energy are frozen here. The
+                # projection itself runs on a worker; the poller forces a rerun
+                # when the result is ready, which applies it at the top of main.
+                enqueue_forward_projection(
+                    session_token(),
+                    volume,
+                    geometry,
+                    proj_indices=proj_idx,
+                    row_indices=row_idx,
+                    col_indices=col_idx,
+                    energy_kev=energy_kev,
+                    use_cuda=use_cuda,
+                    n_projections_total=n_scan,
                 )
-                st.rerun()

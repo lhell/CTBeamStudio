@@ -28,6 +28,12 @@ logging.getLogger(__name__).info("mpr loaded from %s", _mpr.__file__)
 import numpy as np
 import streamlit as st
 
+from visualization.actions import (
+    drain_action_results,
+    mount_queue_poller,
+    session_token,
+    streamlit_notify,
+)
 from visualization.background_load import (
     STATUS_DONE,
     STATUS_FAILED,
@@ -726,6 +732,12 @@ def render_startup_status() -> None:
 def main():
     st.set_page_config(page_title="CTBeamStudio", page_icon="🏥", layout="wide")
 
+    # Apply finished queue items before any widget is created: an apply writes
+    # widget-backed keys (slice indices, sample presets), which Streamlit forbids
+    # after instantiation. Notifications use Streamlit explicitly here; the
+    # default drain notify is a logger for context-free callers.
+    drain_action_results(session_token(), notify=streamlit_notify)
+
     # Render a lightweight shell first: it is streamed to the browser before
     # the (potentially slow) data loading below, so the page appears instantly.
     shell = st.empty()
@@ -768,6 +780,12 @@ def main():
 
     with tab_compare:
         render_comparison_tab(volume, projection_geometry)
+
+    # Mount last: every action button has been evaluated by now, including the
+    # FP button in the tab above. The poller renders nothing; it only forces an
+    # app rerun when a queued item changes state, so results are applied even
+    # when the queue panel is hidden.
+    mount_queue_poller(session_token())
 
 
 if __name__ == "__main__":

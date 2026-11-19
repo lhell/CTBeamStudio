@@ -84,13 +84,13 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **359 passed, 0 skipped**, ~25–45 s depending on disk
+- Baseline in `ct-viewer`: **387 passed, 0 skipped**, ~25–50 s depending on disk
   cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, T-101 + T-102
   added 2, over the 301 baseline; 1 removed by dropping the correlation
   metric; 2 added for the scan z-offset; T-104 added 5; T-106 added 6
   (release-tag lockstep); T-108 added 1 (FP progress callback); T-110
   removed 10 and added 3 (in-canvas overlay toggle replaced by the
-  3D-options checkbox)).
+  3D-options checkbox); T-109 added 28 (14 queue, 12 actions, 2 UI smoke)).
   When your task changes
   the suite profile, update the numbers here as part of done.
 - No `slow` marker and no default deselection exist: a plain `pytest` run is the
@@ -105,9 +105,11 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - `docs/plan.md` is German and stays German; new ledger tasks use its format
   (Ziel / Dateien / Abhängig von / Akzeptanz / Status).
 - Task numbers are permanent: never renumber or reorder them, because they appear
-  in code, tests, CI and specs. File each new task under the phase of its theme
-  (not at the end of the file) and take the next free number — currently `T-108`.
-  See `plan.md` § "Phasen, Themen und Nummernkreise".
+  in code, tests, CI and specs. New tasks are numbered `T-<phase>-<nn>` (two-digit
+  `nn`, starting at `01` per phase — e.g. the next Phase 11 task is `T-11-01`);
+  legacy `T-01`–`T-110` stay unchanged and unstructured `T-111+` is no longer
+  issued. File each new task under the phase of its theme (not at the end of the
+  file). See `plan.md` § "Phasen, Themen und Nummernkreise".
 - New documentation is English.
 - Specs: `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`.
   Plans: `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.

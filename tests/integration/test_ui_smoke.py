@@ -44,6 +44,10 @@ def app():
     at.session_state["projection_geometry"] = ProjectionGeometry()
     at.session_state["geometry_is_default"] = True
     at.session_state["geometry_loaded_original"] = ProjectionGeometry()
+    # The worker-driven queue cannot advance under AppTest (run_every fragments
+    # never fire). Run actions inline so click-then-assert tests still observe
+    # their result in the same run, exactly as they did before T-109.
+    at.session_state["actions_inline"] = True
     at.run()
     return at
 
@@ -90,8 +94,8 @@ def test_sidebar_sections_are_collapsible_in_order(app):
 
 def test_image_expanded_and_measurements_collapsed(app):
     """Only the image section is open. Measured data is an optional second
-    input, so it starts collapsed to keep the actual load controls near the
-    top."""
+    input, so it starts collapsed to keep the load controls near the top. The
+    `Show queue` switch is a plain checkbox, not another expander."""
     expanded = {
         expander.label: expander.proto.expanded for expander in app.sidebar.expander
     }
@@ -99,6 +103,58 @@ def test_image_expanded_and_measurements_collapsed(app):
         "Image": True,
         "Measurements": False,
     }
+
+
+def test_show_queue_switch_is_off_by_default(app):
+    """The queue is a developer tool: present, but hidden until asked for."""
+    boxes = {box.label: box for box in app.sidebar.checkbox}
+
+    assert "Show queue" in boxes
+    assert boxes["Show queue"].value is False
+
+
+def test_show_queue_lists_pending_actions_with_cancel(app):
+    """Option A: queued clicks are visible and only pending ones can be
+    cancelled. A real worker is held on a gate so the second item stays
+    pending; the poller's run_every cannot be driven under AppTest, but its
+    first render still shows the live snapshot.
+    """
+    import threading
+
+    from visualization import action_queue
+
+    token = app.session_state["action_queue_token"]
+    gate = threading.Event()
+    action_queue.enqueue(
+        token,
+        action_queue.QueueItem(
+            label="Blocking load",
+            run=lambda: "ok" if gate.wait(30) else "timeout",
+        ),
+    )
+    pending = action_queue.QueueItem(label="Queued Series", run=lambda: "never")
+    pending_id = action_queue.enqueue(token, pending)
+
+    app.sidebar.checkbox(key="dev_show_queue").check()
+    try:
+        app.run()
+
+        captions = " ".join(c.value for c in app.get("caption"))
+        assert "Blocking load · running" in captions
+        assert "Queued Series · pending" in captions
+        cancels = [b for b in app.sidebar.button if b.label == "✕ Cancel"]
+        assert len(cancels) == 1
+
+        cancels[0].click()
+        app.run()
+        assert pending_id not in [i.id for i in action_queue.snapshot(token)]
+    finally:
+        gate.set()
+        action_queue.reset_queue(token)
+        if "_action_queue_signature" in app.session_state:
+            del app.session_state["_action_queue_signature"]
+        app.sidebar.checkbox(key="dev_show_queue").uncheck()
+        app.run()
 
 
 def test_sidebar_no_longer_has_a_data_header(app):
@@ -479,6 +535,9 @@ def test_sinogram_inspection_run_button_produces_simulation(app):
     _seed_measurements(app, shape=FP_DEFAULT_SIM_SHAPE)
 
     app.button(key="fp_run").click()
+    app.run()
+    # The click applies the inline result after the comparison views have been
+    # drawn in that run; in production the queue poller supplies this rerun.
     app.run()
 
     assert list(app.exception) == []

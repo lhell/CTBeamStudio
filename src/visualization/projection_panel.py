@@ -970,8 +970,14 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
             "Use CUDA if available (forward projection only)",
             value=True,
             key="fp_use_cuda",
+            help=(
+                "Builds the ray (LOR) geometry on the GPU. The projection "
+                "kernel itself is chosen by the installed parallelproj build: "
+                "a CUDA build uses the GPU whenever it can see a device, and a "
+                "CPU-only build always projects on the CPU."
+            ),
         )
-        st.caption("Without CUDA the projection runs on the CPU.")
+        st.caption("A CPU-only parallelproj build always projects on the CPU.")
         energy_kev = float(
             st.slider(
                 "Beam energy (keV)",

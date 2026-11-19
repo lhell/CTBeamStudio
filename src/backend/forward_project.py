@@ -228,7 +228,11 @@ def _forward_project_parallelproj(
 
     n_projs = len(proj_indices)
 
-    # Choose device: CUDA only if available and requested.
+    # Choose the device that builds the LOR geometry. parallelproj 1.10.x picks
+    # the projection kernel itself from the image array and the CUDA devices it
+    # can see: host numpy takes its hybrid route (CUDA library when available,
+    # OpenMP otherwise), so the volume stays on the host below and no cupy
+    # installation is required.
     cuda_available = torch.cuda.is_available() and use_cuda
     dev = "cuda" if cuda_available else "cpu"
 
@@ -263,7 +267,10 @@ def _forward_project_parallelproj(
     row_spacing = geometry.det_row_spacing_mm
     z_step = (pitch * n_rows * row_spacing / ppr) if pitch > 0 else 0.0
 
-    # Volume -> parallelproj (nx, ny, nz) ordering, as float32 numpy.
+    # Volume -> parallelproj (nx, ny, nz) ordering, as float32 numpy. Host
+    # numpy is deliberate: parallelproj's hybrid route copies it to the CUDA
+    # devices itself when they are available, while a CUDA torch image would
+    # take the cupy kernel path (extra dependency, not in the validated env).
     volume_array = volume.array.astype(np.float32)
     volume_xyz = to_parallelproj_batch(volume_array)[0, 0]
 

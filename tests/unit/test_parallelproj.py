@@ -13,10 +13,69 @@ parallelproj = pytest.importorskip("parallelproj")
 
 from backend.parallelproj import (
     from_parallelproj_batch,
+    projector,
     to_parallelproj_batch,
 )
 from backend.parallelproj.geometry import ConeBeamGeometry
-from backend.parallelproj.projector import ConeBeamProjector
+from backend.parallelproj.projector import (
+    ConeBeamProjector,
+    _from_operator_output,
+    _to_operator_input,
+)
+
+
+def _available_device() -> str:
+    """Device that actually exists here: ``cuda:0`` on a GPU box, else CPU.
+
+    Never skips: every test runs on whichever device the machine has.
+    """
+    import torch
+
+    return "cuda:0" if torch.cuda.is_available() else "cpu"
+
+
+class _HostTensor:
+    """CPU-side array stand-in returned by ``_FakeDeviceTensor.cpu()``."""
+
+    def __init__(self, array: np.ndarray):
+        self._array = array
+        self.numpy_calls = 0
+
+    def numpy(self) -> np.ndarray:
+        self.numpy_calls += 1
+        return self._array
+
+
+class _FakeDeviceTensor:
+    """Torch-like tensor that refuses implicit numpy conversion.
+
+    Mirrors audit finding #1: ``np.asarray`` on a CUDA tensor raises
+    ``TypeError: can't convert cuda:0 device type tensor to numpy``, while
+    ``.detach().cpu().numpy()`` succeeds. Using it proves the projector takes
+    the explicit host-copy route; no CUDA hardware is required.
+    """
+
+    def __init__(self, array):
+        self._array = np.asarray(array, dtype=np.float32)
+        self.detach_calls = 0
+        self.cpu_calls = 0
+        self.host = None
+
+    @property
+    def shape(self):
+        return self._array.shape
+
+    def __array__(self, *args, **kwargs):
+        raise TypeError("can't convert cuda:0 device type tensor to numpy.")
+
+    def detach(self):
+        self.detach_calls += 1
+        return self
+
+    def cpu(self):
+        self.cpu_calls += 1
+        self.host = _HostTensor(self._array)
+        return self.host
 
 
 def _four_region_volume(n: int = 16) -> np.ndarray:
@@ -36,7 +95,7 @@ def _four_region_volume(n: int = 16) -> np.ndarray:
     return vol
 
 
-def _default_projector(vol_zyx: np.ndarray) -> ConeBeamProjector:
+def _default_projector(vol_zyx: np.ndarray, dev: str = "cpu") -> ConeBeamProjector:
     """Build a 0° cone-beam projector covering the full volume."""
     g = ConeBeamGeometry(
         sid=500.0,
@@ -49,7 +108,7 @@ def _default_projector(vol_zyx: np.ndarray) -> ConeBeamProjector:
         det_col_spacing_mm=1.0,
         first_angle=0.0,
     )
-    pos_start, pos_end = g.calculate_xray_beam_list(dev="cpu")
+    pos_start, pos_end = g.calculate_xray_beam_list(dev=dev)
 
     n = vol_zyx.shape[0]
     spacing_zyx = (1.0, 1.0, 1.0)
@@ -233,3 +292,100 @@ def test_forward_project_selected_projection_indices_match_full():
         rtol=1e-5,
         atol=1e-5,
     )
+
+
+# --- Device boundary (T-08-01) ---
+#
+# parallelproj 1.10.x dispatches on the image array, so the projector converts
+# every tensor to host numpy at one boundary. These tests pin that contract
+# without needing CUDA: the fake tensor raises on implicit numpy conversion,
+# exactly like a real CUDA tensor did in audit finding #1.
+
+
+def test_lor_positions_never_convert_cuda_tensor_implicitly():
+    """LOR positions go through ``detach().cpu()``, never ``np.asarray``."""
+    raw = np.arange(12, dtype=np.float32).reshape(4, 3)
+    fake = _FakeDeviceTensor(raw)
+
+    out = _to_operator_input(fake)
+
+    assert isinstance(out, np.ndarray)
+    assert out.shape == (4, 3)
+    assert out.dtype == np.float32
+    np.testing.assert_array_equal(out, raw)
+    assert fake.detach_calls == 1
+    assert fake.cpu_calls == 1
+
+
+def test_operator_output_returns_host_numpy():
+    """A tensor-shaped operator result is copied to host memory."""
+    raw = np.arange(6, dtype=np.float32)
+    fake = _FakeDeviceTensor(raw)
+
+    out = _from_operator_output(fake)
+
+    assert isinstance(out, np.ndarray)
+    np.testing.assert_array_equal(out, raw)
+
+
+def test_projector_converts_all_tensors_before_calling_parallelproj(monkeypatch):
+    """``__init__``, ``apply`` and ``adjoint`` hand host numpy to upstream."""
+    seen = {}
+
+    class _StubOperator:
+        in_shape = (2, 2, 2)
+        out_shape = (4,)
+
+        def __call__(self, volume):
+            seen["volume"] = volume
+            return np.ones(4, dtype=np.float32)
+
+        def adjoint(self, flat_proj):
+            seen["adjoint"] = flat_proj
+            return np.ones((2, 2, 2), dtype=np.float32)
+
+    def _factory(start, end, *args, **kwargs):
+        seen["start"] = start
+        seen["end"] = end
+        return _StubOperator()
+
+    monkeypatch.setattr(projector, "ListmodePETProjector", _factory)
+
+    pos = _FakeDeviceTensor(np.zeros((8, 3), dtype=np.float32))
+    proj = ConeBeamProjector(
+        pos,
+        pos,
+        img_shape_zyx=(2, 2, 2),
+        spacing_zyx=(1.0, 1.0, 1.0),
+        origin_zyx=(0.0, 0.0, 0.0),
+        n_det_rows=2,
+        n_det_cols=2,
+        n_projections=1,
+    )
+
+    for key in ("start", "end"):
+        assert isinstance(seen[key], np.ndarray)
+        assert seen[key].shape == (8, 3)
+
+    out = proj.apply(_FakeDeviceTensor(np.ones((2, 2, 2), dtype=np.float32)))
+    assert isinstance(seen["volume"], np.ndarray)
+    assert out.shape == (1, 2, 2)
+
+    adj = proj.adjoint(_FakeDeviceTensor(np.ones((1, 2, 2), dtype=np.float32)))
+    assert isinstance(seen["adjoint"], np.ndarray)
+    assert adj.shape == (2, 2, 2)
+
+
+def test_geometry_lors_from_available_device_match_cpu():
+    """LORs built on the available device project like CPU-built LORs.
+
+    On a CPU-only machine both sides are the CPU path; on a GPU machine the
+    left side exercises exactly the CUDA-tensor boundary that used to raise.
+    """
+    vol_zyx = _four_region_volume(8)
+    vol_xyz = np.transpose(vol_zyx, (2, 1, 0))
+
+    on_device = _default_projector(vol_zyx, dev=_available_device()).apply(vol_xyz)
+    on_cpu = _default_projector(vol_zyx, dev="cpu").apply(vol_xyz)
+
+    np.testing.assert_allclose(on_device, on_cpu, rtol=1e-5, atol=1e-5)

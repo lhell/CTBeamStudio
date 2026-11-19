@@ -15,6 +15,21 @@ output layout.
 
 Volumes enter/leave in the parallelproj ``(x, y, z)`` voxel ordering (World B);
 see :mod:`backend.parallelproj.shape`.
+
+Device model
+------------
+parallelproj 1.10.x decides where a projection runs from the **image array
+type**, not from the LOR tensors (``parallelproj.backend.joseph3d_fwd``):
+
+* host numpy image -- hybrid route: when the installed library sees CUDA
+  devices it copies the image to them and runs the CUDA kernels, otherwise it
+  runs the OpenMP kernels. No ``cupy`` and no CUDA torch tensors needed.
+* CUDA torch/cupy image -- raw ``cupy`` kernels, which requires ``cupy``.
+
+Feeding host numpy therefore works on CPU-only builds and on CUDA builds alike,
+which is why every tensor is converted at this single boundary.
+``np.asarray`` must never be called on a CUDA tensor directly: it raises
+``TypeError: can't convert cuda:0 device type tensor to numpy``.
 """
 
 from typing import Tuple
@@ -25,17 +40,28 @@ from parallelproj.projectors import ListmodePETProjector
 from .shape import spacing_to_parallelproj, tuple_to_parallelproj
 
 
-def _as_numpy_xyz(positions) -> np.ndarray:
-    """Convert LOR positions (numpy / torch, any device) to a C-contiguous
-    float32 numpy array of shape ``(n, 3)`` in ``(x, y, z)`` world order.
+def _as_host_array(value, dtype=np.float32) -> np.ndarray:
+    """Return ``value`` as a C-contiguous host numpy array.
 
-    parallelproj's joseph3d kernel requires C-contiguous float32 arrays, so
-    torch tensors are moved to CPU and have their layout normalised here.
+    Torch tensors are detached and copied to host memory explicitly. This is
+    the only place where tensors may cross into numpy: an implicit
+    ``np.asarray`` on a CUDA tensor raises instead of copying.
     """
-    if hasattr(positions, "detach"):  # torch.Tensor
-        positions = positions.detach().cpu().numpy()
-    arr = np.asarray(positions).reshape(-1, 3).astype(np.float32)
-    return np.ascontiguousarray(arr)
+    if hasattr(value, "detach"):  # torch.Tensor on any device
+        value = value.detach().cpu().numpy()
+    return np.ascontiguousarray(np.asarray(value, dtype=dtype))
+
+
+def _to_operator_input(positions) -> np.ndarray:
+    """LOR positions as a ``(n, 3)`` host float32 array in ``(x, y, z)`` order."""
+    return _as_host_array(positions).reshape(-1, 3)
+
+
+def _from_operator_output(value) -> np.ndarray:
+    """Operator result as host numpy, whatever array type upstream returns."""
+    if hasattr(value, "detach"):  # torch.Tensor on any device
+        value = value.detach().cpu().numpy()
+    return np.asarray(value)
 
 
 class ConeBeamProjector:
@@ -80,8 +106,8 @@ class ConeBeamProjector:
         img_origin = tuple_to_parallelproj(origin_zyx)
 
         self._operator = ListmodePETProjector(
-            np.asarray(pos_beam_start),
-            np.asarray(pos_beam_end),
+            _to_operator_input(pos_beam_start),
+            _to_operator_input(pos_beam_end),
             tuple_to_parallelproj(img_shape_zyx),
             voxel_size,
             img_origin,
@@ -120,14 +146,16 @@ class ConeBeamProjector:
         ordering. Returns a float32 array of shape
         ``(n_projections, n_rows, n_cols)``.
 
+        The volume is handed to parallelproj as host numpy: its hybrid route
+        then runs on CUDA when the library sees devices, and on the CPU
+        otherwise. A CUDA tensor would need ``cupy`` instead.
+
         The flat operator output is ordered ``(proj, col, row)`` (matches the
         LOR layout), so it is reshaped via ``(proj, cols, rows)`` and then the
         ``col``/``row`` axes are swapped to produce the ``(proj, rows, cols)``
         grid.
         """
-        flat = np.asarray(
-            self._operator(np.ascontiguousarray(volume_xyz, dtype=np.float32))
-        )
+        flat = _from_operator_output(self._operator(_as_host_array(volume_xyz)))
         return (
             flat.reshape(self.n_projections, self.n_det_cols, self.n_det_rows)
             .swapaxes(1, 2)
@@ -141,7 +169,7 @@ class ConeBeamProjector:
         volume in parallelproj ``(nx, ny, nz)`` ordering. This inverts the
         reshuffling done in :meth:`apply`.
         """
-        proj = np.asarray(proj_zyx)
+        proj = _from_operator_output(proj_zyx)
         flat = proj.swapaxes(1, 2).reshape(self.flat_out_shape)
         flat = np.ascontiguousarray(flat, dtype=np.float32)
-        return np.asarray(self._operator.adjoint(flat))
+        return _from_operator_output(self._operator.adjoint(flat))

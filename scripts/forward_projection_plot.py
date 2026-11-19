@@ -1,9 +1,12 @@
 """Visual test for forward_project: volume + 0° projection in world orientation.
 
-Run this from PyCharm with the ``ct-viewer`` conda environment (Python 3.12,
-which has parallelproj installed). It builds a small 4-region test volume,
+Run this from PyCharm with the ``ct-viewer`` conda environment, which has
+parallelproj installed. It builds a small 4-region test volume,
 forward-projects it at 0°, and displays both with matplotlib using correct
 *world* axes (x / y / z), plus the source and detector positions of the beam.
+
+CUDA is used automatically when available; pass ``--cpu`` to build the LOR
+geometry on the CPU.
 
 ## World convention used here
 
@@ -21,6 +24,7 @@ is the detector image seen with:
 Requires: numpy, matplotlib, parallelproj (in ct-viewer env).
 """
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -61,8 +65,26 @@ def make_volume(n: int = 16) -> Volume:
     return Volume(array=vol, spacing=spacing, origin=origin, meta={"unit": "1/mm"})
 
 
+def _torch_cuda_available() -> bool:
+    try:
+        import torch
+    except ImportError:  # pragma: no cover - manual script outside the env
+        return False
+    return bool(torch.cuda.is_available())
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="build the LOR geometry on the CPU instead of auto-selecting CUDA",
+    )
+    args = parser.parse_args()
+
+    use_cuda = (not args.cpu) and _torch_cuda_available()
     print(f"parallelproj available: {PARALLELPROJ_AVAILABLE}")
+    print(f"LOR geometry device: {'cuda' if use_cuda else 'cpu'}")
     if not PARALLELPROJ_AVAILABLE:
         print(
             "WARNING: parallelproj not installed. Use the ct-viewer conda "
@@ -85,7 +107,7 @@ def main() -> None:
         projections_per_rotation=1,
     )
 
-    result = forward_project(volume, geometry, use_cuda=False)
+    result = forward_project(volume, geometry, use_cuda=use_cuda)
     proj = result.projections[0]  # (rows=z, cols=y) at 0°
     print(f"projection shape: {result.projections.shape}")
     print(f"projection min/max: {proj.min():.3f} / {proj.max():.3f}")

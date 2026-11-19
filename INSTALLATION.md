@@ -6,8 +6,8 @@ This guide covers all installation options for CTBeamStudio.
 
 **Recommendation: the conda env from `environment.yml` (Option 3a).** It is the
 only route that is validated end to end here: Python 3.11, conda-forge's
-`parallelproj` 1.x with CPU kernels, working forward projection, and the full
-suite green (387 passed, 0 skipped). Forward projection is the point of this
+`parallelproj` 1.10.x with CPU kernels, working forward projection, and the full
+suite green (390 passed, 0 skipped). Forward projection is the point of this
 tool, so a pip-only install gives you most of the UI but not its core feature.
 
 | Situation | Pick |
@@ -32,12 +32,14 @@ if you can build with conda directly.
 
 ## Prerequisites
 
-- **Python 3.11 for the validated conda env.** The pinned `parallelproj` 1.x
-  builds provide Python bindings for 3.11. Python 3.12+ is fine for the pip
-  viewer-only route and for `parallelproj` 2.x, but 2.x needs a different
+- **Python 3.11 for the validated conda env.** The validated dependency is
+  `parallelproj` **1.10.x** (the app imports `parallelproj.projectors`), paired
+  with `libparallelproj` 1.10.x. Python 3.12+ is fine for the pip viewer-only
+  route; `parallelproj` 2.x requires Python >= 3.12, but 2.x needs a different
   library generation (`parallelproj-core`/`libparallelproj` 2.0.x) and is not
   the tested baseline — see
-  [GPU setup](#gpu-setup-nvidia-read-before-you-start).
+  [GPU setup](#gpu-setup-nvidia-read-before-you-start). Pinning **1.3.x** does
+  *not* work: those builds predate the `parallelproj.projectors` API.
 - **Operating System**: Windows 10/11, macOS, or Linux
 - **Minimum 8GB RAM** (16GB+ recommended for large CT datasets)
 - **NVIDIA driver** — only for the optional GPU variant; check with `nvidia-smi`
@@ -108,12 +110,13 @@ be installed from conda-forge. Without it the app still runs, but
 "Run Forward Projection" returns all zeros and shows a warning.
 
 > **Start with the CPU env.** `environment.yml` pins Python 3.11,
-> `parallelproj`/`libparallelproj` 1.x CPU builds and CPU PyTorch. That is the
-> combination the test suite is validated on (387 passed, 0 skipped). If you
-> have an NVIDIA GPU, read [GPU setup](#gpu-setup-nvidia-read-before-you-start)
-> *before* running an unpinned `conda install ... pytorch cuda-toolkit`: the
-> solver can bump Python to 3.12 and install `parallelproj` 2.x instead, which
-> is a different, untested dependency combination here.
+> `parallelproj`/`libparallelproj` **1.10.x** CPU builds and CPU PyTorch. That
+> is the combination the test suite is validated on (390 passed, 0 skipped). If
+> you have an NVIDIA GPU, read
+> [GPU setup](#gpu-setup-nvidia-read-before-you-start) *before* running an
+> unpinned `conda install ... pytorch cuda-toolkit`: the solver can pick
+> `parallelproj` 2.x, which is a different, untested dependency combination
+> here.
 
 #### Option 3a: Miniforge (recommended — conda-forge by default)
 
@@ -164,11 +167,12 @@ Run the `pip install` from the **repository root** (the directory containing
 conda create -n ct-viewer python=3.11 -y
 conda activate ct-viewer
 
-# CPU-only (no NVIDIA GPU). The py311 build string is essential: plain
-# "parallelproj" can resolve to a C-library-only build that has no Python
-# module at all. PyTorch is required by the projection backend, not optional.
+# CPU-only (no NVIDIA GPU). Pin the 1.10.x pair: the app imports
+# parallelproj.projectors, which older 1.3.x builds do not provide. Plain
+# "parallelproj" can also resolve to a C-library-only build with no Python
+# module. PyTorch is required by the projection backend, not optional.
 conda install -c conda-forge \
-  "parallelproj=1.3.*=*py311*" "libparallelproj=1.3.*=*cpu*" "pytorch=*=cpu*" -y
+  "parallelproj=1.10.*" "libparallelproj=1.10.*=*cpu*" "pytorch=*=cpu*" -y
 
 # Install the app and remaining dependencies with pip
 pip install -e ".[dev]"
@@ -184,12 +188,16 @@ env instead of layering GPU packages onto the CPU one:
 
 1. Confirm the driver: `nvidia-smi`. The CUDA version shown there is the
    driver's maximum supported toolkit version, not the version to install.
-2. Keep **Python 3.11** in the solve — do not let a GPU PyTorch build pull 3.12.
-3. Pick a **matched pair**: the same `parallelproj`/`libparallelproj` version
-   and the same CUDA build. `conda search -c conda-forge "parallelproj=1.3.*"`
-   lists the options; for example `parallelproj=1.3.5=cuda112_py311*` goes with
-   `libparallelproj=1.3.5=cuda112*`. Do not mix a 1.x wrapper with a 2.0.x
-   library, and CUDA 11 vs CUDA 13 builds are not interchangeable.
+2. **Python 3.11 is the validated baseline.** If the only GPU PyTorch build for
+   your driver needs 3.12, that is acceptable **as long as `parallelproj` stays
+   on 1.10.x** (1.10.x supports Python >= 3.10). The failure mode is not 3.12
+   itself — it is 3.12 plus an unpinned `parallelproj` resolving to 2.x. Pin the
+   1.10.2 pair explicitly.
+3. Pick a **matched pair** of `parallelproj` **1.10.2** and `libparallelproj`
+   **1.10.2** with the same CUDA generation (conda-forge ships 1.10.2 with
+   `cuda129*` and `cuda130*` library builds). Check what is available with
+   `conda search -c conda-forge "libparallelproj=1.10.2" --info`. Do not mix a
+   1.x wrapper with a 2.0.x library, or a CUDA 12 build with a CUDA 13 build.
 4. Install Python, the matched pair, PyTorch and the toolkit in **one** solve,
    then the app from the repo root:
 
@@ -197,26 +205,33 @@ env instead of layering GPU packages onto the CPU one:
    conda create -n ct-viewer python=3.11 -y
    conda activate ct-viewer
    conda install -c conda-forge python=3.11 \
-     "parallelproj=1.3.5=cuda112_py311*" "libparallelproj=1.3.5=cuda112*" \
+     "parallelproj=1.10.2" "libparallelproj=1.10.2=cuda130*" \
      pytorch cuda-toolkit -y
    pip install -e ".[dev]"
    ```
 
-   Adjust the CUDA build to your driver/GPU; the example above is a known
-   build combination, not a universal pin. Check the result with
-   `conda list parallelproj libparallelproj pytorch` before moving on.
+   Pick `cuda129*` instead of `cuda130*` if that matches your driver; the
+   example is a known build family, not a universal pin. Let conda choose the
+   matching wrapper build number. If your GPU PyTorch build forces Python 3.12,
+   change both `python=3.11` pins to `3.12` and keep `parallelproj=1.10.2` /
+   `libparallelproj=1.10.2` in the same solve. Check the result with
+   `conda list parallelproj libparallelproj pytorch python` before moving on.
 5. Verify the API the app actually imports (see [Verification](#verification)):
    `python -c "from parallelproj.projectors import ListmodePETProjector"`.
 
-Three install traps seen in a real GPU setup:
+Four install traps seen in a real GPU setup:
 
-- Letting the solver upgrade to Python 3.12 and `parallelproj` 2.0.x. That is a
-  valid upstream combination, but it leaves the validated 1.x baseline and
-  changes the diagnostic API (see [Verification](#verification)). Pin
-  `python=3.11` to stay on the tested path.
+- **Letting the solver pair Python 3.12 with `parallelproj` 2.x.** 1.10.x also
+  supports 3.12, so 3.12 itself is not the problem; the problem is an unpinned
+  `parallelproj` resolving to 2.x on 3.12 (different library generation and
+  diagnostic API, see [Verification](#verification)). Pin
+  `parallelproj=1.10.2` and `libparallelproj=1.10.2` explicitly.
+- **Pinning `parallelproj=1.3.*` because an older guide said so.** Those builds
+  predate the `parallelproj.projectors` namespace the app imports, so the
+  projection code fails at import time. Use 1.10.x.
 - Installing `parallelproj=1.3.2=cuda11.1h1234567*`: those builds contain only
   C libraries and headers, so `import parallelproj` fails with
-  `ModuleNotFoundError`. Use a `*_py311*` build.
+  `ModuleNotFoundError`. Use a build that ships the Python module.
 - Installing a modern `libparallelproj` (e.g. 2.0.7/cuda130) next to an old
   `parallelproj` wrapper. The library and wrapper versions must match.
 
@@ -248,8 +263,9 @@ CUDA is **not** enabled or validated by the tests:
 - `scripts/verify_forward_projection.py` and `scripts/forward_projection_plot.py`
   both hard-code `use_cuda=False`, so they check the CPU path. In a GPU-built
   parallelproj env that path can still fail with `cudaSetDevice`; use them in
-  the CPU env from `environment.yml` for a meaningful check (T-08-01 adds an
-  optional `--cuda` flag).
+  the CPU env from `environment.yml` for a meaningful check. T-08-01 changes
+  them to auto-select CUDA when available (like the app) with a `--cpu` flag to
+  force CPU, so they work in either env.
 - In the app, **Use CUDA if available (forward projection only)** is ticked by
   default. Unticking it avoids the projector crash but does not fix a GPU-only
   parallelproj build — see the known limitation above.
@@ -288,7 +304,7 @@ C-library-only builds do not provide a usable Python package at all.
 python -c "import parallelproj, torch; from parallelproj.projectors import ListmodePETProjector; print('parallelproj OK'); print('CUDA available:', torch.cuda.is_available())"
 ```
 
-On a working parallelproj **1.x** build these extra diagnostics also exist:
+On a working parallelproj **1.10.x** build these extra diagnostics also exist:
 
 ```python
 print(parallelproj.cuda_present)              # False = CPU-only build
@@ -302,9 +318,9 @@ Notes on API names:
   diagnostics above (`cuda_present`, `lib_parallelproj_c_fname`) are
   **1.x-only**; 2.0.x removed both (it depends on a separate
   `parallelproj-core` package instead).
-- `parallelproj.projectors.ListmodePETProjector` exists in both 1.x and 2.x;
-  the version choice matters for the Python version, the matching library and
-  which diagnostics are available.
+- `parallelproj.projectors.ListmodePETProjector` exists in **1.10.x** and in
+  2.x, but not in the old 1.3.x builds. The version choice matters for the
+  Python version, the matching library and which diagnostics are available.
 - `torch.cuda.is_available()` is what this app uses to decide whether to
   request CUDA, so check that — not `parallelproj.cuda_present`.
 
@@ -316,7 +332,7 @@ python -c "import streamlit; import pydicom; import plotly; print('OK')"
 ```
 
 For a source checkout, the full check is `python -m pytest -q -rs` from the
-activated env: expect zero skips (387 passed on the CPU env).
+activated env: expect zero skips (390 passed on the CPU env).
 
 ---
 
@@ -342,10 +358,11 @@ streamlit run src/visualization/app.py
 
 ### `import parallelproj` fails although conda lists it
 Check the build string: `conda list parallelproj libparallelproj`. Builds such
-as `1.3.2=cuda11.1h1234567*` ship C libs only and have no Python module. Rebuild
-the env with a `*_py311*` build of `parallelproj` 1.x and a matching
-`libparallelproj` (see [Option 3c](#option-3c-manual-conda-install)). Also make
-sure you are in the activated env — a bare interpreter will not see it.
+as `1.3.2=cuda11.1h1234567*` ship C libs only and have no Python module; the
+1.3.x Python-binding builds also lack `parallelproj.projectors`. Rebuild the
+env with the **1.10.x** pair and a matching `libparallelproj` (see
+[Option 3c](#option-3c-manual-conda-install)). Also make sure you are in the
+activated env — a bare interpreter will not see it.
 
 ### `AttributeError: module 'parallelproj' has no attribute 'cuda_present'`
 The solver installed `parallelproj` 2.x (it requires Python 3.12). The
@@ -389,7 +406,7 @@ user-writable path such as `$HOME` and run it from there.
 ### CPU-only mode for parallelproj
 ```bash
 conda install -c conda-forge \
-  "parallelproj=1.3.*=*py311*" "libparallelproj=1.3.*=*cpu*" "pytorch=*=cpu*"
+  "parallelproj=1.10.*" "libparallelproj=1.10.*=*cpu*" "pytorch=*=cpu*"
 ```
 
 ### Port 8501 already in use
@@ -439,7 +456,7 @@ without any warning, so it looks like it worked. Use conda:
 ```bash
 conda activate ct-viewer
 conda install -c conda-forge \
-  "parallelproj=1.3.*=*py311*" "libparallelproj=1.3.*=*cpu*" "pytorch=*=cpu*"
+  "parallelproj=1.10.*" "libparallelproj=1.10.*=*cpu*" "pytorch=*=cpu*"
 ```
 
 **GPU (CUDA):** do not use a bare `conda install parallelproj pytorch
@@ -455,7 +472,7 @@ there is nothing to do. PyTorch alone can also come from pip, but
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 conda install -c conda-forge \
-  "parallelproj=1.3.*=*py311*" "libparallelproj=1.3.*=*cpu*"
+  "parallelproj=1.10.*" "libparallelproj=1.10.*=*cpu*"
 ```
 
 **Verify installation** with the `from parallelproj.projectors import ...`

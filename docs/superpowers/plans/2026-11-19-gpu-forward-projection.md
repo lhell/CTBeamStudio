@@ -5,8 +5,11 @@ Ledger task: T-08-01
 Design: [2026-11-19-gpu-forward-projection-design.md](../specs/2026-11-19-gpu-forward-projection-design.md)
 
 Prerequisite: a working CUDA conda env built as described in `INSTALLATION.md`
-("GPU setup"), with Python 3.11 and a matched `parallelproj`/`libparallelproj`
-1.x pair. Without a GPU device, steps 5 and 6 can only be prepared, not verified.
+("GPU setup"), with Python 3.11 and a matched `parallelproj` /
+`libparallelproj` **1.10.x** pair. The earlier 1.3.x pin was wrong — those
+builds do not provide `parallelproj.projectors`; 2.x would force Python 3.12 and
+is not the validated baseline. Without a GPU device, steps 5 and 6 can only be
+prepared, not verified.
 
 Suite-machine dependence: the current suite is green on CPU and red on GPU
 because `forward_project` selects CUDA from `torch.cuda.is_available()` while
@@ -36,7 +39,7 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
 ## Steps
 
 1. **Confirm the upstream contract on the GPU machine.**
-   - Inspect the installed `parallelproj` 1.x `ListmodePETProjector`: which
+   - Inspect the installed `parallelproj` 1.10.x `ListmodePETProjector`: which
      input types (numpy vs torch CPU vs torch CUDA) it accepts, and what type
      `__call__`/`adjoint` return for each.
    - Run a minimal 1-projection call with CUDA LOR coordinates and record the
@@ -89,7 +92,10 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
 
 6. **Update the scripts and docs after verification passes.**
    - `scripts/verify_forward_projection.py`, `scripts/forward_projection_plot.py`:
-     optional `--cuda` flag, default off.
+     replace hard-coded `use_cuda=False` with `use_cuda=torch.cuda.is_available()`
+     (auto, matching the app) and add `--cpu` to force CPU. A default-off
+     `--cuda` flag would leave the scripts broken by default in a GPU-built env
+     (error #2). Manual scripts only, no pytest impact; print the chosen device.
    - `INSTALLATION.md`: remove the known-limitation blockquote and rewrite the
      "CUDA in the test suite and helper scripts" note to match the new state,
      including the `CUDA_VISIBLE_DEVICES` finding.

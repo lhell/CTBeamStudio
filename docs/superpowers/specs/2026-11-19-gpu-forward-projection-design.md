@@ -37,7 +37,9 @@ a GPU-built env. Audit finding #1
 ## Non-goals
 
 - No parallelproj 2.x migration. The validated dependency set stays conda-forge
-  `parallelproj` 1.x / matching `libparallelproj`, Python 3.11.
+  `parallelproj` **1.10.x** / matching `libparallelproj` 1.10.x. Python 3.11 on
+  the CPU baseline; 3.12 is acceptable on a GPU env when the GPU PyTorch build
+  requires it, provided `parallelproj` stays 1.10.x (1.10.x supports >= 3.10).
 - No GPU in Docker (`full` stays CPU), no GPU runner in CI, no multi-GPU or
   distributed projection, no changes to the data model or attenuation logic.
 - No new skip guards: a skipped test remains a defect (AGENTS.md, D-21).
@@ -71,14 +73,30 @@ CPU mode (`CUDA_VISIBLE_DEVICES=""`) additionally breaks
 `tests/integration/test_projection_workflow.py` (2) and
 `tests/unit/test_parallelproj.py` (2).
 
-**Design contradiction to resolve:** the old plan
+**Dependency deadlock — resolved 19 Nov 2026:** the old plan
 `docs/superpowers/plans/2026-10-27-parallelproj-forward-projection.md` specifies
 Python ≥ 3.12 and `cuda-toolkit=12.1`, while `AGENTS.md` /
 `docs/local-environment.md` specify Python 3.11, CPU-only as the validated
-baseline (359 passed, 0 skipped at the time of the report; 387 now). A CUDA path
-is documented but untested by design ("Cannot be tested on this machine (no
-CUDA)", audit finding #1). `INSTALLATION.md` now records the pinned baseline and
-the observed GPU failures.
+baseline (359 passed, 0 skipped at the time of the report; 390 now). A CUDA path
+was documented but untested by design ("Cannot be tested on this machine (no
+CUDA)", audit finding #1).
+
+The apparent deadlock — "py3.11 + parallelproj 1.3.5 cannot import; the app
+needs 2.x, which has no py3.11 builds" — was caused by a **wrong pin in
+`INSTALLATION.md`**, not by the dependencies. Verified in the local `ct-viewer`
+env on 19 Nov 2026:
+
+- installed: Python **3.11.18**, `parallelproj` **1.10.2**,
+  `libparallelproj` **1.10.2** (cpu), torch 2.10.0 (cpu);
+- `from parallelproj.projectors import ListmodePETProjector` and
+  `import backend.parallelproj` both succeed.
+
+conda-forge indeed has `parallelproj` 2.0.x only for Python >= 3.12, so 2.x does
+force a py3.12 env (the deleted GPU env). It is **not** required: 1.10.x also
+ships CUDA library builds (`cuda129*`, `cuda130*`). `environment.yml` and
+`INSTALLATION.md` now pin the 1.10.x pair. The green baseline is 390 passed /
+0 skipped; four extra local failures in `test_release_push.py` are the known
+missing-`bash` environment issue documented in `AGENTS.md`, not a regression.
 
 ## Proposed design
 
@@ -166,10 +184,13 @@ the projector fix. Step 1's fallback policy decides this:
   reference projection produced in the validated CPU env. Do not invoke the
   broken CPU path in the GPU env and do not add a skip guard.
 6. **Scripts and docs.** `scripts/verify_forward_projection.py` and
-   `scripts/forward_projection_plot.py` get an optional `--cuda` flag (default
-   off). `INSTALLATION.md` drops the known-limitation block and the "CUDA is not
-   validated by tests" note. Audit finding #1 becomes `fixed` only after a real
-   GPU run.
+   `scripts/forward_projection_plot.py` drop the hard-coded `use_cuda=False`:
+   default to `use_cuda=torch.cuda.is_available()` like the app and add `--cpu`
+   to force CPU. A default-off `--cuda` flag is not enough — in a GPU-built env
+   the CPU path itself is broken (error #2). Print the chosen device. These are
+   manual scripts, not pytest tests. `INSTALLATION.md` drops the
+   known-limitation block and the "CUDA is not validated by tests" note. Audit
+   finding #1 becomes `fixed` only after a real GPU run.
 
 ## Risks / open questions
 
@@ -179,8 +200,10 @@ the projector fix. Step 1's fallback policy decides this:
   but peak VRAM must be measured on the A6000.
 - CPU/CUDA kernels are not expected to be bit-identical; tolerance needs to be
   chosen from measurements, not guessed.
-- A Python 3.11 + CUDA build of `parallelproj`/`libparallelproj`/`pytorch` with
-  matching CUDA major is still required; see INSTALLATION.md "GPU setup".
+- A Python 3.11 + `parallelproj` 1.10.2 CUDA build of
+  `parallelproj`/`libparallelproj`/`pytorch` with matching CUDA generation is
+  still required; see INSTALLATION.md "GPU setup". Do not fall back to 1.3.x or
+  2.x to get a CUDA build.
 - The CPU fallback in a GPU-built env is broken independently of the projector
   fix (error #2); hiding devices with `CUDA_VISIBLE_DEVICES=""` is not a fix.
 - Consequently a same-env CPU/GPU parity test may be impossible on a GPU build;

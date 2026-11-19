@@ -21,8 +21,11 @@ channels:
 dependencies:
   - python=3.11
   - pip
-  - parallelproj
-  - libparallelproj=*=cpu*
+  # 1.10.x is the validated API: it provides parallelproj.projectors, which
+  # the app imports. The old 1.3.x *_py311 builds predate that namespace, and
+  # 2.0.x requires Python >= 3.12. Pin the pair so a fresh solve stays here.
+  - parallelproj=1.10.*
+  - libparallelproj=1.10.*=*cpu*
   # The parallelproj backend in src/backend/forward_project.py builds its
   # tensors with torch, so torch is required, not optional.
   - pytorch=*=cpu*

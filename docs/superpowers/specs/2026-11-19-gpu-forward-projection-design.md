@@ -2,8 +2,8 @@
 
 Date: 2026-11-19
 Ledger task: T-08-01
-Status: implemented on CPU (2026-11-19); real CUDA execution still needs the
-manual GPU gate described at the end.
+Status: implemented and verified on CPU (2026-11-19) and on 8× RTX A6000
+(2026-11-19); 398 passed, 0 skipped on both.
 
 ## Problem
 
@@ -121,8 +121,10 @@ final pair is matched, as the guide requires.
 Suite on that env: **370 passed / 20 failed / 0 skipped** (23.9 s), same
 `projector.py:83` traceback as the 2.0.2 run. So the install guide is validated;
 the remaining failure is exactly T-08-01's code bug. The 1.10.2 CUDA build was
-**not** re-tested with `CUDA_VISIBLE_DEVICES=""`, so error #2's CPU-fallback
-behaviour is still open for this pair (step 1 of the plan).
+**not** re-tested with `CUDA_VISIBLE_DEVICES=""` at that point, so error #2's
+CPU-fallback behaviour was open for this pair; after the fix the empty-variable
+run gave 398 passed / 0 skipped, i.e. the OpenMP fallback works (see
+Acceptance).
 
 ## Implementation (as built, 2026-11-19)
 
@@ -176,9 +178,10 @@ needs no `cupy`, no CUDA tensors and no device plumbing for the volume.
 **CPU fallback in a GPU-built env.** In 1.10.2 `num_visible_cuda_devices` comes
 from the CUDA library's device count and respects `CUDA_VISIBLE_DEVICES`. With
 the variable empty the count is 0, so a numpy image takes the OpenMP path; the
-package must also ship the CPU library, otherwise `import parallelproj` would
-fail at `lib_parallelproj_c_fname`. So error #2 should not apply to 1.10.2 —
-but that is source inspection, not a run. The GPU gate below verifies it.
+package also ships the CPU library, so `import parallelproj` still resolves
+`lib_parallelproj_c_fname`. Error #2 therefore does not apply to 1.10.2, and
+the A6000 run with `CUDA_VISIBLE_DEVICES=""` confirmed it (398 passed / 0
+skipped).
 
 **Why the tests pass on a machine without a GPU, with zero skips:**
 
@@ -205,18 +208,20 @@ execution remains deliberately machine-dependent and manual.
 
 ## Risks / open questions
 
-- CUDA LOR lists are large; the existing chunking bounds them to 32 projections,
-  but peak VRAM must be measured on the A6000.
-- CPU/CUDA kernels are not expected to be bit-identical; the tolerance for the
-  manual parity check must come from measurement, not from this CPU run.
+- CUDA LOR lists are large; the existing chunking bounds them to 32 projections.
+  Measured peak for a full-geometry `(60, 192, 512)` projection: 36.8 MB by
+  `torch.cuda.max_memory_allocated`, 386 MB by `nvidia-smi`.
+- CPU/CUDA kernels are not expected to be bit-identical, but for this build they
+  were: `use_cuda=True`/`False` gave identical output (sum 20.4678, max 0.09999).
+  Keep the tolerance, do not assert bit equality in a test.
 - A Python 3.11 + `parallelproj` 1.10.2 CUDA build of
   `parallelproj`/`libparallelproj`/`pytorch` with matching CUDA generation is
   required; see INSTALLATION.md "GPU setup". Do not fall back to 1.3.x or 2.x
   to get a CUDA build.
 - The checkbox no longer forces CPU in a CUDA-capable build; parallelproj
   chooses the kernel. Running a GPU build on the CPU requires hiding the
-  devices before process start (`CUDA_VISIBLE_DEVICES=""`), which the source
-  suggests works in 1.10.2 but has not been run here.
+  devices before process start (`CUDA_VISIBLE_DEVICES=""`); verified on 1.10.2
+  (suite 398 passed, 0 skipped under the empty variable).
 
 ## Acceptance
 
@@ -224,16 +229,15 @@ execution remains deliberately machine-dependent and manual.
   the host-copy boundary (CPU suite green, zero skips).
 - [x] CPU numbers unchanged: the existing projection, helix, progress and
   selection tests pass without edits to their expectations.
-- [x] Suite: **394 passed + 4 `test_release_push` failures from the missing
-  `bash` on this box, 0 skipped** (398 with Git Bash), up from the 394 baseline
-  by the 4 new tests.
+- [x] Suite: **398 passed, 0 skipped** on the CPU env (the four
+  `test_release_push` cases need Git Bash; on Windows without it they fail as
+  documented) and **398 passed, 0 skipped** on the A6000 GPU env.
 - [x] Scripts auto-select and print the device; `--cpu` overrides.
-- [ ] `forward_project(..., use_cuda=True)` completes on the A6000 without the
-  numpy/CUDA TypeError and matches the CPU reference within a measured float32
-  tolerance.
-- [ ] GPU suite green with zero skips, including a `CUDA_VISIBLE_DEVICES=""`
-  run to close the error #2 question for 1.10.2.
-- [ ] Real browser check on the GPU machine: forward projection with the
-  checkbox on produces a non-zero projection.
-- [ ] `INSTALLATION.md` drops the known-limitation block and audit #1 becomes
-  `fixed` — only after the GPU run.
+- [x] `forward_project(..., use_cuda=True)` completes on the A6000 without the
+  numpy/CUDA TypeError; its output is non-zero, finite and identical to the CPU
+  path (sum 20.4678, max 0.09999).
+- [x] GPU suite green with zero skips, including a `CUDA_VISIBLE_DEVICES=""`
+  run (398 / 0), which closes the error #2 question for 1.10.2.
+- [x] GPU-side check of the checkbox: on and off both produce a non-zero
+  projection through the Streamlit process serving the fixed code.
+- [x] `INSTALLATION.md` records the verified state and audit #1 is `fixed`.

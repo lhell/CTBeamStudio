@@ -241,24 +241,26 @@ Four install traps seen in a real GPU setup:
 - Installing a modern `libparallelproj` (e.g. 2.0.7/cuda130) next to an old
   `parallelproj` wrapper. The library and wrapper versions must match.
 
-> **GPU status (2026-11-19): install verified, code fix awaiting a GPU run.**
-> A fresh 1.10.2 / `libparallelproj 1.10.2=cuda129` env on 8× RTX A6000
-> installs and imports cleanly and sees all 8 devices. The projector crash from
-> audit finding #1 (`np.asarray` on CUDA LOR tensors) is fixed in **T-08-01**:
-> every tensor now crosses one explicit `.detach().cpu().numpy()` boundary, and
-> host numpy selects parallelproj's hybrid route, which runs the CUDA kernels
-> without `cupy`. New CPU tests pin that boundary with a fake device tensor that
-> raises on implicit numpy conversion. The actual CUDA run on the A6000 is still
-> pending, so the CPU env from `environment.yml` remains the only *verified*
-> projection baseline (398 passed, 0 skipped). Before the fix the GPU suite was
-> 370 passed / 20 failed; in the earlier 2.0.2/cuda130 env it was 340 / 19, and
-> hiding CUDA made it worse (336 / 23). See **T-08-01** and
+> **GPU status (2026-11-19): verified on 8× RTX A6000.** A fresh 1.10.2 /
+> `libparallelproj 1.10.2=cuda129` env installs and imports cleanly, sees all 8
+> devices, and the suite is **398 passed / 0 skipped** there. The projector crash
+> from audit finding #1 (`np.asarray` on CUDA LOR tensors) is fixed in
+> **T-08-01**: every tensor crosses one explicit `.detach().cpu().numpy()`
+> boundary, and host numpy selects parallelproj's hybrid route, which runs the
+> CUDA kernels without `cupy`. Verified on the GPU box: a full-geometry
+> `(60, 192, 512)` projection peaks at 36.8 MB by
+> `torch.cuda.max_memory_allocated` (386 MB by `nvidia-smi`), and
+> `use_cuda=True`/`False` give bit-identical non-zero projections. With
+> `CUDA_VISIBLE_DEVICES=""` the same suite still passes 398 / 0, confirming the
+> OpenMP fallback for 1.10.2. Both the CPU env from `environment.yml` and this
+> GPU env are now validated baselines (398 passed, 0 skipped). Before the fix
+> the GPU suite was 370 passed / 20 failed; in the earlier 2.0.2/cuda130 env it
+> was 340 / 19, and hiding CUDA made it worse (336 / 23). See **T-08-01** and
 > `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
 
 ### CUDA in the test suite and helper scripts
 
-The suite is designed to be green with zero skips on both a CPU-only and a GPU
-machine; only the CPU side has been run here so far:
+The suite is green with zero skips on both a CPU-only and a GPU machine:
 
 - `tests/unit/test_parallelproj.py` and
   `tests/integration/test_projection_workflow.py` pass `use_cuda=False`

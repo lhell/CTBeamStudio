@@ -13,16 +13,17 @@ prepared, not verified.
 
 Status of that prerequisite (2026-11-19): a fresh 1.10.2 / `libparallelproj
 1.10.2=cuda129` env on 8× RTX A6000 installs and imports cleanly (`projectors`,
-`operators`, `backend.parallelproj`; 8 devices). The suite there is **370 passed
-/ 20 failed / 0 skipped**, all the same `projector.py:83` crash. So the env is
-ready; only the code fix and the contract checks below remain.
+`operators`, `backend.parallelproj`; 8 devices). Before the fix the suite there
+was **370 passed / 20 failed / 0 skipped**, all the same `projector.py:83`
+crash; after T-08-01 it is **398 passed / 0 skipped** (step 5).
 
-Suite-machine dependence: the current suite is green on CPU and red on GPU
-because `forward_project` selects CUDA from `torch.cuda.is_available()` while
-most tests omit the device argument. The goal is a green, zero-skip suite on
-both machines; the device fixture changes *which* path each test exercises, not
-whether it passes. Real CUDA kernel execution stays a manual verification gate
-(step 5), by precedent with browser-only checks (T-109, T-83).
+Suite-machine dependence: before the fix the suite was green on CPU and red on
+GPU because `forward_project` selected CUDA from `torch.cuda.is_available()`
+while most tests omit the device argument. The fix makes it green with zero
+skips on both machines; the device fixture changes *which* path each test
+exercises, not whether it passes. Real CUDA kernel execution stays a manual
+verification gate (step 5, now passed), by precedent with browser-only checks
+(T-109, T-83).
 
 ## Evidence to reproduce first
 
@@ -67,21 +68,27 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
    `tests/unit/test_parallelproj.py`: fake device tensor with a raising
    `__array__`, `_from_operator_output`, a stubbed `ListmodePETProjector`, and
    an available-device LOR comparison. `python -m pytest -q -rs` in `ct-viewer`:
-   394 passed, 0 skipped (386 + the 4 new tests; the 4 `test_release_push`
-   failures on this box are the documented missing-`bash` issue).
-5. **[ ] Verify on the real GPU machine.**
-   - Suite in the GPU env (zero skips), plus a run with `CUDA_VISIBLE_DEVICES=""`
-     to check that 1.10.2 really falls back to OpenMP as the source suggests.
-   - Peak VRAM during a full-geometry run.
-   - Streamlit: `Use CUDA if available` on → non-zero projection; off → a working
-     projection via the installed build (the checkbox now controls LOR geometry,
-     not the kernel). Record output sums and device in the ledger status.
+   398 passed, 0 skipped with Git Bash (without it, the 4 `test_release_push`
+   cases fail as documented on Windows).
+5. **[x] Verify on the real GPU machine.** 2026-11-19, 8× RTX A6000, fresh
+   py3.11.18 + `parallelproj 1.10.2` + `libparallelproj 1.10.2=cuda129` +
+   `pytorch 2.9.1=cuda129` env at commit `d184122`:
+   - Suite: **398 passed / 0 skipped** (~25.6 s). With
+     `CUDA_VISIBLE_DEVICES=""`: **398 passed / 0 skipped** (~15.5 s), which
+     confirms the OpenMP fallback and closes the error #2 question for 1.10.2.
+   - Peak VRAM for a full-geometry `(60, 192, 512)` projection: **36.8 MB**
+     (`torch.cuda.max_memory_allocated`) / **386 MB** (`nvidia-smi` delta).
+   - Checkbox check via the projection API: `use_cuda=True` and `False` produce
+     bit-identical, non-zero, finite projections (sum 20.4678, max 0.09999).
+     The Streamlit server on that machine served the fixed code and projected
+     successfully.
 6. **[x] Update the scripts and docs.**
    - `scripts/verify_forward_projection.py`, `scripts/forward_projection_plot.py`:
      auto-select CUDA, `--cpu` override, print the chosen LOR device and the CUDA
      device count parallelproj sees.
-   - `INSTALLATION.md`, audit finding #1 and the deadlock note stay on "known
-     limitation" until step 5 passes; the `AGENTS.md` test bar moves to 398.
+   - `INSTALLATION.md`, audit finding #1 and the `AGENTS.md` test bar now record
+     the verified state: GPU status is "verified", finding #1 is `fixed`, and
+     the suite baseline is 398.
 
 ## Done when
 

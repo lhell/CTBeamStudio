@@ -10,7 +10,7 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
 
 ## Must fix
 
-### 1. Forward projection crashes on every CUDA machine — `in progress`
+### 1. Forward projection crashes on every CUDA machine — `fixed`
 
 - **Where:** `src/backend/parallelproj/projector.py:L82-88`, `src/backend/forward_project.py:L209-210`
 - **What:** On a GPU machine the LOR position tensors are created on
@@ -39,15 +39,21 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
     12.9.2; commit `14917ea`): the install and imports are clean
     (`projectors`, `operators`, `backend.parallelproj`), 8 CUDA devices, then
     **370 passed / 20 failed / 0 skipped**. Same traceback:
-    `projector.py:83` receives a CUDA LOR tensor. The 1.10.2 CUDA build was not
-    re-tested with `CUDA_VISIBLE_DEVICES=""`, so the `cudaSetDevice` behaviour
-    is unconfirmed for that pair. Details: `ctbeam_handoff.json`,
+    `projector.py:83` receives a CUDA LOR tensor. Details: `ctbeam_handoff.json`,
     `ctbeam_gpu_install_report.md`, and
     `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
+- **Verified 2026-11-19 on the same 8× RTX A6000** (`d184122`): the suite is
+  **398 passed / 0 skipped** in the GPU env and stays 398 / 0 with
+  `CUDA_VISIBLE_DEVICES=""`, which confirms the OpenMP fallback for 1.10.2
+  (error #2 does not apply to this pair). A full-geometry `(60, 192, 512)`
+  projection peaks at 36.8 MB by `torch.cuda.max_memory_allocated` and
+  386 MB by `nvidia-smi`. `use_cuda=True` and `False` produce bit-identical,
+  non-zero finite projections (sum 20.4678, max 0.09999).
 - **Verify:** Fixed on CPU with a fake-device-tensor test that raises on
-  implicit numpy conversion (`tests/unit/test_parallelproj.py`); the full CPU
-  suite is green with zero skips. The GPU run that flips this entry to `fixed`
-  is still pending (T-08-01, step 5).
+  implicit numpy conversion (`tests/unit/test_parallelproj.py`), then confirmed
+  on the A6000: 398 passed / 0 skipped, a working GPU projection and a working
+  CPU fallback with `CUDA_VISIBLE_DEVICES=""`. The entry was flipped to `fixed`
+  after that run (T-08-01, step 5).
 
 ### 2. DICOM loader ignores the file's RescaleSlope / RescaleIntercept — `open`
 

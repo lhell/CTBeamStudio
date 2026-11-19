@@ -193,6 +193,16 @@ def normalize_difference(diff: np.ndarray) -> np.ndarray:
     return (diff / (2.0 * scale) + 0.5).astype(np.float32)
 
 
+def row_sinogram(array: np.ndarray, row_index: int) -> np.ndarray:
+    """Return the ``(col, projection)`` sinogram for one detector row.
+
+    Canonical stacks are ``(proj, row, col)``. Fixing a row leaves
+    ``(proj, col)``; transposing puts detector columns on the vertical axis and
+    projection angles on the horizontal one — the conventional sinogram view.
+    """
+    return np.asarray(array[:, row_index, :]).T
+
+
 def clamp_index_state(key: str, max_index: int) -> None:
     """Keep a sliders' session-state value inside ``[0, max_index]``."""
     import streamlit as st
@@ -819,6 +829,52 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
     # Shared slider below the views. Renders nothing when there are fewer
     # than two frames on either side (a 0..0 slider is illegal in Streamlit).
     index_slider(st, "Projection index", "sino_shared_index", n_total)
+
+    # --- Second row: row sinogram (rows → cols → projections) ---------------
+    # Fix one detector row and show columns against projection angle. The
+    # horizontal axis is an angle index, not detector columns, so the
+    # detector-spacing resampling used for the projection images above does
+    # not apply here.
+    n_rows_meas = measured.shape[1] if measured is not None else 0
+    n_rows_sim = simulated.shape[1] if simulated is not None else 0
+    n_rows_total = max(n_rows_meas, n_rows_sim)
+
+    row = resolve_view_index("sino_row_index", n_rows_total)
+    meas_row = min(row, n_rows_meas - 1) if n_rows_meas else 0
+    sim_row = min(row, n_rows_sim - 1) if n_rows_sim else 0
+
+    row_sino_meas, row_sino_sim, row_sino_diff = st.columns(3)
+    with row_sino_meas:
+        if n_rows_meas:
+            label = f"Measured sinogram, row {meas_row + 1}/{n_rows_meas}"
+            st.caption(label)
+            _render_projection_image(row_sinogram(measured, meas_row), label)
+        else:
+            _render_placeholder("No measured data for a row sinogram.")
+    with row_sino_sim:
+        if n_rows_sim:
+            label = f"Simulated sinogram, row {sim_row + 1}/{n_rows_sim}"
+            st.caption(label)
+            _render_projection_image(row_sinogram(simulated, sim_row), label)
+        else:
+            _render_placeholder("Run the forward projection to fill this row.")
+    with row_sino_diff:
+        if shapes_match:
+            diff = normalize_difference(
+                row_sinogram(measured, meas_row) - row_sinogram(simulated, sim_row)
+            )
+            st.caption("Difference sinogram (measured − simulated)")
+            st.image(diff, clamp=True, use_column_width=True)
+        elif n_rows_meas and n_rows_sim:
+            _render_placeholder("Shapes differ — see the projection row above.")
+        else:
+            _render_placeholder(
+                "Difference sinogram appears once measured and simulated "
+                "shapes match."
+            )
+
+    # Own slider for the row, below the second row.
+    index_slider(st, "Row index", "sino_row_index", n_rows_total)
 
     if sinogram is not None:
         st.caption(

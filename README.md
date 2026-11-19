@@ -146,7 +146,8 @@ Streamlit's first-run email prompt blocks a non-interactive start.
    set the beam energy, and optionally restrict the run to a subset of projections,
    rows or columns
 6. **Run Forward Projection:** compare measured vs. simulated side by side, read the
-   per-projection MAE/RMSE/SSIM, and scrub through the projection index to find where
+   per-projection MAE/RMSE/SSIM, and scrub through the projection index — or the
+   row index for the columns × projections sinogram row below it — to find where
    the two disagree
 
 ## Development

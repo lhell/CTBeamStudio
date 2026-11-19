@@ -522,8 +522,9 @@ def test_sinogram_inspection_placeholders_are_square_blocks(app):
     # the placeholder's rather than counting every sized block in the app.)
     assert PLACEHOLDER_HEIGHT_PX >= 240
     heights = [h for h in _block_heights(app.main) if h == PLACEHOLDER_HEIGHT_PX]
-    # One per empty slot: measured, simulated, difference.
-    assert len(heights) == 3, heights
+    # One per empty slot: measured, simulated, difference in both the
+    # projection row and the row-sinogram row.
+    assert len(heights) == 6, heights
 
 
 def test_sinogram_inspection_run_button_produces_simulation(app):
@@ -544,6 +545,48 @@ def test_sinogram_inspection_run_button_produces_simulation(app):
     text = _main_text(app)
     assert "Simulated: (24, 16, 64)" in text
     assert "Simulated projection" in text
+
+
+def test_sinogram_inspection_row_sinogram_row(app):
+    """The second row shows the rows → cols → projections sinogram with its
+    own row slider, independent of the projection index slider above."""
+    app.session_state["volume"] = create_demo_volume()
+    app.session_state["forward_projection"] = None
+    _seed_measurements(app, shape=(3, 4, 5))
+    app.session_state["sino_row_index"] = 2
+
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "Measured sinogram, row 3/4" in text
+    labels = [s.label for s in app.slider]
+    assert "Projection index" in labels
+    assert "Row index" in labels
+    assert app.session_state["sino_row_index"] == 2
+
+
+def test_sinogram_inspection_difference_sinogram(app):
+    """Matching shapes fill all three sinogram panels, including the
+    difference, using the same selected row on both sides."""
+    app.session_state["volume"] = create_demo_volume()
+    measured = _seed_measurements(app, shape=(3, 4, 5))
+    app.session_state["forward_projection"] = ForwardProjectionResult(
+        projections=measured + 1.0,
+        geometry=ProjectionGeometry(),
+        row_indices=[0, 1, 2, 3],
+        col_indices=[0, 1, 2, 3, 4],
+        proj_indices=[0, 1, 2],
+    )
+    app.session_state["sino_row_index"] = 3
+
+    app.run()
+
+    assert list(app.exception) == []
+    text = _main_text(app)
+    assert "Measured sinogram, row 4/4" in text
+    assert "Simulated sinogram, row 4/4" in text
+    assert "Difference sinogram" in text
 
 
 # ---------------------------------------------------------------------------

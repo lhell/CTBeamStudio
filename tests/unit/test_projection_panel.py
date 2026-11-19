@@ -18,6 +18,7 @@ from visualization.projection_panel import (
     projection_display_spacing,
     resolve_selection,
     resolve_view_index,
+    row_sinogram,
 )
 
 
@@ -76,6 +77,27 @@ def test_normalize_difference_constant_returns_mid_gray():
     out = normalize_difference(diff)
 
     np.testing.assert_allclose(out, np.full((3, 3), 0.5, dtype=np.float32))
+
+
+def test_row_sinogram_fixes_row_and_swaps_axes():
+    """Canonical (proj, row, col) → (col, proj) for one detector row:
+    columns go vertical, projections horizontal, and only the chosen row is
+    kept. A unique value per voxel makes a wrong axis or row visible."""
+    data = np.arange(3 * 4 * 5, dtype=np.float32).reshape(3, 4, 5)
+
+    out = row_sinogram(data, 2)
+
+    assert out.shape == (5, 3)
+    np.testing.assert_array_equal(out, data[:, 2, :].T)
+    # Sanity: neighbouring rows really are different slices.
+    assert not np.array_equal(out, row_sinogram(data, 3))
+
+
+def test_row_sinogram_keeps_first_and_last_row():
+    data = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
+
+    np.testing.assert_array_equal(row_sinogram(data, 0), data[:, 0, :].T)
+    np.testing.assert_array_equal(row_sinogram(data, 2), data[:, 2, :].T)
 
 
 def test_build_selection_config_maps_all_axes():

@@ -12,7 +12,7 @@ for fast calculation of projections in tomography", Front. Nucl. Med. 3, 1324562
 
 import warnings
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 
@@ -37,6 +37,11 @@ except ImportError:
 from backend.attenuation import ATTENUATION_UNITS
 from backend.geometry import ProjectionGeometry
 from backend.volume import Volume
+
+# Upper bound on projections per joseph3d call. The run is split so the UI can
+# report x/y progress (aim: ~10 updates) while each call stays big enough that
+# the per-call LOR setup overhead disappears.
+_PROJECTION_CHUNK_SIZE = 32
 
 
 @dataclass
@@ -67,6 +72,7 @@ def forward_project(
     n_projections: Optional[int] = None,
     n_projections_total: Optional[int] = None,
     use_cuda: bool = True,
+    progress: Optional[Callable[[int, int], None]] = None,
 ) -> ForwardProjectionResult:
     """Forward project a volume using parallelproj (or placeholder).
 
@@ -84,6 +90,9 @@ def forward_project(
             geometry.projections_per_rotation
         use_cuda: Whether to use CUDA if available
             (ignored if using placeholder)
+        progress: Optional ``callback(done, total)`` called after each chunk
+            of projections, so a UI can show x/y progress. ``total`` is the
+            number of selected projections.
 
     Returns:
         ForwardProjectionResult with synthetic projections
@@ -128,10 +137,11 @@ def forward_project(
             proj_indices,
             use_cuda,
             n_projections_total=n_projections_total,
+            progress=progress,
         )
     else:
         return _forward_project_placeholder(
-            volume, geometry, row_indices, col_indices, proj_indices
+            volume, geometry, row_indices, col_indices, proj_indices, progress
         )
 
 
@@ -141,6 +151,7 @@ def _forward_project_placeholder(
     row_indices: List[int],
     col_indices: List[int],
     proj_indices: List[int],
+    progress: Optional[Callable[[int, int], None]] = None,
 ) -> ForwardProjectionResult:
     """Placeholder implementation that returns zeros.
 
@@ -171,6 +182,11 @@ def _forward_project_placeholder(
     # Return zeros - placeholder for actual projection
     projections = np.zeros((n_projs, n_rows, n_cols), dtype=np.float32)
 
+    # Report completion so a progress bar does not stay empty on a dev
+    # machine without parallelproj.
+    if progress is not None:
+        progress(n_projs, n_projs)
+
     return ForwardProjectionResult(
         projections=projections,
         geometry=geometry,
@@ -188,6 +204,7 @@ def _forward_project_parallelproj(
     proj_indices: List[int],
     use_cuda: bool,
     n_projections_total: Optional[int] = None,
+    progress: Optional[Callable[[int, int], None]] = None,
 ) -> ForwardProjectionResult:
     """Actual forward projection using parallelproj.
 
@@ -198,6 +215,7 @@ def _forward_project_parallelproj(
         col_indices: Which detector columns to project
         proj_indices: Which projections to generate
         use_cuda: Whether to use CUDA if available
+        progress: Optional ``callback(done, total)`` after each chunk.
 
     Returns:
         ForwardProjectionResult with synthetic projections
@@ -244,35 +262,48 @@ def _forward_project_parallelproj(
     row_spacing = geometry.det_row_spacing_mm
     z_step = (pitch * n_rows * row_spacing / ppr) if pitch > 0 else 0.0
 
-    pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
-        dev=dev,
-        projection_indices=proj_indices,
-        z_offset_mm=z_center,
-        z_step_mm=z_step,
-        n_projections_total=n_projections_total or 0,
-    )
-
-    projector = ConeBeamProjector(
-        pos_beam_start,
-        pos_beam_end,
-        img_shape_zyx=img_shape_zyx,
-        spacing_zyx=spacing_zyx,
-        origin_zyx=origin_zyx,
-        n_det_rows=cb_geometry.n_det_rows,
-        n_det_cols=cb_geometry.n_det_cols,
-        n_projections=n_projs,
-    )
-
     # Volume -> parallelproj (nx, ny, nz) ordering, as float32 numpy.
     volume_array = volume.array.astype(np.float32)
     volume_xyz = to_parallelproj_batch(volume_array)[0, 0]
 
-    full_proj = projector.apply(volume_xyz)
+    row_sel = np.asarray(row_indices)
+    col_sel = np.asarray(col_indices)
+    projections = np.empty((n_projs, len(row_sel), len(col_sel)), dtype=np.float32)
 
-    # The projection axis is already in selection order. Only rows / columns
-    # still need to be sliced.
-    projections = full_proj[:, np.asarray(row_indices), :]
-    projections = projections[:, :, np.asarray(col_indices)]
+    # Project in chunks: one joseph3d call per chunk, so the UI can report
+    # x/y progress while a full-geometry run is still working.
+    chunk_size = max(1, min(_PROJECTION_CHUNK_SIZE, n_projs // 10))
+    for start in range(0, n_projs, chunk_size):
+        stop = min(start + chunk_size, n_projs)
+
+        pos_beam_start, pos_beam_end = cb_geometry.calculate_xray_beam_list(
+            dev=dev,
+            projection_indices=proj_indices[start:stop],
+            z_offset_mm=z_center,
+            z_step_mm=z_step,
+            # Centre the helix over the whole selection, not over this
+            # chunk: the beam list would otherwise re-centre per chunk.
+            n_projections_total=n_projections_total or n_projs,
+        )
+
+        projector = ConeBeamProjector(
+            pos_beam_start,
+            pos_beam_end,
+            img_shape_zyx=img_shape_zyx,
+            spacing_zyx=spacing_zyx,
+            origin_zyx=origin_zyx,
+            n_det_rows=cb_geometry.n_det_rows,
+            n_det_cols=cb_geometry.n_det_cols,
+            n_projections=stop - start,
+        )
+
+        chunk = projector.apply(volume_xyz)
+        # The projection axis is already in selection order. Only rows /
+        # columns still need to be sliced.
+        projections[start:stop] = chunk[:, row_sel, :][:, :, col_sel]
+
+        if progress is not None:
+            progress(stop, n_projs)
 
     return ForwardProjectionResult(
         projections=projections,

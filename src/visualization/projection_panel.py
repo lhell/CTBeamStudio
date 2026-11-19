@@ -962,6 +962,18 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                 )
                 projection_volume = prepare_projection_volume(volume, energy_kev)
                 with st.spinner("Running forward projection..."):
+                    # x/y feedback: a full-geometry run takes minutes, and a
+                    # bare spinner does not show how far it has come.
+                    progress_bar = st.progress(
+                        0.0, text=f"Forward projecting 0/{len(proj_idx)} projections"
+                    )
+
+                    def update_progress(current: int, total: int):
+                        progress_bar.progress(
+                            current / total,
+                            text=f"Forward projecting {current}/{total} projections",
+                        )
+
                     result = forward_project(
                         projection_volume,
                         geometry,
@@ -969,7 +981,9 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                         col_indices=col_idx,
                         proj_indices=proj_idx,
                         use_cuda=use_cuda,
+                        progress=update_progress,
                     )
+                    progress_bar.empty()
             except Exception as exc:  # noqa: BLE001 - backend errors in the UI
                 st.error(f"Forward projection failed: {exc}")
             else:

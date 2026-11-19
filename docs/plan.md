@@ -31,7 +31,7 @@ Fundstellen), deshalb sagt eine Nummer nichts über ihr Thema. Das Thema liefert
 | 5 | Projection Geometry | T-50 – T-53 |
 | 6 | Projection-Geometrie in 3D | T-54 – T-56a |
 | 7 | Docker Self-Deployment | T-71 – T-74 |
-| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80 |
+| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
 | 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103 |
@@ -447,6 +447,17 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
   - Forward Projection akzeptiert **nur** Attentuation (`1/mm`/`1/cm`) und lehnt HU mit `ValueError` ab
   - Tab „Real vs Simulated“ konvertiert das Volumen vor der Projektion und bietet einen Energie-Slider
 - **Status:** ✅ Done (Nov 6, 2026) — `volume_for_projection()` liefert `1/mm`, weil parallelproj die Strahlen in mm integriert (1/cm wäre Faktor 10 daneben). Tests: `test_attenuation.py`, `test_display_units.py`, `test_forward_project.py`, `test_projection_panel.py`.
+
+### `[x]` T-108 — Fortschritt der Forward Projection (x/y Projektionen)
+- **Ziel:** „Run Forward Projection“ zeigt x/y Projektionen statt nur eines Spinners, damit ein Lauf über die volle Geometrie (bis 2304 Projektionen) sichtbaren Fortschritt hat.
+- **Dateien:** `src/backend/forward_project.py` (Chunking + `progress=`-Callback), `src/visualization/projection_panel.py` (`st.progress` + Text), `tests/unit/test_forward_project.py`
+- **Abhängig von:** T-63, T-79, T-104
+- **Umsetzung:**
+  1. `forward_project(..., progress=callback(done, total))` projiziert in Chunks (`min(32, n_projs // 10)` Projektionen, also ~10 Updates) statt in einem einzigen joseph3d-Aufruf; der Zeros-Fallback meldet einmal `(n, n)`.
+  2. Die Helix-Zentrierung bekommt `n_projections_total or n_projs` übergeben, sonst würde jeder Chunk auf seine eigene Länge neu zentrieren (der Helix-Test deckt das ab).
+  3. Die UI rendert eine Progress-Bar mit „Forward projecting x/y projections“ und räumt sie nach dem Lauf ab.
+- **Akzeptanz:** `done` wächst monoton und endet bei `total`; das Ergebnis ist identisch mit einem ungechunkten Lauf; die UI zeigt den Zähler.
+- **Status:** ✅ Done (Nov 19, 2026) — Neuer Test `test_forward_project_reports_progress_and_chunking_is_transparent` (Callback-Sequenz + Chunk-Ergebnis == Einzelprojektion); Helix-Tests decken die Zentrierung ab. Test-Bar 362 → 363.
 
 ## Phase 9 — Sinogram & Messdaten
 

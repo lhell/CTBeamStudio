@@ -218,6 +218,44 @@ def _helix_geometry():
 
 
 @requires_projection_backend
+def test_forward_project_reports_progress_and_chunking_is_transparent():
+    """``progress(done, total)`` advances to total, and splitting the run into
+    chunks (T-108) returns exactly what one call per projection returns."""
+    from backend.forward_project import forward_project
+
+    n_proj = 40  # more than one internal chunk
+    volume = Volume(
+        array=np.ones((5, 5, 5), dtype=np.float32) * 0.0194,
+        spacing=(1.0, 1.0, 1.0),
+        origin=(0.0, 0.0, 0.0),
+        meta={"unit": "1/mm"},
+    )
+    geometry = ProjectionGeometry(
+        n_det_cols=1, n_det_rows=1, projections_per_rotation=n_proj
+    )
+
+    calls = []
+    result = forward_project(
+        volume,
+        geometry,
+        proj_indices=list(range(n_proj)),
+        progress=lambda done, total: calls.append((done, total)),
+    )
+
+    done = [c for c, _ in calls]
+    assert done == sorted(done)
+    assert all(total == n_proj for _, total in calls)
+    assert done[-1] == n_proj
+    assert len(calls) >= 2  # 40 projections do not fit one chunk
+
+    single = [
+        forward_project(volume, geometry, proj_indices=[i]).projections
+        for i in range(n_proj)
+    ]
+    np.testing.assert_array_equal(result.projections, np.concatenate(single))
+
+
+@requires_projection_backend
 def test_forward_project_helix_shifts_projections_along_z():
     """pitch > 0 feeds the table: only the projection at z = 0 sees the slab.
 

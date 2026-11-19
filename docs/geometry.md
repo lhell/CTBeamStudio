@@ -146,7 +146,8 @@ The forward projection and the 3D volume view share one world frame:
 - **Source at 0°**: `(sid, 0, z_center)` (anterior, `+x`), rotating counter-clockwise seen from `+z`.
 - **Detector**: opposite the source at `sdd - sid` from the isocenter (SDD is measured from the source, not from the rotation axis).
 - **Volume**: voxel `[0, 0, 0]` of the `(x, y, z)`-reordered grid sits at
-  `Volume.origin` (DICOM `(x, y, z)`), voxel centres at `origin + index * spacing`.
+  `Volume.origin` (project frame, not raw DICOM LPS — the DICOM loader converts
+  it), voxel centres at `origin + index * spacing`.
   The scan plane passes through the volume's z centre, so the central ray
   crosses the middle of the phantom; the demo phantom (and the dummy
   measurement volume) centre their origin on the rotation axis instead, so

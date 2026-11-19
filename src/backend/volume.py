@@ -19,7 +19,9 @@ class Volume:
         spacing: Pixel spacing in mm. Must match array dimensions:
             - 2D: (row_spacing, col_spacing)
             - 3D: (z_spacing, row_spacing, col_spacing)
-        origin: DICOM origin coordinates (x, y, z) or (x, y) for 2D.
+        origin: World position of the first voxel in the project frame
+            (x = anterior, y = left, z = longitudinal), or (x, y) for 2D.
+            DICOM loaders convert ImagePositionPatient from LPS to this frame.
         meta: Optional metadata dictionary. Use meta["unit"] to store the unit
             (e.g., "HU", "1/mm", "1/cm").
 

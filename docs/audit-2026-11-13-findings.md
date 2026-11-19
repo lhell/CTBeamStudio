@@ -97,7 +97,7 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   restore-last-session logic already handles getting data back.
 - **If skipped:** Long sessions leak memory until the process dies.
 
-### 6. Volume origin stored in the wrong frame after the DICOM flip — `open`
+### 6. Volume origin stored in the wrong frame after the DICOM flip — `fixed`
 
 - **Where:** `src/backend/loaders/dicom.py:L344-392`,
   `src/backend/forward_project.py:L219-225`
@@ -118,6 +118,10 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   `(-(y0 + (nrows-1)*row_sp), x0, z_first)`.
 - **If skipped:** Off-center acquisitions silently produce misaligned
   comparisons.
+- **Status:** fixed (Nov 19, 2026, T-01-01) — `load_dicom_series` now converts
+  the DICOM LPS origin to the project frame for standard-axial data; the
+  reorientation test pins the centred case and a new test pins an off-center
+  rectangular grid. `Volume.origin` is documented as project-frame throughout.
 
 ### 7. Dead autograd layers module with a latent bug — `open`
 
@@ -220,7 +224,7 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
 - **Must fix:** 1–3 (CUDA crash, wrong HU for non-default rescale, 3D crash
   for non-HU volumes). Fix 1 and 2 before trusting the simulated-vs-measured
   comparison on real data.
-- **Should fix:** 4–10 (speed, memory, origin frame, dead code, dependencies).
+- **Should fix:** 4–10 (speed, memory, origin frame [6 fixed], dead code, dependencies).
 - **Nice to have:** 11–14.
 - **Lean total:** ~450 lines and 3 dependencies removable (7, 8, 9, 10, 12, 13).
 - **Not audited / not re-verified:** browser UI (no live run — `run_every`

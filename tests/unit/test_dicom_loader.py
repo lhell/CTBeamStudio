@@ -310,6 +310,30 @@ class TestLoadDicomSeries:
             assert volume.array[0, 2, 3] == -1024
             # Spacing follows the axes: new y = old columns, new x = old rows.
             assert volume.spacing == (1.0, 0.8, 0.5)
+            # The origin follows the flip too: DICOM (0,0,0) is the first
+            # row/column voxel, i.e. project x = -(nrows - 1) * row_spacing.
+            assert volume.origin == (-1.5, 0.0, 0.0)
+
+    def test_load_dicom_series_converts_off_center_origin_to_project_frame(self):
+        """A non-isocentric DICOM origin must be converted, not just copied."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            uid = "1.2.3.4.5"
+            _create_ct_dicom(
+                root / "slice0.dcm",
+                series_instance_uid=uid,
+                image_position_patient=(20.0, -30.0, 5.0),
+                pixel_spacing=(0.5, 0.8),  # [row, col]
+                rows=4,
+                cols=6,
+            )
+            volume = load_dicom_series(list(root.glob("*.dcm")))
+
+            # Project x = anterior = -LPS y, starting at the first row's far
+            # end after the flip: -(-30 + 3 * 0.5) = 28.5.
+            # Project y = left = +LPS x = 20; z is unchanged.
+            assert volume.origin == (28.5, 20.0, 5.0)
+            assert volume.spacing == (1.0, 0.8, 0.5)
 
     def test_load_dicom_series_custom_rescale(self):
         """Custom rescale slope and intercept."""

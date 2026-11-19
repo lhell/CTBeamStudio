@@ -239,7 +239,8 @@ def _forward_project_parallelproj(
     cb_geometry = geometry_from_projection_geometry(geometry)
     cb_geometry.n_projections = n_projs
 
-    # Volume is (z, y, x); origin is DICOM (x, y, z) -> reorder to (z, y, x).
+    # Volume is (z, y, x); origin is project-frame (x, y, z) -> reorder to
+    # (z, y, x).
     spacing_zyx = tuple(float(s) for s in volume.spacing)
     origin_zyx = (
         float(volume.origin[2]),

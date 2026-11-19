@@ -379,16 +379,19 @@ def load_dicom_series(
     if unit == "HU" and array.dtype != np.int16:
         array = array.astype(np.int16)
 
-    # Get origin from first slice position
-    # DICOM position is (x, y, z), Volume expects (x, y, z)
-    origin = tuple(positions[0])
-
-    # Build spacing tuple (z, y, x). With the standard-axial reorientation
-    # the new y axis is the old column axis and the new x axis the old row
-    # axis, so the in-plane spacings swap with them.
+    # Volume.origin is the first voxel's world position in the project frame
+    # (x = anterior, y = left), not the raw DICOM LPS position. For standard
+    # axial data the row axis was flipped into project x and the column axis
+    # became project y, so convert the DICOM origin the same way.
     if standard_axial:
+        origin = (
+            -(float(positions[0][1]) + (array.shape[2] - 1) * row_spacing),
+            float(positions[0][0]),
+            float(positions[0][2]),
+        )
         spacing = (slice_spacing, col_spacing, row_spacing)
     else:
+        origin = tuple(float(v) for v in positions[0])
         spacing = (slice_spacing, row_spacing, col_spacing)
 
     # Create metadata

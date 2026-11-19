@@ -2,7 +2,7 @@
 # CTBeamStudio — Implementierungsplan
 
 **Projekt:** `Res_Indep_CTO` / `src/visualization/`
-**Stand:** 2026-11-18
+**Stand:** 2026-11-19
 **Start:** Mi, 2026-10-14
 
 ## Leitprinzipien
@@ -31,7 +31,7 @@ Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 | Phase | Thema | Nummern |
 |---|---|---|
 | 0 | Lizenz & Hygiene | T-01 – T-04 |
-| 1 | Kern & Backend (`Volume`, Loader, MPR, Restrukturierung) | T-10 – T-14, T-78 |
+| 1 | Kern & Backend (`Volume`, Loader, MPR, Restrukturierung) | T-10 – T-14, T-78, T-01-01 |
 | 2 | App (Viewer, Sidebar, Panels) | T-20 – T-23 |
 | 3 | Tests & Tooling | T-30 – T-33, T-81, T-91 |
 | 4 | Deploy (Dockerfile, CI) | T-40 – T-44 |
@@ -131,6 +131,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Abhängig von:** T-63
 - **Akzeptanz:** `Volume`, `ProjectionGeometry`, `forward_project` und Loader (dicom, npy, projection) liegen unter `src/backend/`; `import backend` funktioniert ohne parallelproj (lazy); alle Imports (UI, Tests, Skripte) aktualisiert; Testsuite grün.
 - **Status:** ✅ Done (Nov 4, 2026) — siehe Spec `docs/superpowers/specs/2026-11-04-backend-restructure-design.md`.
+
+### `[x]` T-01-01 — DICOM-Origin in das FP-Weltkoordinatensystem umrechnen
+- **Ziel:** Der DICOM-Loader reorientiert das Gitter in das Projekt-Frame (x = anterior, y = links), lieferte den Origin aber als rohes DICOM-LPS. Bei off-center- oder rechteckigen Volumina landet die FP dadurch gespiegelt/versetzt. Audit-Finding #6.
+- **Dateien:** `src/backend/loaders/dicom.py`, `src/backend/volume.py`, `src/backend/forward_project.py`, `src/visualization/volume3d.py` (Doku/Kommentare), `docs/geometry.md`, `tests/unit/test_dicom_loader.py` (1 neuer Test + Origin-Assertion), `docs/audit-2026-11-13-findings.md`
+- **Abhängig von:** T-11, T-94
+- **Umsetzung:** Für `standard_axial`: `origin = (-(y_LPS + (nrows - 1) * row_spacing), x_LPS, z_first)` — dieselbe Transformation wie beim geflippten/transponierten Gitter. Nicht-axiale Daten behalten den Roh-Origin (Gantry-Tilt bleibt Warnung).
+- **Akzeptanz:** Origin des ersten Voxels liegt im Projekt-Frame, FP und 3D-Ansicht nutzen dieselbe Position; der zentrierte quadratische Fall bleibt unverändert; volle Suite grün, 0 Skips.
+- **Status:** ✅ Done (Nov 19, 2026) — 1 neuer Test für off-center/Rechteck (IPP (20.0, −30.0, 5.0), 4×6, Spacing (0.5, 0.8) → Origin (28.5, 20.0, 5.0)); Reorientierungs-Test pinnt den zentrierten Fall (−1.5, 0.0, 0.0). `Volume.origin` in Dataclass, FP, 3D-View und `docs/geometry.md` als Projekt-Frame dokumentiert; Audit #6 auf `fixed`. Suite grün, 0 Skips (Git Bash auf PATH); flake8/black/isort sauber.
 
 ## Phase 2 — App (Tag 4–5)
 

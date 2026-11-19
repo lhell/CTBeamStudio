@@ -526,7 +526,7 @@ def create_volume_figure(
     projection uses (see ``backend.parallelproj.geometry``): the rotation
     axis runs through the world origin, ``z`` points up, and voxel
     ``[0, 0, 0]`` of the ``(x, y, z)``-reordered grid sits at ``origin``
-    (the DICOM origin). The geometry overlay added on top of this figure
+    (``Volume.origin``). The geometry overlay added on top of this figure
     (``add_trajectory_to_figure``: source path, detector, central beams)
     shares that frame, so what the plot shows is what the forward
     projection actually computes.
@@ -543,7 +543,7 @@ def create_volume_figure(
         n_iso_levels: Number of iso-surface levels to extract
         iso_threshold: Tuple (min, max) HU values for iso-surface threshold
         origin: World position ``(x, y, z)`` of the first voxel — the same
-            DICOM origin the forward projection places the volume at.
+            ``Volume.origin`` the forward projection places the volume at.
             ``None`` keeps the legacy schematic placement centred on the
             rotation axis, which ignores the real origin.
 
@@ -957,7 +957,7 @@ def get_volume_center(
         volume_array: 3D numpy array (z, y, x)
         spacing: Voxel spacing (z, y, x) in mm
         origin: World position ``(x, y, z)`` of the first voxel — the same
-            DICOM origin the forward projection places the volume at.
+            ``Volume.origin`` the forward projection places the volume at.
             ``None`` returns ``(0, 0, 0)``, the legacy assumption that the
             volume is centred on the rotation axis.
 

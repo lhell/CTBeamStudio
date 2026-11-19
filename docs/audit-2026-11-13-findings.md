@@ -25,16 +25,24 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   in `ConeBeamProjector.__init__`. Nothing else changes.
 - **If skipped:** Forward projection is broken on GPU, right after
   environment.yml and README promise "CUDA when available".
-- **Reproduced 2026-11-19** on a real GPU machine (8× RTX A6000, Python 3.12,
-  `parallelproj 2.0.2` + `libparallelproj 2.0.7/cuda130`): 340 passed /
-  19 failed, including this TypeError. A second, independent failure appears
-  with `CUDA_VISIBLE_DEVICES=""`: the GPU-built operator rejects CPU numpy
-  input with `cudaSetDevice failed` (336 passed / 23 failed), so unticking
-  "Use CUDA if available" is not a reliable workaround in a GPU-built env.
-  Details: the install handoff (`ctbeam_handoff.json`) and
-  `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
-- **Verify:** Cannot be tested on this machine (no CUDA); check in a GPU
-  environment or via a mocked-device unit test.
+- **Reproduced 2026-11-19** twice on the 8× RTX A6000 machine:
+  - **Initial env** (Python 3.12, `parallelproj 2.0.2` + `libparallelproj`
+    2.0.7/cuda130): 340 passed / 19 failed, including this TypeError. With
+    `CUDA_VISIBLE_DEVICES=""` the GPU-built operator rejected CPU numpy input
+    with `cudaSetDevice failed` (336 passed / 23 failed), so unticking "Use
+    CUDA if available" is not a reliable workaround in a GPU-built env.
+  - **Corrected env** (Python 3.11.18, `parallelproj 1.10.2` +
+    `libparallelproj 1.10.2/cuda129`, pytorch 2.9.1/cuda129, cuda-toolkit
+    12.9.2; commit `14917ea`): the install and imports are clean
+    (`projectors`, `operators`, `backend.parallelproj`), 8 CUDA devices, then
+    **370 passed / 20 failed / 0 skipped**. Same traceback:
+    `projector.py:83` receives a CUDA LOR tensor. The 1.10.2 CUDA build was not
+    re-tested with `CUDA_VISIBLE_DEVICES=""`, so the `cudaSetDevice` behaviour
+    is unconfirmed for that pair. Details: `ctbeam_handoff.json`,
+    `ctbeam_gpu_install_report.md`, and
+    `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
+- **Verify:** The GPU env itself is now verified (imports OK, 8 devices); the
+  code fix still needs a GPU run or a mocked-device unit test on this machine.
 
 ### 2. DICOM loader ignores the file's RescaleSlope / RescaleIntercept — `open`
 

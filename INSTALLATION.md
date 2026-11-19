@@ -219,6 +219,12 @@ env instead of layering GPU packages onto the CPU one:
 5. Verify the API the app actually imports (see [Verification](#verification)):
    `python -c "from parallelproj.projectors import ListmodePETProjector"`.
 
+**Verified GPU combo** (2026-11-19, 8× RTX A6000, driver CUDA 13.4): Python
+3.11.18, `parallelproj 1.10.2` (`pyha770c72_203`), `libparallelproj 1.10.2`
+(`cuda129`), `pytorch 2.9.1` (`cuda129`), `cuda-toolkit 12.9.2`. It installs
+and imports cleanly and sees all 8 devices; forward projection still fails on
+the projector bug until **T-08-01** is implemented.
+
 Four install traps seen in a real GPU setup:
 
 - **Letting the solver pair Python 3.12 with `parallelproj` 2.x.** 1.10.x also
@@ -235,16 +241,18 @@ Four install traps seen in a real GPU setup:
 - Installing a modern `libparallelproj` (e.g. 2.0.7/cuda130) next to an old
   `parallelproj` wrapper. The library and wrapper versions must match.
 
-> **Known limitation:** the GPU route is not supported yet. Two independent
-> failures were reproduced on 8× RTX A6000 (2026-11-19, 19 failed / 340 passed):
-> (1) the projector calls `np.asarray` on CUDA LOR tensors → `TypeError: can't
-> convert cuda:0 device type tensor to numpy` (audit finding #1); (2) a
-> **GPU-built** parallelproj operator cannot run CPU input — with
-> `CUDA_VISIBLE_DEVICES=""` the suite got worse (23 failed / 336 passed) with
-> `RuntimeError: cudaSetDevice failed: no CUDA-capable device is detected`.
-> Unticking **Use CUDA if available** is therefore **not** a reliable fallback
-> in a GPU-built env. Only the CPU env from `environment.yml` is validated
-> (394 passed, 0 skipped). Planned fix: **T-08-01**,
+> **Known limitation:** the GPU *install* works, but GPU *forward projection*
+> does not yet. A fresh 1.10.2 / `libparallelproj 1.10.2=cuda129` env on 8×
+> RTX A6000 (2026-11-19) installs and imports cleanly and sees all 8 devices;
+> the suite is then **370 passed / 20 failed / 0 skipped**, all from the
+> projector bug below. The projector calls `np.asarray` on CUDA LOR tensors →
+> `TypeError: can't convert cuda:0 device type tensor to numpy` (audit finding
+> #1). In the earlier 2.0.2/cuda130 env the same run was 340 passed / 19 failed,
+> and hiding CUDA made it worse (336 / 23, `cudaSetDevice failed`); that CPU
+> fallback was **not** re-tested on 1.10.2, so untick **Use CUDA if available**
+> only if your build supports CPU input. The CPU env from `environment.yml` is
+> the only validated projection baseline (394 passed, 0 skipped). Planned fix:
+> **T-08-01**,
 > `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`; the reproduced
 > errors are recorded in
 > `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
@@ -258,8 +266,9 @@ CUDA is **not** enabled or validated by the tests:
   `tests/unit/test_forward_project.py` and `test_dummy_measurement.py`) call
   `forward_project(...)` with its default `use_cuda=True`. On a GPU machine
   those take the CUDA path and hit the bug above — that is the source of the
-  19 failures. There is no `conftest.py` fixture or environment variable that
-  forces CPU, so the green 390/0 result only applies to the CPU env.
+  20 failures on 1.10.2 (19 on 2.0.2). There is no `conftest.py` fixture or
+  environment variable that forces CPU, so the green 394/0 result only applies
+  to the CPU env.
 - `scripts/verify_forward_projection.py` and `scripts/forward_projection_plot.py`
   both hard-code `use_cuda=False`, so they check the CPU path. In a GPU-built
   parallelproj env that path can still fail with `cudaSetDevice`; use them in

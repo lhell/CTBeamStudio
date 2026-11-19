@@ -11,6 +11,12 @@ builds do not provide `parallelproj.projectors`; 2.x would force Python 3.12 and
 is not the validated baseline. Without a GPU device, steps 5 and 6 can only be
 prepared, not verified.
 
+Status of that prerequisite (2026-11-19): a fresh 1.10.2 / `libparallelproj
+1.10.2=cuda129` env on 8× RTX A6000 installs and imports cleanly (`projectors`,
+`operators`, `backend.parallelproj`; 8 devices). The suite there is **370 passed
+/ 20 failed / 0 skipped**, all the same `projector.py:83` crash. So the env is
+ready; only the code fix and the contract checks below remain.
+
 Suite-machine dependence: the current suite is green on CPU and red on GPU
 because `forward_project` selects CUDA from `torch.cuda.is_available()` while
 most tests omit the device argument. The goal is a green, zero-skip suite on
@@ -43,8 +49,10 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
      input types (numpy vs torch CPU vs torch CUDA) it accepts, and what type
      `__call__`/`adjoint` return for each.
    - Run a minimal 1-projection call with CUDA LOR coordinates and record the
-     outcome here before changing the projector. Repeat with CPU input to
-     establish whether error #2 also applies to the 1.x build.
+     outcome here before changing the projector. Repeat with CPU input and with
+     `CUDA_VISIBLE_DEVICES=""` to establish whether error #2 also applies to
+     the 1.10.2 CUDA build (not tested yet; the 2026-11-19 install report only
+     confirmed imports and the 20 failing tests).
    - Decide the CPU-fallback policy for a GPU-built env (install a CPU-capable
      `libparallelproj`, or fail with an explicit message). This also fixes the
      parity-test question below: can the GPU build run CPU input in the same

@@ -98,6 +98,31 @@ ships CUDA library builds (`cuda129*`, `cuda130*`). `environment.yml` and
 0 skipped; four extra local failures in `test_release_push.py` are the known
 missing-`bash` environment issue documented in `AGENTS.md`, not a regression.
 
+### GPU install verified with 1.10.2 (2026-11-19)
+
+A fresh `ct-viewer` built by the corrected `INSTALLATION.md` on the 8× RTX A6000
+Linux machine (commit `14917ea`) installs and imports cleanly:
+
+| Package | Version / build |
+|---|---|
+| python | 3.11.18 |
+| parallelproj | 1.10.2 `pyha770c72_203` |
+| libparallelproj | 1.10.2 `cuda129_h897a41e_203` (matched pair) |
+| pytorch | 2.9.1 `cuda129_generic_py311_hc138829_205` |
+| cuda-toolkit | 12.9.2 |
+
+Driver 615.71.10, CUDA UMD 13.4. `projectors`, `operators`,
+`backend.parallelproj` import; `torch.cuda.is_available()` is True and
+`device_count()` is 8. The solver first picked `libparallelproj cuda130` and
+re-mixed it to `cuda129` when the GPU pytorch build joined the same solve — the
+final pair is matched, as the guide requires.
+
+Suite on that env: **370 passed / 20 failed / 0 skipped** (23.9 s), same
+`projector.py:83` traceback as the 2.0.2 run. So the install guide is validated;
+the remaining failure is exactly T-08-01's code bug. The 1.10.2 CUDA build was
+**not** re-tested with `CUDA_VISIBLE_DEVICES=""`, so error #2's CPU-fallback
+behaviour is still open for this pair (step 1 of the plan).
+
 ## Proposed design
 
 1. **One conversion boundary in `backend/parallelproj/projector.py`.**

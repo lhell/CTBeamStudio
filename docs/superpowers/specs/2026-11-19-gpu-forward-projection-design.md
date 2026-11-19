@@ -118,6 +118,24 @@ the observed GPU failures.
      helix, progress) must stay valid.
    - GPU end-to-end run and browser verification are manual and recorded in the
      ledger status (like T-109's browser checks and T-83's `run_every` note).
+
+**Why these tests pass on a machine without a GPU, with zero skips:**
+
+- A session fixture returns `cuda:0` when `torch.cuda.is_available()` and `cpu`
+  otherwise. Every test runs on whichever device exists; nothing is skipped and
+  no test asserts CUDA is present.
+- The CUDA-specific conversion logic is covered with a fake tensor whose
+  `numpy()` / `__array__` raise and whose `.detach().cpu()` yields a plain
+  array. Combined with a stubbed `ListmodePETProjector`, this proves the
+  projector takes the explicit host-copy route without needing CUDA hardware.
+- The numerical assertions (four-region geometry, non-contiguous indices,
+  helix, progress, CPU/GPU parity) run on real data with the available device;
+  CPU numbers stay unchanged, GPU numbers are compared with a tolerance
+  measured on the GPU machine, not hard-coded from a CPU run.
+- What cannot be automated here is real CUDA kernel execution: no test can run
+  actual CUDA kernels and also pass on this CPU-only workstation without a
+  skip. That is why step 5 of the plan is a manual GPU run recorded in the
+  ledger, following the precedent for browser-only checks (T-109, T-83).
 6. **Scripts and docs.** `scripts/verify_forward_projection.py` and
    `scripts/forward_projection_plot.py` get an optional `--cuda` flag (default
    off). `INSTALLATION.md` drops the known-limitation block and the "CUDA is not

@@ -2,7 +2,8 @@
 
 Date: 2026-11-19
 Ledger task: T-08-01
-Status: proposed (not implemented, not in the tested baseline)
+Status: implemented on CPU (2026-11-19); real CUDA execution still needs the
+manual GPU gate described at the end.
 
 ## Problem
 
@@ -123,131 +124,116 @@ the remaining failure is exactly T-08-01's code bug. The 1.10.2 CUDA build was
 **not** re-tested with `CUDA_VISIBLE_DEVICES=""`, so error #2's CPU-fallback
 behaviour is still open for this pair (step 1 of the plan).
 
-## Proposed design
+## Implementation (as built, 2026-11-19)
 
-1. **One conversion boundary in `backend/parallelproj/projector.py`.**
-   Replace `_as_numpy_xyz` (which always moves data to host memory) with two
-   helpers, e.g. `_to_operator_input(value, device)` and
-   `_from_operator_output(value)`, used by `__init__`, `apply` and `adjoint`.
-   - Inputs: keep `float32`, shape `(n, 3)`, C-contiguous; use a torch tensor on
-     the selected device when parallelproj 1.x is given CUDA tensors, numpy
-     arrays on CPU.
-   - Outputs: if the result is a torch tensor, call `.detach().to("cpu").numpy()`
-     before reshaping; numpy results pass through as today.
-   - The reshape/axis swap `(proj, cols, rows) → (proj, rows, cols)` stays
-     unchanged; numerical output must not change on CPU.
-2. **Explicit device on `ConeBeamProjector`.** Add a `device` argument (default
-   `"cpu"`) and pass the `dev` chosen in `forward_project` into the projector.
-   `ConeBeamGeometry` keeps returning tensors on that device. No guessing from
-   tensor types inside the projector.
-3. **Volume placement in `forward_project`.** Transfer the volume to the
-   selected device once, before the chunk loop; keep the existing 32-projection
-   chunking, helix centring and progress callback intact. The returned
-   `ForwardProjectionResult.projections` stays a CPU numpy array.
-4. **Adapter for the upstream API.** Encapsulate the one place that constructs
-   `ListmodePETProjector` so a future 2.x migration does not spread through the
-   projector. 1.x remains the only supported baseline for this task. Decide
-   explicitly how a GPU-built env behaves when the user disables CUDA: either
-   install a CPU-capable `libparallelproj` build or report a clear error instead
-   of the `cudaSetDevice` crash.
-5. **Tests without skips.**
-   - Unit tests for the conversion helpers with a fake tensor that raises on
-     implicit `numpy()`/`__array__` conversion, asserting the explicit
-     `.detach().cpu().numpy()` route is used.
-   - Device-parity tests: a fixture selects `cuda:0` when real CUDA is
-     available and `cpu` otherwise; every test runs somewhere, none skip.
-     On a GPU machine the same test executes the CUDA path.
-   - Existing CPU result tests (four-region geometry, non-contiguous indices,
-     helix, progress) must stay valid.
-   - GPU end-to-end run and browser verification are manual and recorded in the
-     ledger status (like T-109's browser checks and T-83's `run_every` note).
+The installed `parallelproj` 1.10.2 source settled the contract the plan wanted
+to measure on the GPU box (`parallelproj/backend.py`, `joseph3d_fwd`):
 
-**Why these tests pass on a machine without a GPU, with zero skips:**
+- the **image** array decides the kernel, not the LOR tensors;
+- a **host numpy image** takes the hybrid route: the CUDA library copies it to
+  the visible devices and runs the CUDA kernels when the build has them,
+  otherwise the OpenMP library runs;
+- a **CUDA torch/cupy image** takes the raw cupy kernels, which requires `cupy`
+  and a CUDA kernel file.
 
-- A session fixture returns `cuda:0` when `torch.cuda.is_available()` and `cpu`
+So the CUDA route for this app is hybrid mode, not CUDA torch tensors. That
+needs no `cupy`, no CUDA tensors and no device plumbing for the volume.
+
+1. **One conversion boundary** in `src/backend/parallelproj/projector.py`:
+   `_as_host_array`, `_to_operator_input` and `_from_operator_output`. Torch
+   tensors are always consumed with `.detach().cpu().numpy()`, so `np.asarray`
+   never sees a device tensor. `__init__`, `apply` and `adjoint` use only these
+   helpers, which removes the audit's `projector.py:83` crash at its source.
+   Inputs stay float32/C-contiguous and the reshape is unchanged, so CPU numbers
+   do not move.
+2. **No `device` argument on `ConeBeamProjector`.** The original plan added one;
+   with host numpy input it would be unused, and an unused flag is worse than
+   none. `forward_project` still chooses `dev` for LOR generation only.
+3. **Volume placement.** The volume stays a host numpy array. Sending it as a
+   CUDA tensor would force the cupy path; parallelproj's hybrid route performs
+   the host-to-device copy itself. Chunking (32 projections), helix centring,
+   the progress callback and the CPU numpy return value are untouched.
+4. **Upstream adapter.** `ListmodePETProjector` is still built in exactly one
+   place (`ConeBeamProjector.__init__`), so a later 2.x migration stays local.
+5. **Tests: 4 added, zero skips** (`tests/unit/test_parallelproj.py`):
+   - a fake device tensor whose `__array__` raises (the exact CUDA failure),
+     asserting `_to_operator_input` takes the explicit host-copy route;
+   - `_from_operator_output` returning host numpy;
+   - a stubbed `ListmodePETProjector`, asserting `__init__`, `apply` and
+     `adjoint` all receive numpy;
+   - `_available_device()` returns `cuda:0` when present and `cpu` otherwise;
+     the test builds LORs on that device and compares the projection with
+     CPU-built LORs. Here it runs the CPU path; on the A6000 it exercises the
+     CUDA LOR boundary that used to raise.
+   The fake-tensor and stub tests are deterministic everywhere and are what
+   actually pin the contract.
+6. **Scripts and UI.** `scripts/verify_forward_projection.py` and
+   `scripts/forward_projection_plot.py` auto-select CUDA and accept `--cpu`;
+   both print the chosen LOR device and the CUDA device count parallelproj sees.
+   The checkbox help text now says it controls LOR geometry only, because the
+   kernel is chosen by the installed parallelproj build.
+
+**CPU fallback in a GPU-built env.** In 1.10.2 `num_visible_cuda_devices` comes
+from the CUDA library's device count and respects `CUDA_VISIBLE_DEVICES`. With
+the variable empty the count is 0, so a numpy image takes the OpenMP path; the
+package must also ship the CPU library, otherwise `import parallelproj` would
+fail at `lib_parallelproj_c_fname`. So error #2 should not apply to 1.10.2 —
+but that is source inspection, not a run. The GPU gate below verifies it.
+
+**Why the tests pass on a machine without a GPU, with zero skips:**
+
+- A helper returns `cuda:0` when `torch.cuda.is_available()` and `cpu`
   otherwise. Every test runs on whichever device exists; nothing is skipped and
   no test asserts CUDA is present.
 - The CUDA-specific conversion logic is covered with a fake tensor whose
-  `numpy()` / `__array__` raise and whose `.detach().cpu()` yields a plain
-  array. Combined with a stubbed `ListmodePETProjector`, this proves the
-  projector takes the explicit host-copy route without needing CUDA hardware.
+  `__array__` raises and whose `.detach().cpu()` yields a plain array. Combined
+  with a stubbed `ListmodePETProjector`, this proves the host-copy contract
+  without CUDA hardware.
 - The numerical assertions (four-region geometry, non-contiguous indices,
-  helix, progress) run on real data with the available device; CPU numbers stay
-  unchanged. Device results are compared against a reference with a tolerance
-  measured on the GPU machine, not a tolerance guessed from a CPU run.
+  helix, progress) run on real data and keep their CPU expectations.
 - What cannot be automated here is real CUDA kernel execution: no test can run
   actual CUDA kernels and also pass on this CPU-only workstation without a
-  skip. That is why step 5 of the plan is a manual GPU run recorded in the
-  ledger, following the precedent for browser-only checks (T-109, T-83).
+  skip. That stays a manual GPU run recorded in the ledger, following the
+  precedent for browser-only checks (T-109, T-83).
 
-**Machine dependence of the suite — current state and target:**
-
-Today the suite is machine-dependent in *outcome*: `forward_project` defaults to
-`use_cuda=True` and selects `dev = "cuda"` whenever CUDA is present, while most
-tests call it without a device argument. The same commit therefore gives 387
-passed / 0 skipped on the CPU workstation and 340 passed / 19 failed on the
-A6000 box. The green CPU run does not prove the GPU path works — it proves the
-GPU branch was never executed. Zero skips currently hide this by omission, not
-by design.
-
-After T-08-01 the *outcome* is machine-independent (green on both), while
-*coverage* remains deliberately machine-dependent: the fixture runs `cpu` here
-and `cuda:0` there. The fake-tensor/stub tests are deterministic everywhere and
-are what actually pin the conversion contract.
-
-**Parity-test caveat (must be resolved before writing the parity test):**
-
-A CPU/GPU parity test that calls the CPU path inside the GPU env assumes both
-kernels work in the same environment. Error #2 shows a GPU-built
-`libparallelproj` can reject CPU input outright (`cudaSetDevice failed`), so
-such a test would fail on exactly the machine we want to verify, regardless of
-the projector fix. Step 1's fallback policy decides this:
-
-- If the chosen GPU build also runs CPU input, compute both paths in-env and
-  compare with the measured tolerance.
-- If it cannot, compare the device result against a small checked-in synthetic
-  reference projection produced in the validated CPU env. Do not invoke the
-  broken CPU path in the GPU env and do not add a skip guard.
-6. **Scripts and docs.** `scripts/verify_forward_projection.py` and
-   `scripts/forward_projection_plot.py` drop the hard-coded `use_cuda=False`:
-   default to `use_cuda=torch.cuda.is_available()` like the app and add `--cpu`
-   to force CPU. A default-off `--cuda` flag is not enough — in a GPU-built env
-   the CPU path itself is broken (error #2). Print the chosen device. These are
-   manual scripts, not pytest tests. `INSTALLATION.md` drops the
-   known-limitation block and the "CUDA is not validated by tests" note. Audit
-   finding #1 becomes `fixed` only after a real GPU run.
+**Machine dependence of the suite.** Before the fix the outcome was
+machine-dependent (green here, 20 red on the A6000) because the CUDA branch was
+never executed on this workstation. With the boundary moved to host numpy the
+*outcome* is machine-independent: the same code runs on both machines, and the
+available-device test changes only *which* LOR path is exercised. Kernel
+execution remains deliberately machine-dependent and manual.
 
 ## Risks / open questions
 
-- Which tensor type parallelproj 1.x accepts for LOR coordinates in its CUDA
-  build must be confirmed on the GPU machine before settling helper signatures.
 - CUDA LOR lists are large; the existing chunking bounds them to 32 projections,
   but peak VRAM must be measured on the A6000.
-- CPU/CUDA kernels are not expected to be bit-identical; tolerance needs to be
-  chosen from measurements, not guessed.
+- CPU/CUDA kernels are not expected to be bit-identical; the tolerance for the
+  manual parity check must come from measurement, not from this CPU run.
 - A Python 3.11 + `parallelproj` 1.10.2 CUDA build of
   `parallelproj`/`libparallelproj`/`pytorch` with matching CUDA generation is
-  still required; see INSTALLATION.md "GPU setup". Do not fall back to 1.3.x or
-  2.x to get a CUDA build.
-- The CPU fallback in a GPU-built env is broken independently of the projector
-  fix (error #2); hiding devices with `CUDA_VISIBLE_DEVICES=""` is not a fix.
-- Consequently a same-env CPU/GPU parity test may be impossible on a GPU build;
-  the fallback-policy decision in step 1 must say whether parity uses an in-env
-  CPU call or a checked-in reference from the CPU env. Both options keep zero
-  skips; only the second works when the GPU build cannot do CPU.
+  required; see INSTALLATION.md "GPU setup". Do not fall back to 1.3.x or 2.x
+  to get a CUDA build.
+- The checkbox no longer forces CPU in a CUDA-capable build; parallelproj
+  chooses the kernel. Running a GPU build on the CPU requires hiding the
+  devices before process start (`CUDA_VISIBLE_DEVICES=""`), which the source
+  suggests works in 1.10.2 but has not been run here.
 
 ## Acceptance
 
-- `forward_project(..., use_cuda=True)` completes on a GPU env without the
-  numpy/CUDA TypeError; results match the CPU reference (in-env or checked-in,
-  per the step 1 fallback policy) within a documented float32 tolerance.
-- Suite is green with zero skips on both the CPU-only and GPU machines; the
-  device fixture changes which path runs, not whether tests pass. CPU test count
-  only grows by the new tests, and no old test changes its expected result.
-- The default and the unchecked CUDA checkbox are both exercised on the GPU
-  machine; neither crashes, or the unsupported combination fails with a clear
-  message.
-- Real browser check on a GPU machine: forward projection with the checkbox on
-  produces a non-zero projection.
-- Docs: INSTALLATION.md no longer describes the GPU path as broken, audit #1 is
-  `fixed`, AGENTS.md test bar updated if the suite count changed.
+- [x] `np.asarray` on a device tensor is gone; fake-tensor and stub tests pin
+  the host-copy boundary (CPU suite green, zero skips).
+- [x] CPU numbers unchanged: the existing projection, helix, progress and
+  selection tests pass without edits to their expectations.
+- [x] Suite: **394 passed + 4 `test_release_push` failures from the missing
+  `bash` on this box, 0 skipped** (398 with Git Bash), up from the 394 baseline
+  by the 4 new tests.
+- [x] Scripts auto-select and print the device; `--cpu` overrides.
+- [ ] `forward_project(..., use_cuda=True)` completes on the A6000 without the
+  numpy/CUDA TypeError and matches the CPU reference within a measured float32
+  tolerance.
+- [ ] GPU suite green with zero skips, including a `CUDA_VISIBLE_DEVICES=""`
+  run to close the error #2 question for 1.10.2.
+- [ ] Real browser check on the GPU machine: forward projection with the
+  checkbox on produces a non-zero projection.
+- [ ] `INSTALLATION.md` drops the known-limitation block and audit #1 becomes
+  `fixed` — only after the GPU run.

@@ -44,71 +44,44 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
 
 ## Steps
 
-1. **Confirm the upstream contract on the GPU machine.**
-   - Inspect the installed `parallelproj` 1.10.x `ListmodePETProjector`: which
-     input types (numpy vs torch CPU vs torch CUDA) it accepts, and what type
-     `__call__`/`adjoint` return for each.
-   - Run a minimal 1-projection call with CUDA LOR coordinates and record the
-     outcome here before changing the projector. Repeat with CPU input and with
-     `CUDA_VISIBLE_DEVICES=""` to establish whether error #2 also applies to
-     the 1.10.2 CUDA build (not tested yet; the 2026-11-19 install report only
-     confirmed imports and the 20 failing tests).
-   - Decide the CPU-fallback policy for a GPU-built env (install a CPU-capable
-     `libparallelproj`, or fail with an explicit message). This also fixes the
-     parity-test question below: can the GPU build run CPU input in the same
-     env, or must the reference come from the validated CPU env? Record the
-     decision here before step 4 is written.
-
-2. **Introduce the conversion helpers in `src/backend/parallelproj/projector.py`.**
-   - Replace `_as_numpy_xyz` with `_to_operator_input` / `_from_operator_output`.
-   - `__init__`, `apply` and `adjoint` use only those helpers; remove every bare
-     `np.asarray(...)` on tensors that can live on CUDA.
-   - Keep numpy output shape/order and CPU numbers identical.
-
-3. **Thread the device through `src/backend/forward_project.py`.**
-   - `ConeBeamProjector(..., device=dev)`; place the volume on `dev` once before
-     the chunk loop.
-   - Keep `dev = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"`,
-     the 32-projection chunking, z/helix centring, and the progress callback.
-   - Return `projections` as a CPU numpy array as today.
-
-4. **Add tests without adding skips.**
-   - `tests/unit/test_parallelproj.py`: helper tests with a fake CUDA tensor
-     that raises on implicit numpy conversion; device fixture selects `cuda:0`
-     when available, `cpu` otherwise.
-   - `tests/unit/test_forward_project.py`: device-vs-reference parity with a
-     measured tolerance; keep existing CPU cases unchanged. Do **not** call the
-     CPU path inside a GPU env unless step 1 confirmed it works there — error
-     #2 makes that test fail on the target machine otherwise. If the GPU build
-     cannot do CPU, use a small checked-in synthetic reference projection
-     produced in the validated CPU env and compare the device result to it.
-     Either way: zero skips, no conditional assertions on CUDA presence.
-   - `tests/integration/test_projection_workflow.py`: one end-to-end flow on
-     the selected device (chunked run + progress).
-   - `tests/integration/test_ui_smoke.py` and `tests/test_dummy_measurement.py`:
-     update the 15 cases named in the error report so the default `use_cuda=True`
-     no longer crashes on GPU.
-   - Run in the conda env: `python -m pytest -q -rs` — must report no skips.
-
-5. **Verify on the real GPU machine.**
+1. **[x] Confirm the upstream contract.** Done by reading the installed 1.10.2
+   source, which is more precise than one run:
+   `parallelproj.backend.joseph3d_fwd` dispatches on the *image* array. Host
+   numpy takes the hybrid route (CUDA library when devices are visible, OpenMP
+   otherwise); a CUDA torch image needs `cupy`. Feeding host numpy therefore
+   runs on a GPU build without cupy. `CUDA_VISIBLE_DEVICES=""` should fall back
+   to OpenMP because the device count becomes 0 — source-verified, empirical
+   check in step 5.
+2. **[x] Introduce the conversion helpers in
+   `src/backend/parallelproj/projector.py`.** `_as_host_array`,
+   `_to_operator_input` and `_from_operator_output`; `__init__`, `apply` and
+   `adjoint` use only those. Every bare `np.asarray` on a possibly-CUDA tensor
+   is gone. Numpy output shape/order and CPU numbers are unchanged.
+3. **[x] Thread the device through `src/backend/forward_project.py`.** `dev`
+   still selects where the LOR geometry is built; the volume intentionally stays
+   host numpy because parallelproj's hybrid route copies it to the devices
+   itself. Chunking, z/helix centring and the progress callback are untouched.
+   No `device` argument on `ConeBeamProjector`: with host numpy input it would be
+   unused.
+4. **[x] Add tests without adding skips.** Four tests in
+   `tests/unit/test_parallelproj.py`: fake device tensor with a raising
+   `__array__`, `_from_operator_output`, a stubbed `ListmodePETProjector`, and
+   an available-device LOR comparison. `python -m pytest -q -rs` in `ct-viewer`:
+   394 passed, 0 skipped (386 + the 4 new tests; the 4 `test_release_push`
+   failures on this box are the documented missing-`bash` issue).
+5. **[ ] Verify on the real GPU machine.**
    - Suite in the GPU env (zero skips), plus a run with `CUDA_VISIBLE_DEVICES=""`
-     to check error #2 did not reappear under the chosen fallback policy.
+     to check that 1.10.2 really falls back to OpenMP as the source suggests.
    - Peak VRAM during a full-geometry run.
-   - Streamlit: `Use CUDA if available` on → non-zero projection; off → either
-     a working CPU projection or an explicit unsupported-build message, never
-     a `cudaSetDevice` crash. Record output sums and device in the ledger status.
-
-6. **Update the scripts and docs after verification passes.**
+   - Streamlit: `Use CUDA if available` on → non-zero projection; off → a working
+     projection via the installed build (the checkbox now controls LOR geometry,
+     not the kernel). Record output sums and device in the ledger status.
+6. **[x] Update the scripts and docs.**
    - `scripts/verify_forward_projection.py`, `scripts/forward_projection_plot.py`:
-     replace hard-coded `use_cuda=False` with `use_cuda=torch.cuda.is_available()`
-     (auto, matching the app) and add `--cpu` to force CPU. A default-off
-     `--cuda` flag would leave the scripts broken by default in a GPU-built env
-     (error #2). Manual scripts only, no pytest impact; print the chosen device.
-   - `INSTALLATION.md`: remove the known-limitation blockquote and rewrite the
-     "CUDA in the test suite and helper scripts" note to match the new state,
-     including the `CUDA_VISIBLE_DEVICES` finding.
-   - `docs/audit-2026-11-13-findings.md` finding 1 → `fixed`.
-   - `AGENTS.md` test bar: new total if the suite count changed.
+     auto-select CUDA, `--cpu` override, print the chosen LOR device and the CUDA
+     device count parallelproj sees.
+   - `INSTALLATION.md`, audit finding #1 and the deadlock note stay on "known
+     limitation" until step 5 passes; the `AGENTS.md` test bar moves to 398.
 
 ## Done when
 

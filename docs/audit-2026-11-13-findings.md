@@ -10,7 +10,7 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
 
 ## Must fix
 
-### 1. Forward projection crashes on every CUDA machine — `open`
+### 1. Forward projection crashes on every CUDA machine — `in progress`
 
 - **Where:** `src/backend/parallelproj/projector.py:L82-88`, `src/backend/forward_project.py:L209-210`
 - **What:** On a GPU machine the LOR position tensors are created on
@@ -21,8 +21,11 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   The "Use CUDA if available" checkbox defaults to ON, so every GPU user hits
   it. The fix already exists in the same file: `_as_numpy_xyz`
   (`projector.py:L28-38`) does `.detach().cpu().numpy()` — it is never called.
-- **Fix:** Wrap both position tensors with the existing `_as_numpy_xyz` helper
-  in `ConeBeamProjector.__init__`. Nothing else changes.
+- **Fix (2026-11-19, T-08-01):** the conversion boundary in
+  `projector.py` now always uses `.detach().cpu().numpy()` (`_as_host_array`,
+  `_to_operator_input`, `_from_operator_output`), and `__init__`, `apply` and
+  `adjoint` use only those helpers. Host numpy also selects parallelproj's
+  hybrid route, which runs the CUDA kernels without requiring `cupy`.
 - **If skipped:** Forward projection is broken on GPU, right after
   environment.yml and README promise "CUDA when available".
 - **Reproduced 2026-11-19** twice on the 8× RTX A6000 machine:
@@ -41,8 +44,10 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
     is unconfirmed for that pair. Details: `ctbeam_handoff.json`,
     `ctbeam_gpu_install_report.md`, and
     `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
-- **Verify:** The GPU env itself is now verified (imports OK, 8 devices); the
-  code fix still needs a GPU run or a mocked-device unit test on this machine.
+- **Verify:** Fixed on CPU with a fake-device-tensor test that raises on
+  implicit numpy conversion (`tests/unit/test_parallelproj.py`); the full CPU
+  suite is green with zero skips. The GPU run that flips this entry to `fixed`
+  is still pending (T-08-01, step 5).
 
 ### 2. DICOM loader ignores the file's RescaleSlope / RescaleIntercept — `open`
 

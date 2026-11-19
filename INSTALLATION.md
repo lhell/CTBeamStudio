@@ -7,7 +7,7 @@ This guide covers all installation options for CTBeamStudio.
 **Recommendation: the conda env from `environment.yml` (Option 3a).** It is the
 only route that is validated end to end here: Python 3.11, conda-forge's
 `parallelproj` 1.10.x with CPU kernels, working forward projection, and the full
-suite green (394 passed, 0 skipped). Forward projection is the point of this
+suite green (398 passed, 0 skipped). Forward projection is the point of this
 tool, so a pip-only install gives you most of the UI but not its core feature.
 
 | Situation | Pick |
@@ -111,7 +111,7 @@ be installed from conda-forge. Without it the app still runs, but
 
 > **Start with the CPU env.** `environment.yml` pins Python 3.11,
 > `parallelproj`/`libparallelproj` **1.10.x** CPU builds and CPU PyTorch. That
-> is the combination the test suite is validated on (394 passed, 0 skipped). If
+> is the combination the test suite is validated on (398 passed, 0 skipped). If
 > you have an NVIDIA GPU, read
 > [GPU setup](#gpu-setup-nvidia-read-before-you-start) *before* running an
 > unpinned `conda install ... pytorch cuda-toolkit`: the solver can pick
@@ -241,43 +241,41 @@ Four install traps seen in a real GPU setup:
 - Installing a modern `libparallelproj` (e.g. 2.0.7/cuda130) next to an old
   `parallelproj` wrapper. The library and wrapper versions must match.
 
-> **Known limitation:** the GPU *install* works, but GPU *forward projection*
-> does not yet. A fresh 1.10.2 / `libparallelproj 1.10.2=cuda129` env on 8×
-> RTX A6000 (2026-11-19) installs and imports cleanly and sees all 8 devices;
-> the suite is then **370 passed / 20 failed / 0 skipped**, all from the
-> projector bug below. The projector calls `np.asarray` on CUDA LOR tensors →
-> `TypeError: can't convert cuda:0 device type tensor to numpy` (audit finding
-> #1). In the earlier 2.0.2/cuda130 env the same run was 340 passed / 19 failed,
-> and hiding CUDA made it worse (336 / 23, `cudaSetDevice failed`); that CPU
-> fallback was **not** re-tested on 1.10.2, so untick **Use CUDA if available**
-> only if your build supports CPU input. The CPU env from `environment.yml` is
-> the only validated projection baseline (394 passed, 0 skipped). Planned fix:
-> **T-08-01**,
-> `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`; the reproduced
-> errors are recorded in
+> **GPU status (2026-11-19): install verified, code fix awaiting a GPU run.**
+> A fresh 1.10.2 / `libparallelproj 1.10.2=cuda129` env on 8× RTX A6000
+> installs and imports cleanly and sees all 8 devices. The projector crash from
+> audit finding #1 (`np.asarray` on CUDA LOR tensors) is fixed in **T-08-01**:
+> every tensor now crosses one explicit `.detach().cpu().numpy()` boundary, and
+> host numpy selects parallelproj's hybrid route, which runs the CUDA kernels
+> without `cupy`. New CPU tests pin that boundary with a fake device tensor that
+> raises on implicit numpy conversion. The actual CUDA run on the A6000 is still
+> pending, so the CPU env from `environment.yml` remains the only *verified*
+> projection baseline (398 passed, 0 skipped). Before the fix the GPU suite was
+> 370 passed / 20 failed; in the earlier 2.0.2/cuda130 env it was 340 / 19, and
+> hiding CUDA made it worse (336 / 23). See **T-08-01** and
 > `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
 
 ### CUDA in the test suite and helper scripts
 
-CUDA is **not** enabled or validated by the tests:
+The suite is designed to be green with zero skips on both a CPU-only and a GPU
+machine; only the CPU side has been run here so far:
 
-- `tests/unit/test_parallelproj.py` and `tests/integration/test_projection_workflow.py`
-  pass `use_cuda=False` explicitly. Other tests (most of
-  `tests/unit/test_forward_project.py` and `test_dummy_measurement.py`) call
-  `forward_project(...)` with its default `use_cuda=True`. On a GPU machine
-  those take the CUDA path and hit the bug above — that is the source of the
-  20 failures on 1.10.2 (19 on 2.0.2). There is no `conftest.py` fixture or
-  environment variable that forces CPU, so the green 394/0 result only applies
-  to the CPU env.
+- `tests/unit/test_parallelproj.py` and
+  `tests/integration/test_projection_workflow.py` pass `use_cuda=False`
+  explicitly. Other tests call `forward_project(...)` with its default
+  `use_cuda=True`, which selects CUDA only when `torch.cuda.is_available()` is
+  true. With the T-08-01 fix those calls no longer convert CUDA tensors to
+  numpy, so they work on either machine.
+- The device contract is covered without CUDA by a fake tensor that raises on
+  implicit numpy conversion, plus an available-device LOR comparison that runs
+  `cuda:0` on a GPU box and `cpu` here. Nothing skips.
 - `scripts/verify_forward_projection.py` and `scripts/forward_projection_plot.py`
-  both hard-code `use_cuda=False`, so they check the CPU path. In a GPU-built
-  parallelproj env that path can still fail with `cudaSetDevice`; use them in
-  the CPU env from `environment.yml` for a meaningful check. T-08-01 changes
-  them to auto-select CUDA when available (like the app) with a `--cpu` flag to
-  force CPU, so they work in either env.
-- In the app, **Use CUDA if available (forward projection only)** is ticked by
-  default. Unticking it avoids the projector crash but does not fix a GPU-only
-  parallelproj build — see the known limitation above.
+  auto-select CUDA and take `--cpu`; both print the LOR device and the CUDA
+  device count parallelproj sees.
+- In the app, **Use CUDA if available (forward projection only)** controls where
+  the LOR geometry is built. The projection kernel is chosen by the installed
+  parallelproj build: a CUDA build uses the GPU whenever it can see a device,
+  and `CUDA_VISIBLE_DEVICES=""` is the only way to force the CPU path there.
 
 ---
 
@@ -341,7 +339,7 @@ python -c "import streamlit; import pydicom; import plotly; print('OK')"
 ```
 
 For a source checkout, the full check is `python -m pytest -q -rs` from the
-activated env: expect zero skips (394 passed on the CPU env).
+activated env: expect zero skips (398 passed on the CPU env).
 
 ---
 

@@ -129,13 +129,42 @@ the observed GPU failures.
   array. Combined with a stubbed `ListmodePETProjector`, this proves the
   projector takes the explicit host-copy route without needing CUDA hardware.
 - The numerical assertions (four-region geometry, non-contiguous indices,
-  helix, progress, CPU/GPU parity) run on real data with the available device;
-  CPU numbers stay unchanged, GPU numbers are compared with a tolerance
-  measured on the GPU machine, not hard-coded from a CPU run.
+  helix, progress) run on real data with the available device; CPU numbers stay
+  unchanged. Device results are compared against a reference with a tolerance
+  measured on the GPU machine, not a tolerance guessed from a CPU run.
 - What cannot be automated here is real CUDA kernel execution: no test can run
   actual CUDA kernels and also pass on this CPU-only workstation without a
   skip. That is why step 5 of the plan is a manual GPU run recorded in the
   ledger, following the precedent for browser-only checks (T-109, T-83).
+
+**Machine dependence of the suite — current state and target:**
+
+Today the suite is machine-dependent in *outcome*: `forward_project` defaults to
+`use_cuda=True` and selects `dev = "cuda"` whenever CUDA is present, while most
+tests call it without a device argument. The same commit therefore gives 387
+passed / 0 skipped on the CPU workstation and 340 passed / 19 failed on the
+A6000 box. The green CPU run does not prove the GPU path works — it proves the
+GPU branch was never executed. Zero skips currently hide this by omission, not
+by design.
+
+After T-08-01 the *outcome* is machine-independent (green on both), while
+*coverage* remains deliberately machine-dependent: the fixture runs `cpu` here
+and `cuda:0` there. The fake-tensor/stub tests are deterministic everywhere and
+are what actually pin the conversion contract.
+
+**Parity-test caveat (must be resolved before writing the parity test):**
+
+A CPU/GPU parity test that calls the CPU path inside the GPU env assumes both
+kernels work in the same environment. Error #2 shows a GPU-built
+`libparallelproj` can reject CPU input outright (`cudaSetDevice failed`), so
+such a test would fail on exactly the machine we want to verify, regardless of
+the projector fix. Step 1's fallback policy decides this:
+
+- If the chosen GPU build also runs CPU input, compute both paths in-env and
+  compare with the measured tolerance.
+- If it cannot, compare the device result against a small checked-in synthetic
+  reference projection produced in the validated CPU env. Do not invoke the
+  broken CPU path in the GPU env and do not add a skip guard.
 6. **Scripts and docs.** `scripts/verify_forward_projection.py` and
    `scripts/forward_projection_plot.py` get an optional `--cuda` flag (default
    off). `INSTALLATION.md` drops the known-limitation block and the "CUDA is not
@@ -154,13 +183,18 @@ the observed GPU failures.
   matching CUDA major is still required; see INSTALLATION.md "GPU setup".
 - The CPU fallback in a GPU-built env is broken independently of the projector
   fix (error #2); hiding devices with `CUDA_VISIBLE_DEVICES=""` is not a fix.
+- Consequently a same-env CPU/GPU parity test may be impossible on a GPU build;
+  the fallback-policy decision in step 1 must say whether parity uses an in-env
+  CPU call or a checked-in reference from the CPU env. Both options keep zero
+  skips; only the second works when the GPU build cannot do CPU.
 
 ## Acceptance
 
 - `forward_project(..., use_cuda=True)` completes on a GPU env without the
-  numpy/CUDA TypeError; results match the CPU path within a documented
-  float32 tolerance.
-- Suite reports zero skips on both the CPU env and the GPU env; CPU test count
+  numpy/CUDA TypeError; results match the CPU reference (in-env or checked-in,
+  per the step 1 fallback policy) within a documented float32 tolerance.
+- Suite is green with zero skips on both the CPU-only and GPU machines; the
+  device fixture changes which path runs, not whether tests pass. CPU test count
   only grows by the new tests, and no old test changes its expected result.
 - The default and the unchecked CUDA checkbox are both exercised on the GPU
   machine; neither crashes, or the unsupported combination fails with a clear

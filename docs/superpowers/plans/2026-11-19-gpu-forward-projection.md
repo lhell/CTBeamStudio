@@ -8,6 +8,13 @@ Prerequisite: a working CUDA conda env built as described in `INSTALLATION.md`
 ("GPU setup"), with Python 3.11 and a matched `parallelproj`/`libparallelproj`
 1.x pair. Without a GPU device, steps 5 and 6 can only be prepared, not verified.
 
+Suite-machine dependence: the current suite is green on CPU and red on GPU
+because `forward_project` selects CUDA from `torch.cuda.is_available()` while
+most tests omit the device argument. The goal is a green, zero-skip suite on
+both machines; the device fixture changes *which* path each test exercises, not
+whether it passes. Real CUDA kernel execution stays a manual verification gate
+(step 5), by precedent with browser-only checks (T-109, T-83).
+
 ## Evidence to reproduce first
 
 The 2026-11-19 error report (recorded in the design spec) found three failures
@@ -36,7 +43,10 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
      outcome here before changing the projector. Repeat with CPU input to
      establish whether error #2 also applies to the 1.x build.
    - Decide the CPU-fallback policy for a GPU-built env (install a CPU-capable
-     `libparallelproj`, or fail with an explicit message).
+     `libparallelproj`, or fail with an explicit message). This also fixes the
+     parity-test question below: can the GPU build run CPU input in the same
+     env, or must the reference come from the validated CPU env? Record the
+     decision here before step 4 is written.
 
 2. **Introduce the conversion helpers in `src/backend/parallelproj/projector.py`.**
    - Replace `_as_numpy_xyz` with `_to_operator_input` / `_from_operator_output`.
@@ -55,8 +65,13 @@ on 8× RTX A6000, Python 3.12.16, `parallelproj 2.0.2` + `libparallelproj 2.0.7
    - `tests/unit/test_parallelproj.py`: helper tests with a fake CUDA tensor
      that raises on implicit numpy conversion; device fixture selects `cuda:0`
      when available, `cpu` otherwise.
-   - `tests/unit/test_forward_project.py`: CUDA/CPU parity with a measured
-     tolerance; keep existing CPU cases unchanged.
+   - `tests/unit/test_forward_project.py`: device-vs-reference parity with a
+     measured tolerance; keep existing CPU cases unchanged. Do **not** call the
+     CPU path inside a GPU env unless step 1 confirmed it works there — error
+     #2 makes that test fail on the target machine otherwise. If the GPU build
+     cannot do CPU, use a small checked-in synthetic reference projection
+     produced in the validated CPU env and compare the device result to it.
+     Either way: zero skips, no conditional assertions on CUDA presence.
    - `tests/integration/test_projection_workflow.py`: one end-to-end flow on
      the selected device (chunked run + progress).
    - `tests/integration/test_ui_smoke.py` and `tests/test_dummy_measurement.py`:

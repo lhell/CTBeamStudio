@@ -7,7 +7,7 @@ This guide covers all installation options for CTBeamStudio.
 **Recommendation: the conda env from `environment.yml` (Option 3a).** It is the
 only route that is validated end to end here: Python 3.11, conda-forge's
 `parallelproj` 1.10.x with CPU kernels, working forward projection, and the full
-suite green (390 passed, 0 skipped). Forward projection is the point of this
+suite green (394 passed, 0 skipped). Forward projection is the point of this
 tool, so a pip-only install gives you most of the UI but not its core feature.
 
 | Situation | Pick |
@@ -111,7 +111,7 @@ be installed from conda-forge. Without it the app still runs, but
 
 > **Start with the CPU env.** `environment.yml` pins Python 3.11,
 > `parallelproj`/`libparallelproj` **1.10.x** CPU builds and CPU PyTorch. That
-> is the combination the test suite is validated on (390 passed, 0 skipped). If
+> is the combination the test suite is validated on (394 passed, 0 skipped). If
 > you have an NVIDIA GPU, read
 > [GPU setup](#gpu-setup-nvidia-read-before-you-start) *before* running an
 > unpinned `conda install ... pytorch cuda-toolkit`: the solver can pick
@@ -244,7 +244,7 @@ Four install traps seen in a real GPU setup:
 > `RuntimeError: cudaSetDevice failed: no CUDA-capable device is detected`.
 > Unticking **Use CUDA if available** is therefore **not** a reliable fallback
 > in a GPU-built env. Only the CPU env from `environment.yml` is validated
-> (390 passed, 0 skipped). Planned fix: **T-08-01**,
+> (394 passed, 0 skipped). Planned fix: **T-08-01**,
 > `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`; the reproduced
 > errors are recorded in
 > `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
@@ -332,7 +332,7 @@ python -c "import streamlit; import pydicom; import plotly; print('OK')"
 ```
 
 For a source checkout, the full check is `python -m pytest -q -rs` from the
-activated env: expect zero skips (390 passed on the CPU env).
+activated env: expect zero skips (394 passed on the CPU env).
 
 ---
 

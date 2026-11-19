@@ -25,10 +25,14 @@ Status values: `open` / `in progress` / `fixed` / `wontfix`.
   in `ConeBeamProjector.__init__`. Nothing else changes.
 - **If skipped:** Forward projection is broken on GPU, right after
   environment.yml and README promise "CUDA when available".
-- **Reproduced 2026-11-19** on a real GPU machine (8× RTX A6000, fresh conda
-  env): 340 passed / 19 failed, all with exactly this TypeError. Unticking
-  "Use CUDA if available" avoids it because the CPU path never creates CUDA
-  tensors. The install handoff (`ctbeam_handoff.json`) records the run.
+- **Reproduced 2026-11-19** on a real GPU machine (8× RTX A6000, Python 3.12,
+  `parallelproj 2.0.2` + `libparallelproj 2.0.7/cuda130`): 340 passed /
+  19 failed, including this TypeError. A second, independent failure appears
+  with `CUDA_VISIBLE_DEVICES=""`: the GPU-built operator rejects CPU numpy
+  input with `cudaSetDevice failed` (336 passed / 23 failed), so unticking
+  "Use CUDA if available" is not a reliable workaround in a GPU-built env.
+  Details: the install handoff (`ctbeam_handoff.json`) and
+  `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
 - **Verify:** Cannot be tested on this machine (no CUDA); check in a GPU
   environment or via a mocked-device unit test.
 

@@ -13,7 +13,7 @@ tool, so a pip-only install gives you most of the UI but not its core feature.
 | Situation | Pick |
 |---|---|
 | Developing this repo, or need working forward projection | **Option 3a** (Miniforge + `environment.yml`) |
-| Want a GPU | [GPU setup](#gpu-setup-nvidia-read-before-you-start) below, then untick **Use CUDA if available** until the known GPU bug is fixed |
+| Want a GPU | [GPU setup](#gpu-setup-nvidia-read-before-you-start) below — GPU projection is **not** in the tested baseline yet; use the CPU env for a green suite |
 | No Python tooling, just want to look at the app | Option 1, Docker `full` (`slim` is viewer-only) |
 | Viewer only, no projection | Option 2, pip/venv |
 
@@ -220,14 +220,19 @@ Three install traps seen in a real GPU setup:
 - Installing a modern `libparallelproj` (e.g. 2.0.7/cuda130) next to an old
   `parallelproj` wrapper. The library and wrapper versions must match.
 
-> **Known limitation:** a GPU env currently fails forward projection with
-> `TypeError: can't convert cuda:0 device type tensor to numpy`. The bug is in
-> this repo's projector (audit finding #1,
-> `docs/audit-2026-11-13-findings.md`), not in the parallelproj version, so a
-> correctly pinned 1.x GPU env does not avoid it. Until it is fixed, untick
-> **Use CUDA if available** in the sidebar: the CPU code path works on a GPU
-> machine. The green baseline is the CPU env; a GPU env was observed with
-> 19 failing forward-projection tests (340 passed).
+> **Known limitation:** the GPU route is not supported yet. Two independent
+> failures were reproduced on 8× RTX A6000 (2026-11-19, 19 failed / 340 passed):
+> (1) the projector calls `np.asarray` on CUDA LOR tensors → `TypeError: can't
+> convert cuda:0 device type tensor to numpy` (audit finding #1); (2) a
+> **GPU-built** parallelproj operator cannot run CPU input — with
+> `CUDA_VISIBLE_DEVICES=""` the suite got worse (23 failed / 336 passed) with
+> `RuntimeError: cudaSetDevice failed: no CUDA-capable device is detected`.
+> Unticking **Use CUDA if available** is therefore **not** a reliable fallback
+> in a GPU-built env. Only the CPU env from `environment.yml` is validated
+> (387 passed, 0 skipped). Planned fix: **T-08-01**,
+> `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`; the reproduced
+> errors are recorded in
+> `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`.
 
 ### CUDA in the test suite and helper scripts
 
@@ -241,10 +246,13 @@ CUDA is **not** enabled or validated by the tests:
   19 failures. There is no `conftest.py` fixture or environment variable that
   forces CPU, so the green 387/0 result only applies to the CPU env.
 - `scripts/verify_forward_projection.py` and `scripts/forward_projection_plot.py`
-  both hard-code `use_cuda=False`. They run on the CPU even on a GPU machine,
-  so they are safe to use there for checking that parallelproj works.
+  both hard-code `use_cuda=False`, so they check the CPU path. In a GPU-built
+  parallelproj env that path can still fail with `cudaSetDevice`; use them in
+  the CPU env from `environment.yml` for a meaningful check (T-08-01 adds an
+  optional `--cuda` flag).
 - In the app, **Use CUDA if available (forward projection only)** is ticked by
-  default. Untick it on a GPU machine until the bug is fixed.
+  default. Unticking it avoids the projector crash but does not fix a GPU-only
+  parallelproj build — see the known limitation above.
 
 ---
 
@@ -353,8 +361,16 @@ a version-2 symptom.
 
 ### `TypeError: can't convert cuda:0 device type tensor to numpy`
 Forward projection on a GPU env hits the known bug in
-`docs/audit-2026-11-13-findings.md` (finding 1). Untick **Use CUDA if
-available** in the sidebar until it is fixed; the CPU path works there.
+`docs/audit-2026-11-13-findings.md` (finding 1). Two options today: use the
+validated CPU env from `environment.yml`, or untick **Use CUDA if available**
+and install a CPU-capable `libparallelproj` in that env. Unticking alone is not
+enough with a GPU-only parallelproj build.
+
+### `RuntimeError: cudaSetDevice failed: no CUDA-capable device is detected`
+The installed `libparallelproj` is a GPU-only build and cannot run CPU input —
+even with `CUDA_VISIBLE_DEVICES=""`. Rebuild the env with CPU kernels
+(`environment.yml`) or wait for T-08-01, which makes the device handling and
+the unsupported combination explicit.
 
 ### `pip install -e ./CTBeamStudio[dev]` says "does not appear to be a Python project"
 `pyproject.toml` lives in the repository root. Run `cd CTBeamStudio` (or

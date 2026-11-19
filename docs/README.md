@@ -93,6 +93,7 @@ docs/
 | `2026-10-26_projection_geometry_3d_visualization.md` | 3D trajectory visualization | ✅ Done |
 | `2026-10-26_docker_self_deployment.md` | Docker self-deployment | ⚠️ Deferred |
 | `2026-10-27_parallelproj_forward_projection.md` | Forward projection with parallelproj | 🔄 In Progress |
+| `2026-11-19-gpu-forward-projection.md` | Device-independent CUDA forward projection (T-08-01) | ⚠️ Planned |
 
 ### Issues
 | File | Description | Status |
@@ -102,6 +103,7 @@ docs/
 ### Superpowers Specs
 | File | Description |
 |------|-------------|
+| `2026-11-19-gpu-forward-projection-design.md` | GPU forward projection design (T-08-01) |
 | `2026-10-26_projection_geometry_design.md` | ProjectionGeometry design spec |
 
 ---

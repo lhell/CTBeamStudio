@@ -38,7 +38,7 @@ Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 | 5 | Projection Geometry | T-50 – T-53 |
 | 6 | Projection-Geometrie in 3D | T-54 – T-56a |
 | 7 | Docker Self-Deployment | T-71 – T-74 |
-| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108 |
+| 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108, T-08-01 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
 | 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110 |
@@ -465,6 +465,22 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
   3. Die UI rendert eine Progress-Bar mit „Forward projecting x/y projections“ und räumt sie nach dem Lauf ab.
 - **Akzeptanz:** `done` wächst monoton und endet bei `total`; das Ergebnis ist identisch mit einem ungechunkten Lauf; die UI zeigt den Zähler.
 - **Status:** ✅ Done (Nov 19, 2026) — Neuer Test `test_forward_project_reports_progress_and_chunking_is_transparent` (Callback-Sequenz + Chunk-Ergebnis == Einzelprojektion); Helix-Tests decken die Zentrierung ab. Test-Bar 362 → 363.
+
+### `[ ]` T-08-01 — Device-unabhängige Forward Projection (echte CUDA-Unterstützung)
+- **Ziel:** Forward Projection läuft auf CUDA ohne `TypeError: can't convert cuda:0 device type tensor to numpy`; CPU und GPU liefern innerhalb einer gemessenen float32-Toleranz dasselbe Ergebnis.
+- **Hintergrund:** `forward_project` defaultet `use_cuda=True`, die UI-Checkbox ist an, und `ConeBeamGeometry.calculate_xray_beam_list(dev="cuda")` erzeugt CUDA-Tensoren. `ConeBeamProjector` ruft in `__init__`, `apply` und `adjoint` `np.asarray` darauf auf — Audit-Finding #1, am 19.11.2026 auf 8× RTX A6000 reproduziert (340 passed / 19 failed). Unabhängig davon kann ein GPU-gebautes `libparallelproj` CPU-Input nicht verarbeiten: mit `CUDA_VISIBLE_DEVICES=""` 336 passed / 23 failed, `cudaSetDevice failed`. Die validierte Basis bleibt der CPU-Only-Env; die GPU-Route ist derzeit nicht Teil der Testbasis. Fehlerbericht: `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md` (Kapitel „Evidence").
+- **Dateien:** `src/backend/parallelproj/projector.py` (Konversions-Grenze), `src/backend/forward_project.py` (Device-Durchreichung), `tests/unit/test_parallelproj.py`, `tests/unit/test_forward_project.py`, `tests/integration/test_projection_workflow.py`, `scripts/verify_forward_projection.py`, `scripts/forward_projection_plot.py`, `INSTALLATION.md`, `docs/audit-2026-11-13-findings.md`, `AGENTS.md`
+- **Abhängig von:** T-63, T-79, T-91, T-108
+- **Umsetzung:**
+  1. Upstream-Vertrag von `parallelproj` 1.x auf dem GPU-Rechner klären (akzeptierte Input-Typen, Rückgabetyp von `__call__`/`adjoint`).
+  2. `_as_numpy_xyz` durch device-bewusste Helfer ersetzen: Input `float32`, `(n, 3)`, contiguous; Output explizit `.detach().cpu().numpy()`, keine implizite Konversion. Shape/Reihenfolge der Projektionen bleibt unverändert.
+  3. `device` explizit an `ConeBeamProjector` geben; Volume einmal vor dem Chunk-Loop aufs Device; Chunking (32), Helix-Zentrierung und Progress-Callback unverändert lassen.
+  4. Tests ohne neue Skip-Guards: Fake-CUDA-Tensor (wirft bei impliziter numpy-Konversion), Device-Fixture wählt `cuda:0` falls vorhanden sonst `cpu`, CPU/GPU-Parität mit gemessener Toleranz.
+  5. Auf echter GPU: Suite (0 Skips), VRAM-Spitze, Browser-Lauf mit Checkbox an/aus; Results in den Status schreiben.
+  6. Danach Doku-Sync: INSTALLATION.md Known Limitation entfernen, Audit #1 auf `fixed`, Test-Bar in AGENTS.md anpassen.
+- **Akzeptanz:** Suite in CPU- und GPU-Env je 0 Skips; CPU-Ergebnisse bitgleich wie vorher; GPU-Ergebnisse innerhalb der gemessenen Toleranz identisch; Browser-Verifikation auf GPU-Maschine dokumentiert. Kein Eingriff in Docker-Image oder CI (beide bleiben CPU).
+- **Status:** ⚠️ Open (Nov 19, 2026) — nicht implementiert; ohne GPU in der Testbasis nur geplant. Spec `docs/superpowers/specs/2026-11-19-gpu-forward-projection-design.md`, Plan `docs/superpowers/plans/2026-11-19-gpu-forward-projection.md`.
+- **Siehe auch:** Audit-Finding #1 (`docs/audit-2026-11-13-findings.md`), INSTALLATION.md „GPU setup".
 
 ## Phase 9 — Sinogram & Messdaten
 

@@ -141,6 +141,27 @@ streamlit run src/visualization/app.py
 
 ---
 
+#### Desktop shortcut (Windows)
+
+`scripts\install_desktop_shortcut.ps1` installs the "double-click and it runs"
+setup for the conda env:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_desktop_shortcut.ps1
+```
+
+It creates `CTBeamStudio.lnk` on your desktop, pointing at `run_app.cmd` with
+`--server.headless false`, so a double-click activates `ct-viewer`, starts the
+server on port 8501 and opens `http://localhost:8501` in your default browser.
+It also writes `%USERPROFILE%\.streamlit\credentials.toml` if that file is
+missing: with `headless = false` Streamlit otherwise stops at its first-run
+email prompt, which reads stdin and never lets the server bind the port.
+
+Use `-Name <shortcut name>` and `-RepoPath <repo root>` if the defaults (repo
+root = parent of the script, name = `CTBeamStudio`) do not fit.
+
+---
+
 ## Verification
 
 ### Verify parallelproj GPU support

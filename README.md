@@ -121,6 +121,17 @@ On Windows, `run_app.cmd` wraps those steps (it activates `ct-viewer` and warns
 if parallelproj is missing). Using pip alone is fine for the viewer, but
 "Run Forward Projection" then returns zeros.
 
+For a desktop icon that starts the app and opens it in your default browser, run
+once (Windows only):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_desktop_shortcut.ps1
+```
+
+It creates the shortcut (running `run_app.cmd --server.headless false`) and, if
+missing, `%USERPROFILE%\.streamlit\credentials.toml` — without that file
+Streamlit's first-run email prompt blocks a non-interactive start.
+
 ## Usage
 
 1. **Start the app:** `streamlit run src/visualization/app.py`

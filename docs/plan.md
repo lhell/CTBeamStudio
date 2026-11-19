@@ -34,11 +34,11 @@ Fundstellen), deshalb sagt eine Nummer nichts über ihr Thema. Das Thema liefert
 | 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
-| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103 |
+| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110 |
 | 12 | Release Readiness | T-104 – T-107 |
 | – | Research-Backlog | T-75 – T-77 |
 
-**Neue Aufgabe:** nächste freie Nummer (aktuell **T-108**), Eintrag unter der Phase
+**Neue Aufgabe:** nächste freie Nummer (aktuell **T-111**), Eintrag unter der Phase
 ihres Themas — nicht ans Dateiende. Wird eine Aufgabe thematisch falsch einsortiert
 vorgefunden, wandert der Eintrag, nie die Nummer.
 
@@ -752,6 +752,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Abhängig von:** T-85, T-96
 - **Status:** ✅ Done (Nov 12, 2026) — Restore-Button erscheint nur, wenn ein gültiger Session-Record existiert; Clear Cache entfernt ihn (Cache-Datei gelöscht).
 
+### `[x]` T-110 — Scan-Projektionszahl in den Geometry-Tab, Overlay-Anzeige in die 3D Options
+- **Ziel:** Die beiden Trajectory-Overlay-Widgets aus dem Sidebar-Expander „Projection Geometry" stehen an ihrem thematischen Ort: die Projektionszahl des Scans im Geometry-Tab bei den Readouts, die Sichtbarkeit („Show projections") und „Trajectory Downsample" (reine 3D-Darstellung) im 3D-Options-Popover des Viewer-Tabs. Die In-Canvas-„Projection Geometry"-On/Off-Buttons entfallen: ein einziger Schalter statt zweier Bedienorte. Die Zahl ist die **Scan-Länge** (nicht eine Umdrehung): sie steuert sowohl die 3D-Trajektorie als auch die Projektionsachse der Forward Projection; `projections_per_rotation` sagt nur, wie viele Views eine Umdrehung hat.
+- **Dateien:** `src/visualization/projection_panel.py` (`render_geometry_tab`: Projektionszahl; `scan_n_projections`-Helper; FP-Achse und `n_projections_total`; `clear_geometry_edit_state` verwirft sie mit), `src/visualization/sidebar.py` (`_render_geometry_section` entfernt, Default-Geometrie bleibt via `_ensure_geometry`), `src/visualization/app.py` (Viewer-Popover, `show_projections`-Gate, Zahl via Helper), `src/visualization/volume3d.py` (`add_geometry_toggle` entfernt), `tests/unit/test_geometry_toggle.py` (gelöscht), `tests/integration/test_ui_smoke.py`
+- **Abhängig von:** T-99
+- **Umsetzung:** `scan_n_projections(geometry)` liest `st.session_state["scan_n_projections"]` (Fallback `projections_per_rotation`, bis der Geometry-Tab einmal gerendert hat — Streamlit wendet Widget-Werte vor dem Script-Lauf an). Der Viewer zieht die Trajektorie daraus, die FP löst ihre Projektionsauswahl gegen `(n_scan, rows, cols)` auf und übergibt `n_projections_total=n_scan`, damit eine Helix über den ganzen Scan zentriert bleibt. Laden oder Generieren einer Geometrie verwirft den Key, damit die neue Geometrie ihren Wert vorgibt. Die Sidebar hält nur noch den Default-Geometrie-Fallback.
+- **Akzeptanz:** Sidebar zeigt nur noch Image/Measurements; der Geometry-Tab hat genau ein „Projections"-Feld (Startwert = `projections_per_rotation`); „all" in den Sample options projiziert `n_scan` Projektionen (nicht `projections_per_rotation`); die 3D Options bieten „Show projections" (an) und „Trajectory Downsample" (1/100); der Plotly-Spec trägt keine `updatemenus` mehr; Suite grün ohne Skips, Lint sauber.
+- **Status:** ✅ Done (Nov 19, 2026) — Toggle-Modul gelöscht, UI-Smoke angepasst; Test-Bar 359 passed / 0 skipped. Im Browser (Port 8502) verifiziert: „Projections" = 12 ⇒ 3D-Trajektorie mit 12 Punkten **und** FP-Lauf meldet `Forward projecting 0/12` / `Simulated: (12, 192, 512) · 12 projections` (mit `projections_per_rotation` = 60 wären es 60 gewesen).
+
 ## Phase 12 — Release Readiness (Nov 13, 2026)
 
 Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden schließen (T-73 CI-Route), Plan-Hygiene und Helix-FP-Verifikation. Nutzerentscheidung: Helix-FP gehört **in** den Meilenstein, nicht danach.
@@ -917,7 +925,7 @@ brainstorm → spec → plan).
 | Feature | Description |
 |---------|-------------|
 | Render Mode | Iso-Surface (Plotly). PyVista shelved — see T-82 |
-| Geometry Overlay | In-canvas "Projection Geometry" On/Off buttons (no rerun) |
+| Geometry Overlay | „Show projections" checkbox in the 3D options, plus „Trajectory Downsample"; the scan's projection count lives in the Geometry tab and also drives the forward projection |
 | Opacity Controls | Volume Opacity (0.1-1.0), Surface Opacity (0.1-1.0) |
 | Camera Presets | iso, front, back, left, right, top, bottom |
 | Source/Detector | Auto or manual positioning |

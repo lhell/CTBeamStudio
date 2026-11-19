@@ -40,10 +40,13 @@ def _series_stub(description: str, patient_id: str, n_slices: int):
 
 
 def render_sidebar():
-    """Render the sidebar with data loading and geometry controls.
+    """Render the sidebar with data loading controls.
+
+    The geometry controls live in the tabs: the projection count in the
+    Geometry tab, the 3D overlay options in the Viewer tab.
 
     Returns:
-        tuple: (volume, projection_geometry, n_projections, downsample)
+        tuple: (volume, projection_geometry)
     """
     st.sidebar.title("🏥 CTBeamStudio")
 
@@ -68,14 +71,12 @@ def render_sidebar():
 
     volume, projection_geometry = _render_image_section()
 
-    projection_geometry, n_projections, downsample = _render_geometry_section(
-        projection_geometry
-    )
+    projection_geometry = _ensure_geometry(projection_geometry)
 
     # Measurements loader (sinogram / projection data)
     render_measurement_sidebar()
 
-    return volume, projection_geometry, n_projections, downsample
+    return volume, projection_geometry
 
 
 def _render_image_section():
@@ -209,61 +210,27 @@ def _render_image_section():
     return volume, projection_geometry
 
 
-def _render_geometry_section(projection_geometry):
-    """Render the 3D trajectory-overlay settings as a collapsible block.
+def _ensure_geometry(projection_geometry):
+    """Return the active geometry, restoring the default on a fresh start.
 
-    The geometry file loading lives in the Geometry tab (T-99), next to the
-    readouts and the edit form. This section holds only the trajectory
-    settings the 3D view consumes — they are visualization-only and do not
-    affect the forward projection (which uses the Sample options in the
-    Sinogram Inspection tab).
+    Always show a geometry: both tabs (projection count, 3D overlay) need one.
+    An explicit load or edit already wrote session state, so this only fills
+    the gap where nothing was ever selected.
 
     Args:
         projection_geometry: Currently active geometry, or None.
 
     Returns:
-        tuple: (projection_geometry, n_projections, downsample)
+        The active or default geometry.
     """
-    with st.sidebar.expander("Projection Geometry", expanded=False):
-        # Always show a geometry: restore the cached one or use the defaults.
-        if projection_geometry is None:
-            projection_geometry = default_geometry()
-            st.session_state["projection_geometry"] = projection_geometry
-            st.session_state["geometry_loaded_original"] = projection_geometry
-            st.session_state["geometry_is_default"] = True
+    if projection_geometry is not None:
+        return projection_geometry
 
-        # One full rotation by default: a circular scan acquires exactly
-        # ``projections_per_rotation`` views. The widget has a key, so its
-        # value must be seeded through session state to make the geometry the
-        # default rather than a hardcoded number.
-        if "sidebar_n_projections" not in st.session_state:
-            st.session_state["sidebar_n_projections"] = int(
-                projection_geometry.projections_per_rotation
-            )
-
-        n_projections = st.number_input(
-            "Projections",
-            min_value=1,
-            step=100,
-            key="sidebar_n_projections",
-        )
-        downsample_options = [10, 50, 100, 200, 500]
-        downsample = st.selectbox(
-            "Trajectory Downsample",
-            options=downsample_options,
-            # Default 1/100: one marker and one detector plane per hundred
-            # projections. At 1/10 the ring turns into a dense band of ~230
-            # planes, which hides the volume and costs a trace per plane.
-            index=downsample_options.index(100),
-            format_func=lambda x: f"1/{x}",
-            key="sidebar_downsample",
-        )
-        st.caption(
-            "3D geometry overlay only — does not affect the forward "
-            "projection. Load a geometry file in the Geometry tab."
-        )
-
-    return projection_geometry, n_projections, downsample
+    projection_geometry = default_geometry()
+    st.session_state["projection_geometry"] = projection_geometry
+    st.session_state["geometry_loaded_original"] = projection_geometry
+    st.session_state["geometry_is_default"] = True
+    return projection_geometry
 
 
 def startup_job_name() -> str:

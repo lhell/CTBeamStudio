@@ -127,8 +127,10 @@ if parallelproj is missing). Using pip alone is fine for the viewer, but
 2. **Load data:** enter a DICOM folder path in the sidebar, or start without data to
    get the built-in demo phantom
 3. **Viewer tab:** scroll through slices, set a window preset, and switch to 3D to see
-   the volume inside the gantry with the geometry overlay
-4. **Geometry tab:** inspect and edit the projection geometry
+   the volume inside the gantry with the geometry overlay (show/hide it and its
+   trajectory downsampling in ⚙️ 3D Options)
+4. **Geometry tab:** inspect and edit the projection geometry, and set the scan's
+   projection count (used by both the 3D trajectory and the forward projection)
 5. **Sinogram Inspection tab:** load measured projections (or use the synthetic ones),
    set the beam energy, and optionally restrict the run to a subset of projections,
    rows or columns

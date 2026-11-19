@@ -87,6 +87,25 @@ EDITABLE_GEOMETRY_FIELDS: tuple[GeometryField, ...] = (
 
 SELECTION_MODES: tuple[str, ...] = ("all", "central", "range", "downsample")
 
+# Session-state key of the scan's projection count, edited in the Geometry tab.
+# The 3D trajectory and the forward projection's projection axis both use it;
+# ``projections_per_rotation`` only defines how many views make one turn.
+SCAN_N_PROJECTIONS_KEY = "scan_n_projections"
+
+
+def scan_n_projections(geometry) -> int:
+    """Return the number of projections in the scan.
+
+    This is the number the user edits in the Geometry tab, valid for the 3D
+    trajectory and the forward projection. Until that tab has rendered once,
+    fall back to one full rotation (``projections_per_rotation``), which is
+    the scan length of a circular acquisition.
+    """
+    import streamlit as st
+
+    fallback = int(getattr(geometry, "projections_per_rotation", 0) or 0)
+    return int(st.session_state.get(SCAN_N_PROJECTIONS_KEY, fallback))
+
 
 def build_selection_config(
     proj_mode: str = "all",
@@ -232,11 +251,18 @@ def format_axis_order(order: tuple[str, str, str]) -> str:
 
 
 def clear_geometry_edit_state() -> None:
-    """Drop cached widget values so a newly loaded geometry prefills cleanly."""
+    """Drop cached widget values so a newly loaded geometry prefills cleanly.
+
+    The scan's projection count belongs to the geometry too, so it is
+    re-seeded from ``projections_per_rotation`` instead of keeping a stale
+    value from the previous geometry.
+    """
     import streamlit as st
 
     for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("geo_edit_"):
+        if isinstance(key, str) and (
+            key.startswith("geo_edit_") or key == SCAN_N_PROJECTIONS_KEY
+        ):
             del st.session_state[key]
 
 
@@ -591,6 +617,27 @@ def render_geometry_tab(geometry: Optional[ProjectionGeometry]) -> None:
         f"Type: {geometry.geometry_type} · Source: {geometry.source} · "
         f"Detector: {geometry.n_det_cols} × {geometry.n_det_rows} @ "
         f"{geometry.det_col_spacing_mm:.3f} × {geometry.det_row_spacing_mm:.3f} mm"
+    )
+
+    # Number of projections in the scan. Both the 3D trajectory and the forward
+    # projection's projection axis use it; ``Projections / Rotation`` above only
+    # says how many views make one turn. One full rotation is the default for a
+    # circular scan; the widget key is seeded through session state so a loaded
+    # geometry supplies the number instead of a constant.
+    if SCAN_N_PROJECTIONS_KEY not in st.session_state:
+        st.session_state[SCAN_N_PROJECTIONS_KEY] = int(
+            geometry.projections_per_rotation
+        )
+    st.number_input(
+        "Projections",
+        min_value=1,
+        step=100,
+        key=SCAN_N_PROJECTIONS_KEY,
+    )
+    st.caption(
+        "Number of projections in the scan — used by the 3D trajectory and by "
+        "the forward projection. The Sample options in the Sinogram Inspection "
+        "tab can select a subset."
     )
 
     with st.form("geometry_form"):
@@ -951,11 +998,11 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
         if volume is None:
             st.error("Load a volume in the sidebar first.")
         else:
-            detector_shape = (
-                geometry.projections_per_rotation,
-                geometry.n_det_rows,
-                geometry.n_det_cols,
-            )
+            # The projection axis is the scan's projection count from the
+            # Geometry tab, not one rotation: a helical scan spans several
+            # rotations, and "all" must mean all of them.
+            n_scan = scan_n_projections(geometry)
+            detector_shape = (n_scan, geometry.n_det_rows, geometry.n_det_cols)
             try:
                 proj_idx, row_idx, col_idx = resolve_selection(
                     selection, detector_shape
@@ -980,6 +1027,9 @@ def render_comparison_tab(volume, geometry: Optional[ProjectionGeometry]) -> Non
                         row_indices=row_idx,
                         col_indices=col_idx,
                         proj_indices=proj_idx,
+                        # Centre a helix over the whole scan, even when only a
+                        # subset of projections is computed.
+                        n_projections_total=n_scan,
                         use_cuda=use_cuda,
                         progress=update_progress,
                     )

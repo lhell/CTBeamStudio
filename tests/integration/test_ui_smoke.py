@@ -28,7 +28,7 @@ from visualization.phantom import DummyMeasurement, create_demo_volume
 
 APP_PATH = Path(__file__).resolve().parents[2] / "src" / "visualization" / "app.py"
 
-SIDEBAR_SECTIONS = ["Image", "Projection Geometry", "Measurements"]
+SIDEBAR_SECTIONS = ["Image", "Measurements"]
 TAB_LABELS = ["🩻 Viewer", "📐 Geometry", "🔍 Sinogram Inspection"]
 
 
@@ -88,16 +88,15 @@ def test_sidebar_sections_are_collapsible_in_order(app):
     assert [expander.label for expander in app.sidebar.expander] == SIDEBAR_SECTIONS
 
 
-def test_image_expanded_geometry_and_measurements_collapsed(app):
-    """Only the image section is open. Geometry is only needed when a geometry
-    file exists, and measured data is an optional second input, so both start
-    collapsed to keep the actual load controls near the top."""
+def test_image_expanded_and_measurements_collapsed(app):
+    """Only the image section is open. Measured data is an optional second
+    input, so it starts collapsed to keep the actual load controls near the
+    top."""
     expanded = {
         expander.label: expander.proto.expanded for expander in app.sidebar.expander
     }
     assert expanded == {
         "Image": True,
-        "Projection Geometry": False,
         "Measurements": False,
     }
 
@@ -157,41 +156,41 @@ def test_startup_shows_an_empty_state_with_both_load_actions(tmp_path, monkeypat
     assert "Load Demo Phantom" in labels
 
 
-def test_3d_plot_has_a_projection_geometry_toggle_in_the_corner(app):
-    """The geometry overlay is switched on/off from inside the Plotly canvas:
-    the spec carries the button pair, and its Off button hides every overlay
-    trace while keeping the volume visible."""
-    spec = None
-    for key, child in app.main.children.items():
+def _plotly_spec(app):
+    """Return the parsed spec of the app's Plotly 3D chart."""
+    for child in app.main.children.values():
         for element in _walk(child):
             if getattr(element, "type", None) == "plotly_chart" or hasattr(
                 element, "spec"
             ):
-                spec = element.spec
-                break
-    assert spec is not None, "no Plotly chart found"
+                return json.loads(element.spec)
+    raise AssertionError("no Plotly chart found")
 
-    chart = json.loads(spec)
-    menus = chart["layout"]["updatemenus"]
-    assert len(menus) == 1
-    assert menus[0]["type"] == "buttons"
-    assert menus[0]["xanchor"] == "right"
-    assert menus[0]["yanchor"] == "bottom"
-    assert [button["label"] for button in menus[0]["buttons"]] == ["On", "Off"]
 
-    # It is a click control, not a drag slider.
+def test_3d_plot_carries_no_in_canvas_overlay_button(app):
+    """The overlay's on/off control is the "Show projections" checkbox in the
+    3D options now, so the Plotly canvas itself carries neither an update menu
+    nor a slider."""
+    chart = _plotly_spec(app)
+
+    assert chart["layout"].get("updatemenus", []) == []
     assert chart["layout"].get("sliders", []) == []
 
-    texts = [annotation.get("text") for annotation in chart["layout"]["annotations"]]
-    assert "Projection Geometry" in texts
 
-    on_visible = menus[0]["buttons"][0]["args"][0]["visible"]
-    off_visible = menus[0]["buttons"][1]["args"][0]["visible"]
-    assert len(on_visible) == len(chart["data"])
-    assert all(on_visible)
-    # The iso-surface volume traces stay; the overlay traces go away.
-    assert any(off_visible)
-    assert not all(off_visible)
+def test_3d_options_offer_the_show_projections_checkbox(app):
+    """The overlay is switched from the 3D options, and starts visible."""
+    boxes = {checkbox.label: checkbox for checkbox in app.checkbox}
+
+    assert boxes["Show projections"].value is True
+
+
+def test_projection_count_lives_in_the_geometry_tab(app):
+    """The trajectory length is a scan property, so its control sits next to the
+    geometry readouts instead of the sidebar."""
+    counts = [box for box in app.number_input if box.label == "Projections"]
+
+    assert len(counts) == 1
+    assert counts[0].value == 2304
 
 
 def _walk(element):
@@ -202,8 +201,8 @@ def _walk(element):
 
 def test_3d_options_no_longer_offer_a_show_trajectory_checkbox(app):
     """The trajectory is chosen automatically when a geometry is loaded, and
-    the overlay is switched from the in-plot control. A second driver for the
-    same thing would only be able to contradict it."""
+    the overlay is switched by the single "Show projections" checkbox. A second
+    Show Trajectory driver could only contradict it."""
     labels = [checkbox.label for checkbox in app.checkbox]
 
     assert "Show Trajectory" not in labels

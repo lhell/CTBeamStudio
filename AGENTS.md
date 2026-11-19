@@ -84,11 +84,13 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **362 passed, 0 skipped**, ~25–45 s depending on disk
+- Baseline in `ct-viewer`: **359 passed, 0 skipped**, ~25–45 s depending on disk
   cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, T-101 + T-102
   added 2, over the 301 baseline; 1 removed by dropping the correlation
   metric; 2 added for the scan z-offset; T-104 added 5; T-106 added 6
-  (release-tag lockstep)).
+  (release-tag lockstep); T-108 added 1 (FP progress callback); T-110
+  removed 10 and added 3 (in-canvas overlay toggle replaced by the
+  3D-options checkbox)).
   When your task changes
   the suite profile, update the numbers here as part of done.
 - No `slow` marker and no default deselection exist: a plain `pytest` run is the

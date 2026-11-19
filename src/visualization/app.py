@@ -49,9 +49,9 @@ from visualization.mpr import extract_slice
 from visualization.projection_panel import (
     render_comparison_tab,
     render_geometry_tab,
+    scan_n_projections,
 )
 from visualization.volume3d import (
-    add_geometry_toggle,
     add_source_detector_figure,
     create_volume_figure,
     get_volume_center,
@@ -156,9 +156,7 @@ def viewer_has_3d(view: str) -> bool:
     return view != "2D"
 
 
-def render_viewer_tab(
-    volume, projection_geometry, n_projections: int, trajectory_downsample: int
-) -> None:
+def render_viewer_tab(volume, projection_geometry, n_projections: int) -> None:
     """Render the 3D volume and MPR views."""
     if volume is None:
         if st.session_state.get("startup_polling"):
@@ -239,6 +237,30 @@ def render_viewer_tab(
             )
             # Update session state for rendering
             st.session_state["volume_downsample"] = volume_downsample
+
+            # Geometry overlay controls. They replaced the sidebar's
+            # "Projection Geometry" expander and the in-canvas On/Off buttons:
+            # the count lives in the Geometry tab (it describes the scan), the
+            # overlay itself is a 3D rendering choice and belongs here.
+            col_overlay, col_traj = st.columns(2)
+            with col_overlay:
+                show_projections = st.checkbox(
+                    "Show projections",
+                    value=True,
+                    key="3d_show_projections",
+                )
+            with col_traj:
+                trajectory_downsample = st.selectbox(
+                    "Trajectory Downsample",
+                    options=[10, 50, 100, 200, 500],
+                    # Default 1/100: one marker and one detector plane per
+                    # hundred projections. At 1/10 the ring turns into a dense
+                    # band of ~230 planes, which hides the volume and costs a
+                    # trace per plane.
+                    index=2,
+                    format_func=lambda x: f"1/{x}",
+                    key="3d_trajectory_downsample",
+                )
 
             # Single opacity slider
             opacity = st.slider(
@@ -383,63 +405,56 @@ def render_viewer_tab(
                 origin=origin,
             )
 
-            # Traces added from here on belong to the geometry overlay: the
-            # in-plot buttons toggle everything after this point (see
-            # add_geometry_toggle). Keep this immediately after
-            # create_volume_figure and before every overlay trace.
-            n_base_traces = len(fig.data)
-
+            # Traces added below belong to the geometry overlay, switched by
+            # the "Show projections" checkbox in the 3D options.
             if isocenter is None:
                 isocenter = get_volume_center(volume.array, spacing, origin=origin)
 
             # Add the trajectory whenever a geometry is loaded; without one
             # there is no path to draw, so fall back to the single
-            # source/detector pair. The in-plot "Projection Geometry" control
-            # switches the overlay on and off, so no second show/hide checkbox
-            # is needed here.
-            if projection_geometry is not None:
-                from visualization.volume3d import (
-                    add_trajectory_to_figure,
-                    get_trajectory_positions,
-                )
+            # source/detector pair.
+            if show_projections:
+                if projection_geometry is not None:
+                    from visualization.volume3d import (
+                        add_trajectory_to_figure,
+                        get_trajectory_positions,
+                    )
 
-                # The trajectory follows the volume's z position (its z
-                # centre), the same placement the forward projection uses,
-                # so the drawn scan intersects the volume even when the
-                # DICOM z origin is far from the world origin.
-                z_offset = 0.0
-                if origin is not None:
-                    z_offset = float(origin[2]) + 0.5 * (
-                        volume.array.shape[0] - 1
-                    ) * float(spacing[0])
+                    # The trajectory follows the volume's z position (its z
+                    # centre), the same placement the forward projection uses,
+                    # so the drawn scan intersects the volume even when the
+                    # DICOM z origin is far from the world origin.
+                    z_offset = 0.0
+                    if origin is not None:
+                        z_offset = float(origin[2]) + 0.5 * (
+                            volume.array.shape[0] - 1
+                        ) * float(spacing[0])
 
-                src_positions, det_positions = get_trajectory_positions(
-                    projection_geometry, n_projections, z_offset=z_offset
-                )
-                fig = add_trajectory_to_figure(
-                    fig,
-                    src_positions,
-                    det_positions,
-                    trajectory_downsample,
-                    geometry=projection_geometry,
-                )
-            else:
-                # Use legacy single source/detector
-                fig = add_source_detector_figure(
-                    fig,
-                    volume_array=volume.array,
-                    spacing=spacing,
-                    isocenter=isocenter,
-                    sid=sid,
-                    sdd=sid,
-                    gantry_angle=gantry_angle,
-                    show_source=True,
-                    show_detector=True,
-                    source_pos=source_pos,
-                    detector_pos=detector_pos,
-                )
-
-            fig = add_geometry_toggle(fig, n_base_traces)
+                    src_positions, det_positions = get_trajectory_positions(
+                        projection_geometry, n_projections, z_offset=z_offset
+                    )
+                    fig = add_trajectory_to_figure(
+                        fig,
+                        src_positions,
+                        det_positions,
+                        trajectory_downsample,
+                        geometry=projection_geometry,
+                    )
+                else:
+                    # Use legacy single source/detector
+                    fig = add_source_detector_figure(
+                        fig,
+                        volume_array=volume.array,
+                        spacing=spacing,
+                        isocenter=isocenter,
+                        sid=sid,
+                        sdd=sid,
+                        gantry_angle=gantry_angle,
+                        show_source=True,
+                        show_detector=True,
+                        source_pos=source_pos,
+                        detector_pos=detector_pos,
+                    )
 
             # Height is shared with the MPR container so both columns end on
             # one baseline. The top-anchored scene domain keeps the cube above
@@ -719,7 +734,13 @@ def main():
     # Render sidebar and get values
     from visualization.sidebar import render_sidebar
 
-    volume, projection_geometry, n_projections, trajectory_downsample = render_sidebar()
+    volume, projection_geometry = render_sidebar()
+
+    # The scan's projection count is edited in the Geometry tab. The tab
+    # renders after the viewer, but Streamlit applies a widget's new value to
+    # session state before the rerun script starts, so the viewer already sees
+    # it in the same run.
+    n_projections = scan_n_projections(projection_geometry)
 
     # Nothing is loaded automatically: the viewer shows the empty state and the
     # user picks image data or the demo phantom. Clear Cache therefore lands in
@@ -740,9 +761,7 @@ def main():
     )
 
     with tab_view:
-        render_viewer_tab(
-            volume, projection_geometry, n_projections, trajectory_downsample
-        )
+        render_viewer_tab(volume, projection_geometry, n_projections)
 
     with tab_geometry:
         render_geometry_tab(projection_geometry)

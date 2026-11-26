@@ -115,12 +115,14 @@ def test_image_expanded_and_measurements_collapsed(app):
     }
 
 
-def test_show_queue_switch_is_off_by_default(app):
-    """The queue is a developer tool: present, but hidden until asked for."""
+def test_queue_window_has_no_show_queue_switch(app):
+    """The queue window is always visible: there is no `Show queue` checkbox
+    any more, and the dark gray window CSS ships with the sidebar."""
     boxes = {box.label: box for box in app.sidebar.checkbox}
 
-    assert "Show queue" in boxes
-    assert boxes["Show queue"].value is False
+    assert "Show queue" not in boxes
+    styles = [m.value for m in app.sidebar.markdown]
+    assert any("stVerticalBlockBorderWrapper" in style for style in styles)
 
 
 def test_show_queue_lists_pending_actions_with_cancel(app):
@@ -145,7 +147,6 @@ def test_show_queue_lists_pending_actions_with_cancel(app):
     pending = action_queue.QueueItem(label="Queued Series", run=lambda: "never")
     pending_id = action_queue.enqueue(token, pending)
 
-    app.sidebar.checkbox(key="dev_show_queue").check()
     try:
         app.run()
 
@@ -163,7 +164,6 @@ def test_show_queue_lists_pending_actions_with_cancel(app):
         action_queue.reset_queue(token)
         if "_action_queue_signature" in app.session_state:
             del app.session_state["_action_queue_signature"]
-        app.sidebar.checkbox(key="dev_show_queue").uncheck()
         app.run()
 
 
@@ -628,8 +628,11 @@ def test_measurements_panel_offers_opt_in_sampling(app):
     assert boxes["Sample instead of the whole file"] is False
 
 
-def _stub_dummy_measurement() -> DummyMeasurement:
-    """A tiny coherent stand-in for the (expensive) real generator."""
+def _stub_dummy_measurement(**kwargs):
+    """A tiny coherent stand-in for the (expensive) real generator.
+
+    Accepts ``**kwargs`` because the sidebar passes generation parameters
+    through (the shared demo constants since T-11-06); the stub ignores them."""
     geometry = ProjectionGeometry(
         n_det_cols=8,
         n_det_rows=4,
@@ -652,8 +655,8 @@ def _stub_dummy_measurement() -> DummyMeasurement:
         sinogram=sinogram,
         params={
             "energy_kev": 70.0,
-            "spr": 0.3,
-            "scatter_sigma_mm": 25.0,
+            "spr": 0.05,
+            "scatter_sigma_mm": 10.0,
             "i0": 1e5,
             "seed": 42,
             "fp_from_cache": False,

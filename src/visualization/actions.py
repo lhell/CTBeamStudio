@@ -214,9 +214,17 @@ def apply_measurements(sinogram, state: MutableMapping) -> str:
 def enqueue_dummy_measurement(session: str) -> str:
     def make_run(item):
         def run():
-            from visualization.phantom import create_dummy_measured_sinogram
+            from visualization.phantom import (
+                DEMO_SCATTER_SIGMA_MM,
+                DEMO_SPR,
+                create_dummy_measured_sinogram,
+            )
 
-            return create_dummy_measured_sinogram()
+            # Light scatter, like load_demo_volume (T-11-06): the shared
+            # demo constants keep both entry points identical.
+            return create_dummy_measured_sinogram(
+                spr=DEMO_SPR, scatter_sigma_mm=DEMO_SCATTER_SIGMA_MM
+            )
 
         return run
 
@@ -383,35 +391,68 @@ def _elapsed(item: QueueItem, now: float) -> float:
     return max(0.0, end - started)
 
 
-def render_action_queue(session: str) -> None:
-    """Draw one row per queue entry in the developer panel.
+# The queue renders as a dark gray window: fixed height, internally scrollable,
+# so finished items pile up at the top (FIFO) instead of stretching the
+# sidebar. Scoped to the sidebar's bordered containers, of which this panel is
+# the only one; the light text keeps the rows readable inside the dark box in
+# the default light theme.
+QUEUE_PANEL_CSS = """
+<style>
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #383b44;
+    border: 1px solid #59606f;
+    border-radius: 0.5rem;
+  }
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] p,
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
+    color: #e8eaf0;
+  }
+</style>
+"""
 
-    Only pending rows get a Cancel button: a running item is inside a C call
-    and cannot be stopped, so offering a button there would be a lie.
+# Window height: grows with the row count up to the cap, then the box scrolls.
+QUEUE_PANEL_CAP_PX = 200
+QUEUE_PANEL_BASE_PX = 56
+QUEUE_PANEL_ROW_PX = 26
+
+
+def render_action_queue(session: str) -> None:
+    """Draw one row per queue entry in a dark gray, scrollable sidebar window.
+
+    Rows keep queue order (FIFO), so finished items drift upward and the
+    active ones stay at the bottom; once the rows exceed the capped height the
+    window scrolls instead of growing. Only pending rows get a Cancel button:
+    a running item is inside a C call and cannot be stopped, so offering a
+    button there would be a lie.
     """
     items = action_queue.snapshot(session)
-    if not items:
-        st.caption("No queued actions.")
-        return
+    height = min(
+        QUEUE_PANEL_CAP_PX,
+        QUEUE_PANEL_BASE_PX + QUEUE_PANEL_ROW_PX * len(items),
+    )
+    with st.container(height=height, border=True):
+        if not items:
+            st.caption("No queued actions.")
+            return
 
-    now = time.time()
-    for item in items:
-        parts = [f"{item.label} · {item.status} · {_elapsed(item, now):.0f}s"]
-        if item.progress is not None:
-            current, total = item.progress
-            parts.append(f"{current}/{total}")
-            st.progress(current / total if total else 0.0)
-        if item.status == STATUS_FAILED and item.error is not None:
-            parts.append(str(item.error))
-        icon_col, text_col = st.columns([1, 6])
-        with icon_col:
-            st.caption(_STATUS_ICON.get(item.status, "•"))
-        with text_col:
-            st.caption(" · ".join(parts))
-        if item.status == STATUS_PENDING:
-            if st.button("✕ Cancel", key=f"queue_cancel_{item.id}"):
-                action_queue.cancel(session, item.id)
-                st.rerun()
+        now = time.time()
+        for item in items:
+            parts = [f"{item.label} · {item.status} · {_elapsed(item, now):.0f}s"]
+            if item.progress is not None:
+                current, total = item.progress
+                parts.append(f"{current}/{total}")
+                st.progress(current / total if total else 0.0)
+            if item.status == STATUS_FAILED and item.error is not None:
+                parts.append(str(item.error))
+            icon_col, text_col = st.columns([1, 6])
+            with icon_col:
+                st.caption(_STATUS_ICON.get(item.status, "•"))
+            with text_col:
+                st.caption(" · ".join(parts))
+            if item.status == STATUS_PENDING:
+                if st.button("✕ Cancel", key=f"queue_cancel_{item.id}"):
+                    action_queue.cancel(session, item.id)
+                    st.rerun()
 
     if st.button("Clear finished", key="queue_clear_finished"):
         action_queue.clear_finished(session)
@@ -419,11 +460,13 @@ def render_action_queue(session: str) -> None:
 
 
 def render_developer_options(session: str) -> None:
-    """Plain sidebar switch that gates the queue UI behind ``Show queue``."""
+    """Sidebar queue window, always visible.
+
+    The dark gray look comes from ``QUEUE_PANEL_CSS``, injected with the panel.
+    """
     with st.sidebar:
-        visible = st.checkbox("Show queue", key="dev_show_queue", value=False)
-        if visible:
-            render_action_queue(session)
+        st.markdown(QUEUE_PANEL_CSS, unsafe_allow_html=True)
+        render_action_queue(session)
 
 
 @st.fragment(run_every="1s")
@@ -433,8 +476,7 @@ def _queue_poller(session: str) -> None:
     Rendering nothing is deliberate: elements drawn by a fragment linger once
     it stops being mounted, whereas an app-scoped rerun redraws the sidebar
     queue panel with fresh rows. It also applies results that would otherwise
-    sit in the registry until the next user interaction, including when
-    ``Show queue`` is off.
+    sit in the registry until the next user interaction.
     """
     signature = (
         tuple(

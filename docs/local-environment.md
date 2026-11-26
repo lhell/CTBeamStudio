@@ -20,6 +20,7 @@ live in [AGENTS.md](../AGENTS.md).
 | Streamlit | 1.39.1 |
 | **nibabel** | installed (via the `nifti` extra) — keeps the NIfTI tests from skipping |
 | flake8 / black / isort | installed (via the `dev` extra) |
+| **Git Bash** | `C:\Program Files\Git\bin` on the **user PATH** (permanent, set Nov 26 2026) — `tests/unit/test_release_push.py` shells out to `bash`; with this entry the 4 tests pass locally without manual PATH tweaks |
 
 No NVIDIA GPU on this machine (`nvidia-smi` absent), so CUDA is unavailable and
 `cuda_enabled` is `False` by design.

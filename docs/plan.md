@@ -41,7 +41,7 @@ Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 | 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108, T-08-01, T-08-02 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
-| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110, T-11-01 – T-11-03 |
+| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110, T-11-01 – T-11-05 |
 | 12 | Release Readiness | T-104 – T-107 |
 | – | Research-Backlog | T-75 – T-77 |
 
@@ -845,6 +845,31 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
   3. Alternativen verworfen: `streamlit:setFrameHeight`-Selbstresize aus dem iframe (im Live-Test ignoriert der Streamlit-Elternknoten die Message für `components.html` nicht respektiert — kein Resize) und serverseitige Spaltenbreiten-Schätzung (unbekannt im Backend).
 - **Akzeptanz:** Alle sechs Slots quadratisch bei beliebiger Fensterbreite; beide Reihen bündig; Placeholder-Texte weiterhin in den Smoke-Tests sichtbar; Suite grün, 0 Skips; Lint sauber.
 - **Status:** ✅ Done (Nov 26, 2026) — im Browser (Port 8501) verifiziert: gefüllte Views 190 × 190 px, leere Slots 188 × 188 px (vorher 300 × 512); Suite 412 passed / 0 skipped, flake8/black/isort sauber.
+
+### `[x]` T-11-04 — FP-Start blockiert, wenn parallelproj fehlt
+- **Ziel:** Ein Klick auf „Run Forward Projection" ohne installiertes parallelproj startet nichts: ein `st.error` erklärt Ursache und Env-Korrektur, statt still Nullen in die Queue zu stellen. Die passive `st.warning` über dem Button bleibt.
+- **Hintergrund:** Nutzerwunsch „Print warning before trying to start projection if parallelproj not available". Nach einem Start über einen Interpreter ohne parallelproj (z. B. das System-Python 3.13 mit Streamlit, aber ohne parallelproj — PyCache-Beleg vom selben Tag) lieferte der Platzhalter-Backend Nullen; die Warnung im Tab wurde übersehen.
+- **Dateien:** `src/visualization/projection_panel.py` (`render_forward_projection_tab`, Click-Guard), `tests/integration/test_ui_smoke.py` (+1 Test), `AGENTS.md`, `docs/plan.md`
+- **Abhängig von:** T-110
+- **Akzeptanz:** Ohne parallelproj zeigt der Klick einen Fehler und enqueue nichts (`forward_projection` bleibt leer); mit parallelproj verhält sich der Button unverändert; CI (installiert parallelproj) bleibt grün; Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — Guard prüft `PARALLELPROJ_AVAILABLE` vor dem Enqueue; der Test monkeypatcht das Flag und prüft Fehlermeldung plus leeres Ergebnis. UI-Smoke-Modul 36 passed; Test-Bar 412 → 413.
+
+### `[x]` T-11-05 — Demo-Messung ohne Streuung (Alignment-Check)
+- **Ziel:** Die Dummy-Messung wird ohne Streuung erzeugt (`spr=0.0`, Poisson-Rauschen bleibt), damit gemessene und simulierte Projektion im Sinogram-Inspection-Tab geometrisch deckungsgleich verglichen werden können.
+- **Hintergrund:** Nutzereindruck „Dummy-Messung und FP wirken geometrisch verschoben". Zahlen-Check gegen den FP-Cache: bester ganzzahliger Shift (0, 0) px — keine echte Verschiebung; Zeilen-Flip ausgeschlossen (NCC unflippt 0,99691 vs. geflippt 0,99415). Die Streuung (spr 0,3, σ 25 mm am Detektor) erklärt den Eindruck: NCC fällt 0,99998 → 0,99691, MAE steigt 0,0053 → 0,3089. Streuung deshalb vorerst abgeschaltet; der Generator-Default (0,3) und die Streu-Tests in `tests/test_dummy_measurement.py` bleiben unangetastet.
+- **Dateien:** `src/visualization/sidebar.py` (`load_demo_volume` ruft den Generator mit `spr=0.0`), `tests/unit/test_demo_load.py` + `tests/integration/test_ui_smoke.py` (Stub nimmt `**kwargs`, Params spr 0,0), `docs/plan.md`
+- **Abhängig von:** T-93
+- **Umsetzung:** `load_demo_volume` ruft den Generator mit `spr=0.0` auf. **Nachtrag (Browser-Verifikation):** Der Sidebar-Button „🎲 Generate dummy measurement" läuft über einen zweiten Pfad (`actions.enqueue_dummy_measurement`), der den Generator mit Defaults (`spr=0.3`) rief — die erste Verifikation zeigte deshalb noch die Scatter-Metrik (MAE 0,3242). Auch dieser Pfad ruft jetzt mit `spr=0.0`; der Generator-Default bleibt für direkte Aufrufer.
+- **Akzeptanz:** Demo-Messung entspricht exp(−ideal) + Poisson-Rauschen; gemessen vs. simuliert bei gleicher Energie auf Rausch-Niveau (MAE ≈ 0,005); Verschiebung/Flip ausgeschlossen; Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — im Browser (Port 8520, Sidebar-Button + „Run Forward Projection") verifiziert: **MAE 0,005668 · RMSE 0,008881 · SSIM 0,9950** (vorher 0,3242 / 0,4251 mit Streuung) — Panels deckungsgleich auf Rausch-Niveau. Headless-Check: bester Shift (0, 0), NCC 0,99998; FP-Cache frisch berechnet und ersetzt (max Diff zum alten Cache 0,0). Demo-/Smoke-Tests 19 + 36 passed; Suite 413 / 0 skipped; Lint sauber.
+
+### `[x]` T-11-06 — Leichte Demo-Streuung wieder an (gemeinsame Konstanten)
+- **Ziel:** Nach dem Alignment-Check (T-11-05) kehrt Streuung in „leicht" zurück: `spr=0.05`, `scatter_sigma_mm=10 mm` (vorher 0,3 / 25 mm — der Halo, der als Fehlausrichtung wirkte), als gemeinsame Konstanten für beide Demo-Einstiegspfade.
+- **Hintergrund:** Nutzerwunsch „re-include lighter scatter". Der Fehlausrichtungs-Eindruck stammte aus dem breiten 25-mm-Blur bei spr 0,3; eine leichte Streuung erhält den Realismus (Kontrastverlust) ohne den Halo. Bei der Umsetzung zeigte sich, dass der Sidebar-Button „🎲 Generate dummy measurement" über `enqueue_dummy_measurement` einen **zweiten** Generator-Aufruf mit Defaults hatte (deshalb zeigte die erste Browser-Verifikation zu T-11-05 noch MAE 0,3242) — beide Pfade nutzen jetzt dieselben Konstanten.
+- **Dateien:** `src/visualization/phantom.py` (`DEMO_SPR`, `DEMO_SCATTER_SIGMA_MM`), `src/visualization/sidebar.py`, `src/visualization/actions.py`, `tests/unit/test_demo_load.py` + `tests/integration/test_ui_smoke.py` (Stub-Params), `docs/plan.md`
+- **Abhängig von:** T-11-05
+- **Akzeptanz:** Beide Demo-Pfade erzeugen identische Messungen mit spr 0,05 / σ 10 mm; erwartete App-Metrik MAE ≈ 0,05 (zwischen rauschfreiem 0,0057 und altem 0,32); Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — Headless-Check gegen den FP-Cache: Stack-MAE 0,05124, Frame 1: 0,05211 (max 0,161). Werkzeugnotiz: eine Suite-Lauf mit `%PATH%`-Expansion vor der Conda-Aktivierung lief im System-Python 3.13 (9 Skips, 2 Fehlfails) — ungültig; der korrigierte Lauf (verzögerte Expansion nach Aktivierung) ist maßgeblich.
 
 ## Phase 12 — Release Readiness (Nov 13, 2026)
 

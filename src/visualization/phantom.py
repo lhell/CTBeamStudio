@@ -272,6 +272,13 @@ def create_demo_volume(
 DUMMY_FP_CACHE = Path("data/cache/dummy_fp_standard.npz")
 DUMMY_CACHE_VERSION = 3
 
+# Demo scatter realism (T-11-06): light scatter — visible contrast loss
+# without the 25 mm halo that read as a geometric misalignment against the
+# simulated side. Shared by both demo entry points (load_demo_volume and
+# enqueue_dummy_measurement) so they cannot drift apart again.
+DEMO_SPR = 0.05
+DEMO_SCATTER_SIGMA_MM = 10.0
+
 
 @dataclass(frozen=True)
 class DummyMeasurement:

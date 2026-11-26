@@ -281,14 +281,22 @@ def load_demo_volume():
 
     The demo is a self-contained trio (T-93): the Shepp-Logan phantom, a
     dummy CBCT geometry that sees the whole head, and a synthetic measured
-    sinogram (forward projection + scatter + Poisson noise). Seeding them
-    together makes the Sinogram Inspection comparison live immediately,
-    without real scanner data. The ideal forward projection is disk-cached,
-    so this costs ~3.5 s after the first generation (~13-23 s fresh).
+    sinogram (forward projection + Poisson noise; scatter is switched off
+    for now — T-11-05 — because its 25 mm blur halo read as a geometric
+    misalignment against the simulated side). Seeding them together makes
+    the Sinogram Inspection comparison live immediately, without real
+    scanner data. The ideal forward projection is disk-cached, so this
+    costs ~3.5 s after the first generation (~13-23 s fresh).
     """
-    from visualization.phantom import create_dummy_measured_sinogram
+    from visualization.phantom import (
+        DEMO_SCATTER_SIGMA_MM,
+        DEMO_SPR,
+        create_dummy_measured_sinogram,
+    )
 
-    dummy = create_dummy_measured_sinogram()
+    dummy = create_dummy_measured_sinogram(
+        spr=DEMO_SPR, scatter_sigma_mm=DEMO_SCATTER_SIGMA_MM
+    )
     st.session_state["volume"] = dummy.volume
     st.session_state["demo_mode"] = True
     st.session_state["series"] = _series_stub(

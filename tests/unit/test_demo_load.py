@@ -28,8 +28,11 @@ def app():
     return at
 
 
-def _stub_dummy_measurement() -> DummyMeasurement:
-    """A tiny coherent stand-in for the (expensive) real generator."""
+def _stub_dummy_measurement(**kwargs):
+    """A tiny coherent stand-in for the (expensive) real generator.
+
+    Accepts ``**kwargs`` because the sidebar passes generation parameters
+    through (the shared demo constants since T-11-06); the stub ignores them."""
     geometry = ProjectionGeometry(
         n_det_cols=8,
         n_det_rows=4,
@@ -52,8 +55,8 @@ def _stub_dummy_measurement() -> DummyMeasurement:
         sinogram=sinogram,
         params={
             "energy_kev": 70.0,
-            "spr": 0.3,
-            "scatter_sigma_mm": 25.0,
+            "spr": 0.05,
+            "scatter_sigma_mm": 10.0,
             "i0": 1e5,
             "seed": 42,
             "fp_from_cache": False,

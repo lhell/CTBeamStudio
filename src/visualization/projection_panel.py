@@ -803,12 +803,48 @@ def projection_display_image(array: np.ndarray, window, spacing=None) -> np.ndar
 # box off against one column. The point is that an empty slot reserves the
 # same vertical space as a filled one, which keeps the row -- and everything
 # below it -- from jumping when the first projection arrives.
+#
+# This is only the fallback: SQUARE_VIEW_CSS squares every slot off for real
+# (aspect-ratio 1/1 at the column's rendered width), independent of the
+# browser width.
 PLACEHOLDER_HEIGHT_PX = 360
 
 # Upper bound (px) for a comparison view. The cap itself comes from the
 # projection images (see comparison_view_height); this only stops a very
 # large detector from turning one row into a page of its own.
 COMPARISON_VIEW_MAX_HEIGHT_PX = 720
+
+# Comparison views (components.html) and their empty-slot placeholders are
+# squared off by CSS: aspect-ratio makes every slot as tall as its column is
+# wide, independent of the browser width, so the two rows line up and the
+# measured sinogram no longer scrolls in an oversized box. The heights
+# computed in Python (comparison_view_height, PLACEHOLDER_HEIGHT_PX) are only
+# the fallback Streamlit paints before/if the stylesheet applies.
+#
+# iframe.stIFrame / iframe[title="st.iframe"] is every components.html iframe
+# in this app -- the comparison views are the only ones. Scoped so the demo
+# banner and the Geometry tab's st.info boxes are untouched.
+SQUARE_VIEW_CSS = """
+<style>
+  iframe.stIFrame, iframe[title="st.iframe"] {
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
+  }
+  .sino-placeholder {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 1px dashed rgba(128, 128, 128, 0.5);
+    border-radius: 0.5rem;
+    color: rgba(128, 128, 128, 0.9);
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+</style>
+"""
 
 # Zoom range of the comparison viewer, relative to "fit the column width".
 VIEW_ZOOM_MAX = 8
@@ -825,6 +861,10 @@ def comparison_view_height(*frames) -> int:
     projection images above it and the boxes line up. Without data the
     placeholder height applies; the result is clamped to
     ``[PLACEHOLDER_HEIGHT_PX, COMPARISON_VIEW_MAX_HEIGHT_PX]``.
+
+    This is the fallback footprint only: SQUARE_VIEW_CSS squares every view
+    off at the column's rendered width via ``aspect-ratio``, which overrides
+    this height wherever the stylesheet applies.
     """
     sides = [
         max(np.shape(frame)) for frame in frames if frame is not None and np.size(frame)
@@ -919,17 +959,20 @@ def _render_comparison_view(image: np.ndarray, height: int) -> None:
     )
 
 
-def _render_placeholder(message: str, height: int = PLACEHOLDER_HEIGHT_PX) -> None:
-    """Render an empty slot at the size a projection image will occupy.
+def _render_placeholder(message: str) -> None:
+    """Render an empty slot as a square ``.sino-placeholder`` box.
 
     A bare ``st.info`` is a one-line strip, which left the three columns
-    looking collapsed until data arrived. The fixed-height, borderless
-    container gives the hint the same footprint as an image slot.
+    looking collapsed until data arrived, and a fixed-height container
+    cannot match the square image slots around it at an arbitrary browser
+    width. The marker class lets SQUARE_VIEW_CSS square the slot off with
+    ``aspect-ratio``: it reserves exactly the footprint a filled view has.
     """
     import streamlit as st
 
-    with st.container(height=height, border=False):
-        st.info(message)
+    st.markdown(
+        f'<div class="sino-placeholder">{message}</div>', unsafe_allow_html=True
+    )
 
 
 def render_comparison_tab() -> None:
@@ -950,6 +993,12 @@ def render_comparison_tab() -> None:
     )
 
     st.subheader("Sinogram Inspection")
+
+    # Square every slot off at the column's rendered width (see
+    # SQUARE_VIEW_CSS): the views and the empty placeholders around them
+    # share one aspect-ratio, so both rows line up at any browser width.
+    st.markdown(SQUARE_VIEW_CSS, unsafe_allow_html=True)
+
     sinogram = st.session_state.get("sinogram")
 
     measured = None
@@ -1012,7 +1061,6 @@ def render_comparison_tab() -> None:
             _render_placeholder(
                 "No measured data — load measurements in the sidebar or "
                 "generate a dummy measurement.",
-                height=view_height,
             )
     with col_sim:
         if n_sim:
@@ -1024,7 +1072,6 @@ def render_comparison_tab() -> None:
         else:
             _render_placeholder(
                 "Run the forward projection to fill this column.",
-                height=view_height,
             )
     with col_diff:
         if shapes_match:
@@ -1045,12 +1092,10 @@ def render_comparison_tab() -> None:
                 f"Shapes differ ({measured.shape} vs {simulated.shape}) — preset "
                 'the projection to "all" (📐 Full projection geometry) to '
                 "compare.",
-                height=view_height,
             )
         else:
             _render_placeholder(
                 "Difference appears once measured and simulated shapes match.",
-                height=view_height,
             )
 
     # Shared slider below the views. Renders nothing when there are fewer
@@ -1083,9 +1128,7 @@ def render_comparison_tab() -> None:
                 height=view_height,
             )
         else:
-            _render_placeholder(
-                "No measured data for a row sinogram.", height=view_height
-            )
+            _render_placeholder("No measured data for a row sinogram.")
     with row_sino_sim:
         if n_rows_sim:
             label = f"Simulated sinogram, row {sim_row + 1}/{n_rows_sim}"
@@ -1095,9 +1138,7 @@ def render_comparison_tab() -> None:
                 height=view_height,
             )
         else:
-            _render_placeholder(
-                "Run the forward projection to fill this row.", height=view_height
-            )
+            _render_placeholder("Run the forward projection to fill this row.")
     with row_sino_diff:
         if shapes_match:
             diff = difference_image(
@@ -1107,14 +1148,11 @@ def render_comparison_tab() -> None:
             st.caption("Difference sinogram (measured − simulated)")
             _render_comparison_view(diff, height=view_height)
         elif n_rows_meas and n_rows_sim:
-            _render_placeholder(
-                "Shapes differ — see the projection row above.", height=view_height
-            )
+            _render_placeholder("Shapes differ — see the projection row above.")
         else:
             _render_placeholder(
                 "Difference sinogram appears once measured and simulated "
                 "shapes match.",
-                height=view_height,
             )
 
     st.caption(
@@ -1273,6 +1311,17 @@ def render_forward_projection_tab(
     if st.button("Run Forward Projection", type="primary", key="fp_run"):
         if volume is None:
             st.error("Load a volume in the sidebar first.")
+        elif not PARALLELPROJ_AVAILABLE:
+            # Hard stop instead of queueing a run that could only produce the
+            # warned-about zeros: a projection without parallelproj is never
+            # useful, so nothing is started (T-11-04).
+            st.error(
+                "parallelproj is not installed in this environment — the "
+                "forward projection would return zeros, so nothing was "
+                "started. Install it via conda-forge (conda install -c "
+                "conda-forge parallelproj) and launch the app from the "
+                "ct-viewer environment, e.g. via run_app.cmd."
+            )
         else:
             # The projection axis is the scan's projection count from the
             # Geometry tab, not one rotation: a helical scan spans several

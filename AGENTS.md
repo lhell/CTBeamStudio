@@ -84,7 +84,7 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **411 passed, 0 skipped**, ~25–50 s depending on disk
+- Baseline in `ct-viewer`: **412 passed, 0 skipped**, ~25–50 s depending on disk
   cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, T-101 + T-102
   added 2, over the 301 baseline; 1 removed by dropping the correlation
   metric; 2 added for the scan z-offset; T-104 added 5; T-106 added 6
@@ -95,7 +95,10 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
   T-11-01 added 4 (2 row-sinogram helpers, 2 UI smoke), 7 more for the
   capped, zoomable comparison views (height, PNG encoding, viewer HTML) and
   6 for the shared level/window (stack window, clipping, difference scale,
-  session cache); T-08-01 added 4 (device-boundary conversion, no skips)).
+  session cache); T-08-01 added 4 (device-boundary conversion, no skips);
+  T-11-02 added 1 (vectorized trajectory pinned to the scalar formulas);
+  T-11-03 rewrote 2 smoke tests for the square comparison views
+  (placeholder divs + injected stylesheet), no net change).
   The same 398 pass with zero skips on the 8× RTX A6000 GPU env, including
   with `CUDA_VISIBLE_DEVICES=""`. When your task changes the suite profile,
   update the numbers here as part of done.

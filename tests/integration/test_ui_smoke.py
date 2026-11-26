@@ -89,7 +89,12 @@ def test_geometry_tab_shows_default_geometry_hint(app):
 
 
 def test_comparison_tab_lists_missing_inputs(app):
-    messages = " ".join(info.value for info in app.info).lower()
+    """Empty slots are square placeholder divs (markdown), not st.info."""
+    messages = " ".join(
+        [c.value for c in app.caption]
+        + [m.value for m in app.markdown]
+        + [i.value for i in app.info]
+    ).lower()
     assert "measured data" in messages
 
 
@@ -418,9 +423,10 @@ def _seed_measurements(at, shape, fmt="numpy"):
 
 
 def _main_text(at) -> str:
-    """Concatenate every caption/info/warning string rendered in main."""
+    """Concatenate every caption/markdown/info/warning string rendered in main."""
     return " ".join(
         [c.value for c in at.caption]
+        + [m.value for m in at.markdown]
         + [i.value for i in at.info]
         + [w.value for w in at.warning]
     )
@@ -491,30 +497,14 @@ def test_sinogram_inspection_empty_frame_hints(app):
     assert "run the forward projection" in hints
 
 
-def _block_heights(node) -> list[int]:
-    """Collect the fixed heights of every ``st.container(height=...)``."""
-    heights = []
-    proto = getattr(node, "proto", None)
-    if proto is not None:
-        try:
-            if proto.HasField("vertical") and proto.vertical.height:
-                heights.append(proto.vertical.height)
-        except Exception:
-            pass
-    for child in (getattr(node, "children", {}) or {}).values():
-        heights.extend(_block_heights(child))
-    return heights
-
-
 def test_sinogram_inspection_placeholders_are_square_blocks(app):
     """The empty slots must reserve the same vertical space a projection
     image will occupy, so the layout does not jump when data arrives.
 
-    A one-line st.info leaves the three columns as thin strips. Each empty
-    slot therefore renders inside a fixed-height, square-ish container.
+    Each empty slot renders a square ``.sino-placeholder`` box, squared off
+    by the stylesheet injected with the tab (aspect-ratio 1/1 at the
+    column's rendered width) to match the square comparison views around it.
     """
-    from visualization.projection_panel import PLACEHOLDER_HEIGHT_PX
-
     app.session_state["sinogram"] = None
     app.session_state["forward_projection"] = None
     app.session_state["volume"] = create_demo_volume()
@@ -522,14 +512,15 @@ def test_sinogram_inspection_placeholders_are_square_blocks(app):
     app.run()
 
     assert list(app.exception) == []
-    # Square-ish: tall enough to match an image slot rather than a one-line
-    # hint. (The viewer's own image box uses a different height, so match on
-    # the placeholder's rather than counting every sized block in the app.)
-    assert PLACEHOLDER_HEIGHT_PX >= 240
-    heights = [h for h in _block_heights(app.main) if h == PLACEHOLDER_HEIGHT_PX]
+    bodies = [m.value for m in app.markdown]
+    placeholders = [b for b in bodies if 'class="sino-placeholder"' in b]
     # One per empty slot: measured, simulated, difference in both the
     # projection row and the row-sinogram row.
-    assert len(heights) == 6, heights
+    assert len(placeholders) == 6, placeholders
+    # The tab injects the stylesheet that squares the slots and the views.
+    styles = [b for b in bodies if "aspect-ratio" in b]
+    assert any("iframe.stIFrame" in b for b in styles), bodies
+    assert any(".sino-placeholder" in b for b in styles), bodies
 
 
 def test_sinogram_inspection_run_button_produces_simulation(app):
@@ -550,6 +541,27 @@ def test_sinogram_inspection_run_button_produces_simulation(app):
     text = _main_text(app)
     assert "Simulated: (24, 16, 64)" in text
     assert "Simulated projection" in text
+
+
+def test_forward_projection_run_is_blocked_without_parallelproj(app, monkeypatch):
+    """Without parallelproj the run button refuses to start: queueing the
+    placeholder backend could only fill the tab with warned-about zeros
+    (T-11-04). The button stays enabled so the reason appears at click time,
+    as an st.error next to the passive st.warning above it."""
+    import backend.forward_project as fp_module
+
+    monkeypatch.setattr(fp_module, "PARALLELPROJ_AVAILABLE", False)
+
+    app.session_state["volume"] = create_demo_volume()
+    app.session_state["forward_projection"] = None
+    app.button(key="fp_run").click()
+    app.run()
+
+    assert list(app.exception) == []
+    errors = " ".join(e.value for e in app.error)
+    assert "parallelproj is not installed" in errors
+    # Nothing was enqueued or computed: the result state stays empty.
+    assert app.session_state["forward_projection"] is None
 
 
 def test_sinogram_inspection_row_sinogram_row(app):

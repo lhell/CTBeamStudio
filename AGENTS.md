@@ -76,6 +76,10 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
   a subset).
 - NEVER commit data files (`.dcm`, `.ima`, `.npy`, `.npz`, …): gitignored, and the CI
   data-guard fails on them. AAPM data is external with citation duties (`docs/data.md`).
+- **Commit only the files this session changed.** Stage named paths
+  (`git add <file> …`), never `git add .` / `git add -A` / `git commit -a`:
+  the tree may hold unrelated or half-finished user work that must not ride
+  along. Check `git status --short` before staging and name every file (D-27).
 - DICOM via `pydicom` only — no SimpleITK, no ITK (D-1).
 - Streamlit pin: `>=1.37.0,<1.40.0` (`st.fragment` GA in 1.37; 1.40 removes
   `use_column_width`, ledger D-13).

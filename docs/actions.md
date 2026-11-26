@@ -19,12 +19,14 @@ forward projection needs a volume at click time.
 
 ## Where to see the queue
 
-Sidebar → **Show queue** (plain checkbox, off by default, at the bottom below
-the collapsible sections). The panel
-shows every item with its status, elapsed time, progress when known, and any
-error message. Hiding the panel does **not** stop the queue: an invisible
+Sidebar → the queue window at the bottom, below the collapsible sections —
+always visible, no switch. It is a dark gray, fixed-height box that scrolls
+internally instead of stretching the sidebar. The running item is pinned to
+the top so it stays visible without scrolling; pending items follow, and the
+finished history sits below the fold. It shows every item with its status,
+elapsed time, progress when known, and any error message. An invisible
 one-second poller forces an app rerun whenever an item changes state, so
-results are applied even with the panel closed. Each click also shows an
+results are applied regardless of what is on screen. Each click also shows an
 `Added to queue` toast as acknowledgement.
 
 **✕ Cancel** appears only on *pending* items. A running item is inside a

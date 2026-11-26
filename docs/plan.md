@@ -871,6 +871,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Akzeptanz:** Beide Demo-Pfade erzeugen identische Messungen mit spr 0,05 / σ 10 mm; erwartete App-Metrik MAE ≈ 0,05 (zwischen rauschfreiem 0,0057 und altem 0,32); Suite grün, 0 Skips; Lint sauber.
 - **Status:** ✅ Done (Nov 26, 2026) — Headless-Check gegen den FP-Cache: Stack-MAE 0,05124, Frame 1: 0,05211 (max 0,161). Werkzeugnotiz: eine Suite-Lauf mit `%PATH%`-Expansion vor der Conda-Aktivierung lief im System-Python 3.13 (9 Skips, 2 Fehlfails) — ungültig; der korrigierte Lauf (verzögerte Expansion nach Aktivierung) ist maßgeblich.
 
+### `[x]` T-11-07 — Queue-Fenster immer sichtbar (dunkelgrau, scrollend)
+- **Ziel:** Das Queue-Panel ist ohne Schalter sichtbar: das „Show queue"-Kontrollkästchen entfällt, das Fenster zeigt sich standardmäßig als dunkelgraue, scrollende Box unten in der Sidebar. Der laufende Eintrag steht immer ganz oben im Fenster (darunter Wartende, dann die fertige Historie).
+- **Hintergrund:** Nutzerwünsche „show the queue per default in dark gray window in sidebar", „remove the checkbox" und „always show (last) running process". Das Fenster wächst bis 200 px mit und scrollt dann intern, statt die Sidebar zu strecken; das Box-Opening ist nach oben gescrollt, deshalb wird der laufende Eintrag an den Anfang sortiert — die Historie rutscht unter den Falz.
+- **Dateien:** `src/visualization/actions.py` (`QUEUE_PANEL_CSS`, Container mit fester Höhe, Reihenfolge laufend → wartend → fertig), `tests/integration/test_ui_smoke.py`, `docs/actions.md`, `docs/plan.md`
+- **Abhängig von:** T-109
+- **Akzeptanz:** Kein „Show queue"-Kontrollkästchen mehr; Queue-Fenster immer gerendert; das CSS trifft nur das Queue-Fenster, nicht den Sidebar-Grundblock (gleicher Test-Id — Scope über `[height]`); laufender Eintrag vor fertigen gerendert; Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — im Browser (Port 8513, Dark Theme) verifiziert: Sidebar unverändert normal, Queue-Fenster dunkelgrau (`#383b44`) mit hellem Text, kein Kontrollkästchen. Erste CSS-Fassung traf den Sidebar-Grundblock und färbte die ganze Sidebar — Scope um `[height]` erweitert (nur das Queue-Fenster hat eine feste Höhe). Suite 414 / 0 skipped; Lint sauber (black formatierte nur den neuen Test). Werkzeugnotiz: `set PATH=…%PATH%` in derselben `cmd`-Zeile wie die Aktivierung expandiert `%PATH%` **vor** der Aktivierung und löscht die Env — der Lauf lief im System-Python (9 Skips, 2 Fehlfails, ungültig); maßgeblich ist der Lauf mit Batch-Datei (PATH vor Aktivierung setzen).
+
 ## Phase 12 — Release Readiness (Nov 13, 2026)
 
 Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden schließen (T-73 CI-Route), Plan-Hygiene und Helix-FP-Verifikation. Nutzerentscheidung: Helix-FP gehört **in** den Meilenstein, nicht danach.

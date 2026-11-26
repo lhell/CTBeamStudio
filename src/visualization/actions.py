@@ -392,19 +392,21 @@ def _elapsed(item: QueueItem, now: float) -> float:
 
 
 # The queue renders as a dark gray window: fixed height, internally scrollable,
-# so finished items pile up at the top (FIFO) instead of stretching the
-# sidebar. Scoped to the sidebar's bordered containers, of which this panel is
-# the only one; the light text keeps the rows readable inside the dark box in
-# the default light theme.
+# so it never stretches the sidebar. The running item is rendered first (the
+# box opens scrolled to the top), pending items follow, and the finished
+# history sits below the fold. Scoped with ``[height]`` because the sidebar's
+# root block and other wrappers share the same test id; the queue container is
+# the only one with a fixed height. The light text keeps the rows readable
+# inside the dark box.
 QUEUE_PANEL_CSS = """
 <style>
-  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] {
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"][height] {
     background-color: #383b44;
     border: 1px solid #59606f;
     border-radius: 0.5rem;
   }
-  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] p,
-  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"][height] p,
+  [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"][height] [data-testid="stCaptionContainer"] {
     color: #e8eaf0;
   }
 </style>
@@ -419,11 +421,11 @@ QUEUE_PANEL_ROW_PX = 26
 def render_action_queue(session: str) -> None:
     """Draw one row per queue entry in a dark gray, scrollable sidebar window.
 
-    Rows keep queue order (FIFO), so finished items drift upward and the
-    active ones stay at the bottom; once the rows exceed the capped height the
-    window scrolls instead of growing. Only pending rows get a Cancel button:
-    a running item is inside a C call and cannot be stopped, so offering a
-    button there would be a lie.
+    The running item is pinned to the top (the box opens scrolled to the top),
+    pending rows follow, and the finished history sits below the fold; once
+    the rows exceed the capped height the window scrolls instead of growing.
+    Only pending rows get a Cancel button: a running item is inside a C call
+    and cannot be stopped, so offering a button there would be a lie.
     """
     items = action_queue.snapshot(session)
     height = min(
@@ -433,28 +435,32 @@ def render_action_queue(session: str) -> None:
     with st.container(height=height, border=True):
         if not items:
             st.caption("No queued actions.")
-            return
+        else:
+            running = [i for i in items if i.status == STATUS_RUNNING]
+            pending = [i for i in items if i.status == STATUS_PENDING]
+            finished = [
+                i for i in items if i.status not in (STATUS_RUNNING, STATUS_PENDING)
+            ]
+            now = time.time()
+            for item in running + pending + finished:
+                parts = [f"{item.label} · {item.status} · {_elapsed(item, now):.0f}s"]
+                if item.progress is not None:
+                    current, total = item.progress
+                    parts.append(f"{current}/{total}")
+                    st.progress(current / total if total else 0.0)
+                if item.status == STATUS_FAILED and item.error is not None:
+                    parts.append(str(item.error))
+                icon_col, text_col = st.columns([1, 6])
+                with icon_col:
+                    st.caption(_STATUS_ICON.get(item.status, "•"))
+                with text_col:
+                    st.caption(" · ".join(parts))
+                if item.status == STATUS_PENDING:
+                    if st.button("✕ Cancel", key=f"queue_cancel_{item.id}"):
+                        action_queue.cancel(session, item.id)
+                        st.rerun()
 
-        now = time.time()
-        for item in items:
-            parts = [f"{item.label} · {item.status} · {_elapsed(item, now):.0f}s"]
-            if item.progress is not None:
-                current, total = item.progress
-                parts.append(f"{current}/{total}")
-                st.progress(current / total if total else 0.0)
-            if item.status == STATUS_FAILED and item.error is not None:
-                parts.append(str(item.error))
-            icon_col, text_col = st.columns([1, 6])
-            with icon_col:
-                st.caption(_STATUS_ICON.get(item.status, "•"))
-            with text_col:
-                st.caption(" · ".join(parts))
-            if item.status == STATUS_PENDING:
-                if st.button("✕ Cancel", key=f"queue_cancel_{item.id}"):
-                    action_queue.cancel(session, item.id)
-                    st.rerun()
-
-    if st.button("Clear finished", key="queue_clear_finished"):
+    if items and st.button("Clear finished", key="queue_clear_finished"):
         action_queue.clear_finished(session)
         st.rerun()
 

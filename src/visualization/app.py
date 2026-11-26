@@ -792,8 +792,8 @@ def main():
 
     # Mount last: every action button has been evaluated by now, including the
     # FP button in the tab above. The poller renders nothing; it only forces an
-    # app rerun when a queued item changes state, so results are applied even
-    # when the queue panel is hidden.
+    # app rerun when a queued item changes state, so results are applied
+    # without waiting for the next user interaction.
     mount_queue_poller(session_token())
 
 

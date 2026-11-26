@@ -167,6 +167,46 @@ def test_show_queue_lists_pending_actions_with_cancel(app):
         app.run()
 
 
+def test_queue_pins_the_running_item_above_history(app):
+    """The running item renders before finished ones: the window opens
+    scrolled to the top, so the active row stays visible without scrolling,
+    however long the finished history below has grown.
+
+    ``run_now`` settles a real DONE item (with finished_at set); the gate
+    holds the second item running so it stays in the registry as running.
+    """
+    import threading
+
+    from visualization import action_queue
+
+    token = app.session_state["action_queue_token"]
+    done = action_queue.QueueItem(label="Old finished", run=lambda: "x")
+    action_queue.run_now(token, done)
+    gate = threading.Event()
+    action_queue.enqueue(
+        token,
+        action_queue.QueueItem(
+            label="Live job",
+            run=lambda: "ok" if gate.wait(30) else "timeout",
+        ),
+    )
+    try:
+        app.run()
+
+        captions = [c.value for c in app.get("caption")]
+        running_idx = next(
+            i for i, c in enumerate(captions) if "Live job · running" in c
+        )
+        done_idx = next(i for i, c in enumerate(captions) if "Old finished · done" in c)
+        assert running_idx < done_idx
+    finally:
+        gate.set()
+        action_queue.reset_queue(token)
+        if "_action_queue_signature" in app.session_state:
+            del app.session_state["_action_queue_signature"]
+        app.run()
+
+
 def test_sidebar_no_longer_has_a_data_header(app):
     headers = [h.value for h in app.sidebar.header]
     assert "Data" not in headers

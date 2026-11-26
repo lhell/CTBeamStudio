@@ -86,6 +86,50 @@ def test_get_trajectory_positions_with_z_offset():
         assert src_a[1] == pytest.approx(src_b[1], rel=0.01)
 
 
+def test_get_trajectory_positions_matches_scalar_formulas():
+    """The vectorized trajectory equals the per-projection scalar formulas.
+
+    Regression: get_trajectory_positions is vectorized (the per-projection
+    Python loop cost ~0.3 s at 51k projections on every rerun that shows the
+    3D view). This pins it to get_source_position/get_detector_position for a
+    helical scan, where the z feed formula has the most surface.
+    """
+    geo = ProjectionGeometry(
+        sid=600.0,
+        sdd=1000.0,
+        pitch=0.5,
+        n_det_rows=64,
+        det_row_spacing_mm=2.0,
+        source_offset_x=3.0,
+        source_offset_y=-2.0,
+        source_offset_z=1.5,
+        detector_offset_x=-1.0,
+        detector_offset_y=4.0,
+    )
+    n = 17
+
+    src_positions, det_positions = get_trajectory_positions(
+        geo, n_projections=n, z_offset=12.0
+    )
+
+    assert len(src_positions) == n
+    assert len(det_positions) == n
+    projections_per_rotation = geo.projections_per_rotation
+    total_angle = 360.0 * (n / projections_per_rotation)
+    z_step = (
+        geo.pitch * geo.n_det_rows * geo.det_row_spacing_mm / (projections_per_rotation)
+    )
+    for i, (src, det) in enumerate(zip(src_positions, det_positions)):
+        angle = (i / n) * total_angle
+        z_pos = 12.0 - (z_step * n) / 2 + i * z_step
+        assert src == pytest.approx(
+            get_source_position(geo, angle, z_pos), rel=1e-9, abs=1e-9
+        )
+        assert det == pytest.approx(
+            get_detector_position(geo, angle, z_pos), rel=1e-9, abs=1e-9
+        )
+
+
 def test_get_source_position_with_offsets():
     """Test source position with offsets."""
     geo = ProjectionGeometry(sid=600.0, source_offset_x=10.0, source_offset_y=20.0)

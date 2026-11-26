@@ -91,6 +91,10 @@ def get_trajectory_positions(geometry, n_projections: int, z_offset: float = 0.0
     """Generate source and detector positions for all projections.
 
     For helical scans, accounts for table feed (Z movement) during acquisition.
+    Vectorized with numpy: the overlay is rebuilt on every rerun that shows
+    the 3D view (Streamlit executes all tab bodies), and the per-projection
+    Python loop cost ~0.3 s at 51k projections (~12 ms at the default 2304)
+    each time.
 
     Args:
         geometry: ProjectionGeometry object
@@ -103,20 +107,21 @@ def get_trajectory_positions(geometry, n_projections: int, z_offset: float = 0.0
     Returns:
         (source_positions, detector_positions) as lists of (x,y,z) tuples
     """
-    source_positions = []
-    detector_positions = []
+    n = int(n_projections)
 
     # Calculate total angle based on number of projections
     # Default: 2304 projections per 360° rotation.
-    projections_per_rotation = getattr(geometry, "projections_per_rotation", 2304)
-    total_angle = 360.0 * (n_projections / projections_per_rotation)
+    projections_per_rotation = float(
+        getattr(geometry, "projections_per_rotation", 2304) or 2304
+    )
+    total_angle = 360.0 * (n / projections_per_rotation)
 
     # Calculate Z step per projection for helical scans
-    pitch = getattr(geometry, "pitch", 0.0)
-    n_det_rows = getattr(geometry, "n_det_rows", 64)
-    det_row_spacing = getattr(geometry, "det_row_spacing_mm", 1.0)
+    pitch = float(getattr(geometry, "pitch", 0.0) or 0.0)
+    n_det_rows = int(getattr(geometry, "n_det_rows", 64) or 64)
+    det_row_spacing = float(getattr(geometry, "det_row_spacing_mm", 1.0) or 1.0)
 
-    if pitch != 0 and n_projections > 1:
+    if pitch != 0 and n > 1:
         # Collimation width = number of rows * row width
         collimation_width = n_det_rows * det_row_spacing
         # Table feed per rotation = pitch * collimation_width
@@ -124,25 +129,55 @@ def get_trajectory_positions(geometry, n_projections: int, z_offset: float = 0.0
         # Z step per projection
         z_step = table_feed_per_rotation / projections_per_rotation
         # Total Z range
-        total_z = z_step * n_projections
+        total_z = z_step * n
     else:
         # Circular scan - no Z movement
         z_step = 0.0
         total_z = 0.0
 
-    for i in range(n_projections):
-        source_angle = (i / n_projections) * total_angle
+    # Vectorized trajectory: angle i/n * total_angle, z centred on z_offset —
+    # the same per-projection formulas as get_source_position and
+    # get_detector_position, evaluated for all i at once.
+    angles = np.radians(np.linspace(0.0, total_angle, n, endpoint=False))
+    z_pos = z_offset - total_z / 2 + np.arange(n) * z_step
 
-        # Z offset for helical: centred on z_offset (the volume's z centre)
-        z_pos = z_offset - total_z / 2 + i * z_step
+    # Detector is opposite to source on the central beam, at a distance
+    # sdd - sid from the isocenter: SDD is measured from the source, not
+    # from the rotation axis (same convention as the parallelproj forward
+    # projection, see backend.parallelproj.geometry). The detector follows
+    # the source's z offset (see ProjectionGeometry).
+    did = geometry.sdd - geometry.sid
+    source = np.column_stack(
+        (
+            geometry.sid * np.cos(angles) + geometry.source_offset_x,
+            geometry.sid * np.sin(angles) + geometry.source_offset_y,
+            z_pos + geometry.source_offset_z,
+        )
+    )
+    detector = np.column_stack(
+        (
+            -did * np.cos(angles) + geometry.detector_offset_x,
+            -did * np.sin(angles) + geometry.detector_offset_y,
+            z_pos + geometry.source_offset_z,
+        )
+    )
 
-        src = get_source_position(geometry, source_angle, z_pos)
-        det = get_detector_position(geometry, source_angle, z_pos)
-
-        source_positions.append(src)
-        detector_positions.append(det)
-
-    return source_positions, detector_positions
+    return (
+        list(
+            zip(
+                source[:, 0].tolist(),
+                source[:, 1].tolist(),
+                source[:, 2].tolist(),
+            )
+        ),
+        list(
+            zip(
+                detector[:, 0].tolist(),
+                detector[:, 1].tolist(),
+                detector[:, 2].tolist(),
+            )
+        ),
+    )
 
 
 def add_trajectory_to_figure(

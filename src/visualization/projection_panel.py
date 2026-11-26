@@ -195,6 +195,27 @@ def window_image(array: np.ndarray, window: tuple[float, float]) -> np.ndarray:
     return np.clip(image, 0.0, 1.0).astype(np.float32)
 
 
+def relative_window(
+    window: tuple[float, float], level_pct: float, width_pct: float
+) -> tuple[float, float]:
+    """Return the display window picked by percent level/width of ``window``.
+
+    The sinogram tab shows detector readings, not HU, so its window options
+    are percent of the auto stack range instead of the Viewer tab's HU
+    presets: level 50 / width 100 reproduces the auto window exactly, a
+    smaller width zooms into a sub-range, and the mapping never depends on
+    the data units. The width is clamped to at least one percent so the
+    window never collapses to zero span (which would paint everything black).
+    """
+    lo, hi = window
+    span = hi - lo
+    if span <= 0:
+        return window
+    width = max(float(width_pct), 1.0) / 100.0 * span
+    level = lo + min(max(float(level_pct), 0.0), 100.0) / 100.0 * span
+    return (level - width / 2.0, level + width / 2.0)
+
+
 def apply_geometry_updates(
     geometry: ProjectionGeometry, updates: dict
 ) -> ProjectionGeometry:
@@ -975,6 +996,37 @@ def _render_placeholder(message: str) -> None:
     )
 
 
+SINO_LEVEL_PCT_KEY = "sino_level_pct"
+SINO_WIDTH_PCT_KEY = "sino_width_pct"
+
+
+def render_level_window_options(
+    auto_window: tuple[float, float],
+) -> tuple[float, float]:
+    """Collapsed level/window expander above the comparison views.
+
+    The sinogram tab shows detector readings rather than HU, so the options
+    are percent of the auto stack range instead of the Viewer tab's HU
+    presets. Collapsed by default: the auto window is right for a first
+    look, the sliders are for when a frame needs contrast tuning. The
+    defaults (level 50, width 100) reproduce the auto window exactly, so
+    the expander changes nothing until the user moves a slider. The sliders
+    have fixed 0..100 limits, so a new dataset can never push a stored
+    widget value out of range.
+    """
+    import streamlit as st
+
+    with st.expander("🎚️ Level / Window", expanded=False):
+        lo, hi = auto_window
+        st.caption(
+            f"Auto window: {lo:.4g} … {hi:.4g} (data units). Defaults "
+            "reproduce it; a smaller width zooms into a sub-range."
+        )
+        level_pct = st.slider("Level", 0, 100, 50, key=SINO_LEVEL_PCT_KEY)
+        width_pct = st.slider("Width", 1, 100, 100, key=SINO_WIDTH_PCT_KEY)
+    return relative_window(auto_window, level_pct, width_pct)
+
+
 def render_comparison_tab() -> None:
     """Sinogram Inspection: measured vs simulated projections side by side.
 
@@ -1028,7 +1080,10 @@ def render_comparison_tab() -> None:
     # the same gray in both rows and in both sources, so the brightness no
     # longer follows the slider and measured vs simulated stays comparable.
     # Same for the difference: one symmetric scale, zero pinned to mid-gray.
-    window, diff_scale = cached_comparison_scales(measured, simulated)
+    # The level/window expander (collapsed by default, above the views) lets
+    # the user pick a sub-window in percent of that auto range.
+    auto_window, diff_scale = cached_comparison_scales(measured, simulated)
+    window = render_level_window_options(auto_window)
 
     # Both rows are capped at the largest side of a projection frame, so the
     # sinogram row below never grows past the images here and the two rows

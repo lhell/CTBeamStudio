@@ -23,6 +23,7 @@ from visualization.projection_panel import (
     prepare_projection_volume,
     projection_display_image,
     projection_display_spacing,
+    relative_window,
     resolve_selection,
     resolve_view_index,
     row_sinogram,
@@ -77,8 +78,33 @@ def test_window_image_maps_and_clips_through_the_shared_window():
 
 def test_window_image_with_zero_span_is_black():
     out = window_image(np.full((3, 3), 42.0, dtype=np.float32), (5.0, 5.0))
-
     np.testing.assert_allclose(out, np.zeros((3, 3), dtype=np.float32))
+
+
+def test_relative_window_defaults_reproduce_the_auto_window():
+    """Level 50 / width 100 is the identity: the expander changes nothing
+    until the user moves a slider."""
+    assert relative_window((10.0, 20.0), 50, 100) == (10.0, 20.0)
+
+
+def test_relative_window_zooms_into_a_subrange():
+    """The width is centered on the level: level 25 / width 50 shows the
+    lower half of the auto range, level 75 / width 50 the upper half. Level
+    0/100 push the window center to the data edges, so the window extends
+    past the data and window_image clips (standard level/window semantics)."""
+    assert relative_window((10.0, 20.0), 50, 50) == (12.5, 17.5)
+    assert relative_window((10.0, 20.0), 25, 50) == (10.0, 15.0)
+    assert relative_window((10.0, 20.0), 75, 50) == (15.0, 20.0)
+    assert relative_window((10.0, 20.0), 100, 50) == (17.5, 22.5)
+    assert relative_window((10.0, 20.0), 0, 50) == (7.5, 12.5)
+
+
+def test_relative_window_never_collapses_to_zero_span():
+    """A zero width would paint everything black: it is clamped to one
+    percent of the auto range. Degenerate input passes through unchanged."""
+    lo, hi = relative_window((10.0, 20.0), 50, 0)
+    assert hi > lo
+    assert relative_window((5.0, 5.0), 50, 100) == (5.0, 5.0)
 
 
 def test_projection_display_image_keeps_a_value_at_one_gray_level():

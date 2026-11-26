@@ -879,6 +879,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Akzeptanz:** Kein „Show queue"-Kontrollkästchen mehr; Queue-Fenster immer gerendert; das CSS trifft nur das Queue-Fenster, nicht den Sidebar-Grundblock (gleicher Test-Id — Scope über `[height]`); laufender Eintrag vor fertigen gerendert; Suite grün, 0 Skips; Lint sauber.
 - **Status:** ✅ Done (Nov 26, 2026) — im Browser (Port 8513, Dark Theme) verifiziert: Sidebar unverändert normal, Queue-Fenster dunkelgrau (`#383b44`) mit hellem Text, kein Kontrollkästchen. Erste CSS-Fassung traf den Sidebar-Grundblock und färbte die ganze Sidebar — Scope um `[height]` erweitert (nur das Queue-Fenster hat eine feste Höhe). Suite 414 / 0 skipped; Lint sauber (black formatierte nur den neuen Test). Werkzeugnotiz: `set PATH=…%PATH%` in derselben `cmd`-Zeile wie die Aktivierung expandiert `%PATH%` **vor** der Aktivierung und löscht die Env — der Lauf lief im System-Python (9 Skips, 2 Fehlfails, ungültig); maßgeblich ist der Lauf mit Batch-Datei (PATH vor Aktivierung setzen).
 
+### `[x]` T-11-08 — Level/Window-Optionen im Sinogram-Inspection-Tab
+- **Ziel:** Ein „🎚️ Level / Window"-Expander über den Vergleichsansichten (standardmäßig eingeklappt): Level und Fensterbreite in Prozent des Auto-Stack-Fensters; Level 50 / Breite 100 reproduziert das Auto-Fenster exakt.
+- **Hintergrund:** Nutzerwunsch „include sinogram level window options (collapsed by default above)". Der Tab zeigt Detektorwerte, keine HU — deshalb Prozent-Slider statt der HU-Presets des Viewer-Tabs; feste 0..100-Grenzen, damit ein neuer Datensatz einen gespeicherten Slider-Wert nie außerhalb des Bereichs lässt. Der laufende Eintrag wird weiter über das gemeinsame Fenster (`cached_comparison_scales`) geführt; die Slider bilden nur einen Teilbereich davon ab.
+- **Dateien:** `src/visualization/projection_panel.py` (`relative_window`, `render_level_window_options`, Aufruf in `render_comparison_tab`), `tests/unit/test_projection_panel.py`, `tests/integration/test_ui_smoke.py`, `docs/plan.md`
+- **Abhängig von:** T-11-01
+- **Akzeptanz:** Expander eingeklappt über den Ansichten; Defaults ändern nichts (Auto-Fenster); kleinere Breite zoomt in einen Teilbereich; Slider-Werte überleben Datensatzwechsel ohne Ausnahme; Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — 3 Unit-Tests (`relative_window`: Identität, Teilbereich inkl. Rand-Verhalten, Mindestbreite gegen Null-Span) + 1 Smoke-Test (Expander eingeklappt über den Ansichten, Slider-Defaults 50/100). Suite 418 / 0 skipped; Lint sauber.
+
 ## Phase 12 — Release Readiness (Nov 13, 2026)
 
 Nächster Meilenstein (Grilling-Round vom 13.11.2026): Deploy/Env-lose Enden schließen (T-73 CI-Route), Plan-Hygiene und Helix-FP-Verifikation. Nutzerentscheidung: Helix-FP gehört **in** den Meilenstein, nicht danach.

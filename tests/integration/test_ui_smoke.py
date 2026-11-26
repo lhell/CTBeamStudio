@@ -563,6 +563,19 @@ def test_sinogram_inspection_placeholders_are_square_blocks(app):
     assert any(".sino-placeholder" in b for b in styles), bodies
 
 
+def test_sinogram_level_window_expander_is_collapsed_by_default(app):
+    """The level/window options live in an expander above the views, closed
+    until asked for: the auto window is right for a first look. The sliders
+    default to level 50 / width 100, which reproduces the auto window
+    exactly, so the expander changes nothing until the user moves one."""
+    expanders = {e.label: e.proto.expanded for e in app.expander}
+    assert expanders.get("🎚️ Level / Window") is False
+
+    sliders = {s.label: s.value for s in app.slider}
+    assert sliders.get("Level") == 50
+    assert sliders.get("Width") == 100
+
+
 def test_sinogram_inspection_run_button_produces_simulation(app):
     """Placeholder backend: with a matching measured shape (fp defaults
     on the default geometry yield the (24, 16, 64) simulated stack),

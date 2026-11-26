@@ -88,7 +88,7 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
 - Backend code is Streamlit-free; keep it importable and testable without Streamlit.
 
 ## Test bar
-- Baseline in `ct-viewer`: **418 passed, 0 skipped**, ~25–50 s depending on disk
+- Baseline in `ct-viewer`: **419 passed, 0 skipped**, ~25–50 s depending on disk
   cache (T-92 + T-93 added 29 tests, T-94 to T-97 added 10, T-101 + T-102
   added 2, over the 301 baseline; 1 removed by dropping the correlation
   metric; 2 added for the scan z-offset; T-104 added 5; T-106 added 6
@@ -105,7 +105,9 @@ missing. Details: `docs/local-environment.md`, `INSTALLATION.md`.
   (placeholder divs + injected stylesheet), no net change; T-11-04 added 1
   (FP run blocked with st.error when parallelproj is missing); T-11-07 added
   1 (queue window always visible, running item pinned at the top); T-11-08
-  added 4 (sinogram level/window expander, collapsed by default)).
+  added 4 (sinogram level/window expander, collapsed by default); T-11-11
+  added 1 (zoom persistence per comparison view slot, survives slider
+  reruns)).
   The same 398 pass with zero skips on the 8× RTX A6000 GPU env, including
   with `CUDA_VISIBLE_DEVICES=""`. When your task changes the suite profile,
   update the numbers here as part of done.

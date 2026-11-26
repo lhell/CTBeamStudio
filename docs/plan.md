@@ -41,7 +41,7 @@ Unstrukturierte neue Nummern ab `T-111` werden nicht mehr vergeben.
 | 8 | Forward Projection & Attenuation | T-61 – T-63, T-79, T-80, T-108, T-08-01, T-08-02 |
 | 9 | Sinogram & Messdaten | T-64 – T-66, T-90, T-92, T-93, T-98, T-102 |
 | 10 | Vergleich simuliert vs. gemessen | T-67 – T-69 |
-| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110, T-11-01 – T-11-05 |
+| 11 | App & Viewer (Integration, Layout, 3D) | T-70, T-82 – T-89, T-94 – T-97, T-99 – T-101, T-103, T-109, T-110, T-11-01 – T-11-08, T-11-11 |
 | 12 | Release Readiness | T-104 – T-107 |
 | – | Research-Backlog | T-75 – T-77 |
 
@@ -886,6 +886,14 @@ vorgefunden, wandert der Eintrag, nie die Nummer.
 - **Abhängig von:** T-11-01
 - **Akzeptanz:** Expander eingeklappt über den Ansichten; Defaults ändern nichts (Auto-Fenster); kleinere Breite zoomt in einen Teilbereich; Slider-Werte überleben Datensatzwechsel ohne Ausnahme; Suite grün, 0 Skips; Lint sauber.
 - **Status:** ✅ Done (Nov 26, 2026) — 3 Unit-Tests (`relative_window`: Identität, Teilbereich inkl. Rand-Verhalten, Mindestbreite gegen Null-Span) + 1 Smoke-Test (Expander eingeklappt über den Ansichten, Slider-Defaults 50/100). Suite 418 / 0 skipped; Lint sauber.
+
+### `[x]` T-11-11 — Zoom bleibt über Slider-Änderungen erhalten (Sinogram-Ansichten)
+- **Ziel:** Der Ctrl+Rad-Zoom (und die Scroll-Position) der sechs Vergleichsansichten überlebt Slider-Änderungen: der Viewer speichert beides pro Ansicht-Slot in `localStorage` und stellt es beim Neuaufbau des iframes wieder her; Doppelklick setzt zurück (und überschreibt den Speicher).
+- **Hintergrund:** Nutzerwunsch „keep zoom when changing slider of sinograms". Jeder Streamlit-Rerun baut die `components.html`-iframes neu — mit neuem Bild (neuer PNG-Data-URI) wird das iframe ersetzt und der Zoom war weg. Slot-Ids (`sino-proj-meas` … `sino-row-diff`) halten die Speicher auseinander; gleiche Slots teilen keinen Schlüssel. Identischer srcdoc lädt das iframe laut Browser-Verifikation gar nicht neu (React lässt es stehen) — dort bleibt der Zoom ohnehin erhalten.
+- **Dateien:** `src/visualization/projection_panel.py` (`build_zoomable_image_html` mit `view_id` + Persistenz, `_render_comparison_view`, sechs Aufrufstellen), `tests/unit/test_projection_panel.py`, `docs/plan.md`
+- **Abhängig von:** T-11-01
+- **Akzeptanz:** Zoom + Scroll werden pro Slot gespeichert und nach iframe-Neuaufbau wiederhergestellt; Doppelklick resettet; `AppTest` kann iframes nicht treiben — Browser-Verifikation nötig; Suite grün, 0 Skips; Lint sauber.
+- **Status:** ✅ Done (Nov 26, 2026) — Browser-Verifikation (Port 8514, Demo-Phantom, Sinogram Inspection): Ctrl+Rad zoomt (100 → 115 → 132,25 %), Zoom hält über die Poller-Reruns eines laufenden FP (26 s) und den Drain-Rerun; iframe-Neuaufbau simuliert (Element ersetzt, frisches Dokument via `performance.timeOrigin` bestätigt) → Zoom aus `localStorage` wiederhergestellt (132,25 %). Ein Unit-Test pinnt die Schlüssel pro Slot. Test-Bar 418 → 419; Lint sauber.
 
 ## Phase 12 — Release Readiness (Nov 13, 2026)
 

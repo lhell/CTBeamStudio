@@ -247,7 +247,7 @@ def test_png_data_uri_downscales_the_long_side():
 def test_zoomable_html_embeds_the_image_and_the_wheel_zoom():
     uri = "data:image/png;base64,AAAA"
 
-    html = build_zoomable_image_html(uri)
+    html = build_zoomable_image_html(uri, "sino-proj-meas")
 
     assert f'src="{uri}"' in html
     assert '"wheel"' in html
@@ -258,6 +258,20 @@ def test_zoomable_html_embeds_the_image_and_the_wheel_zoom():
     # app's dark theme, so the default light track stood out.
     assert "::-webkit-scrollbar" in html
     assert "scrollbar-color" in html
+
+
+def test_zoomable_html_persists_zoom_per_view_id():
+    """A Streamlit rerun — every slider tick — rebuilds the iframe and would
+    reset the zoom: the viewer stores zoom and scroll per view slot in
+    localStorage and restores them on load, so a slider sweep keeps the
+    inspection zoom. Two slots must not share a key."""
+    html = build_zoomable_image_html("data:image/png;base64,AAAA", "sino-proj-meas")
+
+    assert "localStorage" in html
+    assert "sinoViewZoom:sino-proj-meas" in html
+
+    other = build_zoomable_image_html("data:image/png;base64,AAAA", "sino-row-diff")
+    assert "sinoViewZoom:sino-row-diff" in other
 
 
 def test_build_selection_config_maps_all_axes():

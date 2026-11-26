@@ -916,7 +916,7 @@ def png_data_uri(image: np.ndarray, max_side: int = 2048) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def build_zoomable_image_html(data_uri: str) -> str:
+def build_zoomable_image_html(data_uri: str, view_id: str) -> str:
     """Self-contained viewer: scrolls, and zooms with Ctrl + mouse wheel.
 
     ``st.image`` fills the column width and offers no zoom, so a tall
@@ -926,6 +926,11 @@ def build_zoomable_image_html(data_uri: str) -> str:
     wheel scrolls, as expected in a scroll box). Double-click resets it. The
     image is centred while it fits and aligns to the start once it overflows,
     so nothing is clipped un-scrollably.
+
+    A Streamlit rerun — every slider tick — rebuilds the iframe and would
+    reset the zoom. ``view_id`` names the view slot, and zoom plus scroll
+    position are persisted under it in ``localStorage`` and restored on
+    load, so inspecting one region across a slider sweep keeps the zoom.
     """
     return f"""
 <style>
@@ -946,7 +951,21 @@ def build_zoomable_image_html(data_uri: str) -> str:
   const box = document.getElementById("box");
   const img = document.getElementById("img");
   const step = 1.15, min = 0.1, max = {VIEW_ZOOM_MAX};
+  const key = "sinoViewZoom:{view_id}";
   let zoom = 1.0;
+  let saveTimer = null;
+  function save() {{
+    try {{
+      localStorage.setItem(
+        key,
+        JSON.stringify({{ zoom: zoom, x: box.scrollLeft, y: box.scrollTop }})
+      );
+    }} catch (e) {{}}
+  }}
+  function scheduleSave() {{
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 150);
+  }}
   box.addEventListener("wheel", function (ev) {{
     if (!ev.ctrlKey) return;
     ev.preventDefault();
@@ -959,22 +978,47 @@ def build_zoomable_image_html(data_uri: str) -> str:
     img.style.width = zoom * 100 + "%";
     box.scrollLeft = fx * img.offsetWidth - (ev.clientX - rect.left);
     box.scrollTop = fy * img.offsetHeight - (ev.clientY - rect.top);
+    save();
   }}, {{ passive: false }});
+  box.addEventListener("scroll", scheduleSave, {{ passive: true }});
   box.addEventListener("dblclick", function () {{
     zoom = 1.0;
     img.style.width = "100%";
+    save();
   }});
+  try {{
+    const stored = JSON.parse(localStorage.getItem(key) || "null");
+    if (stored && isFinite(stored.zoom)) {{
+      const z = Math.min(max, Math.max(min, stored.zoom));
+      const x = Number(stored.x) || 0;
+      const y = Number(stored.y) || 0;
+      const restore = function () {{
+        zoom = z;
+        img.style.width = zoom * 100 + "%";
+        box.scrollLeft = x;
+        box.scrollTop = y;
+      }};
+      if (img.complete && img.naturalWidth > 0) restore();
+      else img.addEventListener("load", restore, {{ once: true }});
+    }}
+  }} catch (e) {{}}
 }})();
 </script>
 """
 
 
-def _render_comparison_view(image: np.ndarray, height: int) -> None:
-    """Render one already-normalized image as a capped, zoomable view."""
+def _render_comparison_view(image: np.ndarray, height: int, view_id: str) -> None:
+    """Render one already-normalized image as a capped, zoomable view.
+
+    ``view_id`` keeps the zoom across Streamlit reruns (see
+    :func:`build_zoomable_image_html`): each of the six comparison slots has
+    its own stable id, so a slider tick rebuilds the iframe but restores the
+    zoom the slot had.
+    """
     from streamlit.components.v1 import html as component_html
 
     component_html(
-        build_zoomable_image_html(png_data_uri(image)),
+        build_zoomable_image_html(png_data_uri(image), view_id),
         height=height,
         scrolling=False,
     )
@@ -1111,6 +1155,7 @@ def render_comparison_tab() -> None:
             _render_comparison_view(
                 projection_display_image(measured[meas_index], window, meas_spacing),
                 height=view_height,
+                view_id="sino-proj-meas",
             )
         else:
             _render_placeholder(
@@ -1123,6 +1168,7 @@ def render_comparison_tab() -> None:
             _render_comparison_view(
                 projection_display_image(simulated[sim_index], window, sim_spacing),
                 height=view_height,
+                view_id="sino-proj-sim",
             )
         else:
             _render_placeholder(
@@ -1141,7 +1187,7 @@ def render_comparison_tab() -> None:
             # above, then the image — otherwise the difference image starts
             # one caption-line higher than its neighbours.
             st.caption("Difference (measured − simulated)")
-            _render_comparison_view(diff, height=view_height)
+            _render_comparison_view(diff, height=view_height, view_id="sino-proj-diff")
         elif n_meas and n_sim:
             _render_placeholder(
                 f"Shapes differ ({measured.shape} vs {simulated.shape}) — preset "
@@ -1181,6 +1227,7 @@ def render_comparison_tab() -> None:
             _render_comparison_view(
                 window_image(row_sinogram(measured, meas_row), window),
                 height=view_height,
+                view_id="sino-row-meas",
             )
         else:
             _render_placeholder("No measured data for a row sinogram.")
@@ -1191,6 +1238,7 @@ def render_comparison_tab() -> None:
             _render_comparison_view(
                 window_image(row_sinogram(simulated, sim_row), window),
                 height=view_height,
+                view_id="sino-row-sim",
             )
         else:
             _render_placeholder("Run the forward projection to fill this row.")
@@ -1201,7 +1249,7 @@ def render_comparison_tab() -> None:
                 diff_scale,
             )
             st.caption("Difference sinogram (measured − simulated)")
-            _render_comparison_view(diff, height=view_height)
+            _render_comparison_view(diff, height=view_height, view_id="sino-row-diff")
         elif n_rows_meas and n_rows_sim:
             _render_placeholder("Shapes differ — see the projection row above.")
         else:
@@ -1211,8 +1259,9 @@ def render_comparison_tab() -> None:
             )
 
     st.caption(
-        "Ctrl + mouse wheel zooms a view, double-click resets it. "
-        "A view scrolls when it is larger than its box."
+        "Ctrl + mouse wheel zooms a view, double-click resets it. The zoom "
+        "is kept when you move a slider. A view scrolls when it is larger "
+        "than its box."
     )
 
     # Own slider for the row, below the second row.
